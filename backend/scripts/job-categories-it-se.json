@@ -1,0 +1,73 @@
+{
+  "name": "IT (SE, kỹ sư hạ tầng, kỹ sư web)",
+  "children": [
+    {
+      "name": "IT Consultant / Presales",
+      "children": [
+        { "name": "IT Consultant (App / Infra)" },
+        { "name": "Presales IT" }
+      ]
+    },
+    {
+      "name": "Ứng dụng / Hệ thống (SE / Programmer)",
+      "children": [
+        { "name": "Kỹ sư ứng dụng / lập trình" },
+        { "name": "Kỹ sư hệ thống / kiến trúc" },
+        { "name": "Quản lý dự án IT (PM)" }
+      ]
+    },
+    {
+      "name": "Hạ tầng (Infrastructure)",
+      "children": [
+        { "name": "Kỹ sư hạ tầng (Server / Network / Cloud)" },
+        { "name": "Kỹ sư dữ liệu / DB" },
+        { "name": "Vận hành – giám sát hệ thống" }
+      ]
+    },
+    {
+      "name": "Support / Helpdesk",
+      "children": [
+        { "name": "IT Support / Technical Support" },
+        { "name": "Helpdesk" },
+        { "name": "IT Comtor / BrSE" }
+      ]
+    },
+    {
+      "name": "IT nội bộ (In-house / Corporate IT)",
+      "children": [
+        { "name": "IT nội bộ (ứng dụng)" },
+        { "name": "IT nội bộ (hạ tầng / chiến lược IT)" }
+      ]
+    },
+    {
+      "name": "R&D / Engineering",
+      "children": [
+        { "name": "Kỹ sư R&D" },
+        { "name": "Nhóm QA / Test" },
+        { "name": "QA / Tester" }
+      ]
+    },
+    {
+      "name": "Web Service / Mobile App / Data",
+      "children": [
+        { "name": "Data Analyst / Data Scientist" },
+        { "name": "Web Engineer (Front-end / Back-end / Full-stack)" },
+        { "name": "Web PM" },
+        { "name": "Mobile App Engineer (iOS / Android)" }
+      ]
+    },
+    {
+      "name": "Embedded / Network / IoT",
+      "children": [
+        { "name": "Kỹ sư phần mềm nhúng / IoT" }
+      ]
+    },
+    {
+      "name": "Security",
+      "children": [
+        { "name": "Security Engineer" },
+        { "name": "Security Consultant" }
+      ]
+    }
+  ]
+}

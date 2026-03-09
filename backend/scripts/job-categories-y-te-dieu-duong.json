@@ -1,0 +1,38 @@
+{
+  "name": "Y tế - Điều dưỡng",
+  "children": [
+    {
+      "name": "Điều dưỡng – chăm sóc",
+      "children": [
+        { "name": "Điều dưỡng viên" },
+        { "name": "Trợ lý điều dưỡng" },
+        { "name": "Điều dưỡng trưởng / quản lý điều dưỡng" }
+      ]
+    },
+    {
+      "name": "Y tế – chăm sóc sức khỏe (khác)",
+      "children": [
+        { "name": "Kỹ thuật viên y tế" },
+        { "name": "Hộ lý / chăm sóc người cao tuổi" },
+        { "name": "Nhân viên y tế khác" }
+      ]
+    },
+    {
+      "name": "Y tế chuyên môn cao",
+      "children": [
+        { "name": "Bác sĩ / Nha sĩ" },
+        { "name": "Dược sĩ" },
+        { "name": "Kỹ thuật xét nghiệm / chẩn đoán hình ảnh" },
+        { "name": "Chuyên gia tâm lý – tư vấn tâm lý" }
+      ]
+    },
+    {
+      "name": "Phúc lợi – chăm sóc xã hội",
+      "children": [
+        { "name": "Nhân viên phúc lợi xã hội" },
+        { "name": "Nhân viên chăm sóc tại nhà" },
+        { "name": "Quản lý cơ sở phúc lợi" }
+      ]
+    }
+  ]
+}

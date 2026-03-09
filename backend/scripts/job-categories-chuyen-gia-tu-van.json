@@ -1,0 +1,49 @@
+{
+  "name": "Chuyên gia tư vấn / Luật – kế toán / Tài chính / Bất động sản",
+  "children": [
+    {
+      "name": "Tư vấn kinh doanh – chiến lược",
+      "children": [
+        { "name": "Tư vấn chiến lược, điều hành doanh nghiệp" },
+        { "name": "Tư vấn tổ chức, nhân sự" },
+        { "name": "Tư vấn cải tiến quy trình, vận hành" }
+      ]
+    },
+    {
+      "name": "Tư vấn tài chính – kế toán",
+      "children": [
+        { "name": "Tư vấn tài chính doanh nghiệp" },
+        { "name": "Tư vấn kế toán, kiểm soát tài chính" }
+      ]
+    },
+    {
+      "name": "Tư vấn sản xuất – kỹ thuật",
+      "children": [
+        { "name": "Tư vấn sản xuất, kỹ thuật" },
+        { "name": "Tư vấn quản lý chất lượng" }
+      ]
+    },
+    {
+      "name": "Luật – pháp lý – sở hữu trí tuệ",
+      "children": [
+        { "name": "Luật sư" },
+        { "name": "Sở hữu trí tuệ, bằng sáng chế" }
+      ]
+    },
+    {
+      "name": "Kế toán – thuế – kiểm toán",
+      "children": [
+        { "name": "Kế toán" },
+        { "name": "Kiểm toán" },
+        { "name": "Tư vấn thuế" }
+      ]
+    },
+    {
+      "name": "Hành chính – pháp lý chuyên môn",
+      "children": [
+        { "name": "Thủ tục pháp lý, giấy phép" },
+        { "name": "Lao động, bảo hiểm xã hội" }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,188 @@
+{
+  "rirekisho": {
+    "creation_date": "2025年11月11日",
+    "name_furigana": "ほー ごっく ほあん あいん",
+    "full_name": "HO NGOC HOANG ANH",
+    "birth_date": "2002-08-29",
+    "age": 23,
+    "gender": "男",
+    "postal_code": "165-0027",
+    "address": "東京都中野区野方1-46-8 フラット中野101号",
+    "address_furigana": null,
+    "phone": "070-8514-8959",
+    "email": "hnhaa29@gmail.com",
+    "emergency_contact_address": null,
+    "education_history": [
+      {
+        "year": 2017,
+        "month": 9,
+        "description": "（ベトナム）NGUYEN KHUYEN 高等学校 入学"
+      },
+      {
+        "year": 2020,
+        "month": 6,
+        "description": "（ベトナム）NGUYEN KHUYEN 高等学校 卒業"
+      },
+      {
+        "year": 2020,
+        "month": 9,
+        "description": "（ベトナム）情報技術大学 入学"
+      },
+      {
+        "year": 2021,
+        "month": 12,
+        "description": "（ベトナム）情報技術大学 退学"
+      },
+      {
+        "year": 2022,
+        "month": 4,
+        "description": "（日本）ASUKA 学院日本語学校 入学"
+      },
+      {
+        "year": 2024,
+        "month": 3,
+        "description": "（日本）ASUKA 学院日本語学校 卒業"
+      },
+      {
+        "year": 2024,
+        "month": 4,
+        "description": "（日本）マネジメントイノベーションテクノロジー専門学校 入学"
+      },
+      {
+        "year": 2026,
+        "month": 3,
+        "description": "（日本）マネジメントイノベーションテクノロジー専門学校 卒業見込み"
+      }
+    ],
+    "work_history": [
+      {
+        "year": 2021,
+        "month": 6,
+        "description": "（ベトナム） Everrise Vietnam有限会社 開始"
+      },
+      {
+        "year": 2022,
+        "month": 2,
+        "description": "（ベトナム） Everrise Vietnam有限会社 終了"
+      },
+      {
+        "year": 2025,
+        "month": 4,
+        "description": "（日本）リッケイソフト株式会社 インターンシップ 開始"
+      },
+      {
+        "year": 2025,
+        "month": 7,
+"description": "（日本）リッケイソフト株式会社 インターンシップ 終了"
+      }
+    ],
+    "licenses_qualifications": [
+      {
+        "year": 2020,
+        "month": 12,
+        "name": "（日本）TOEIC公開テスト680点取得"
+      },
+      {
+        "year": 2022,
+        "month": 4,
+        "name": "（日本）Microsoft Certified: Azure Fundamentals (AZ-900) 取得"
+      },
+      {
+        "year": 2022,
+        "month": 11,
+        "name": "（日本）Microsoft Certified: Security, Compliance, and Identity Fundamentals (SC-900) 取得"
+      },
+      {
+        "year": 2023,
+        "month": 7,
+        "name": "（日本）日本語能力試験 JLPT N2 取得"
+      }
+    ],
+    "nearest_station": "JR中央 線 中野 駅",
+    "dependents_count": 0,
+    "has_spouse": false,
+    "spouse_support_obligation": false,
+    "residence_status": "留学",
+    "residence_expiry": "2026-06-01",
+    "self_pr": "私は自ら課題を見つけ、積極的に学びながら解決していく姿勢を大切にしています。ベトナムおよび日本での開発インターンシップでは、JavaやReact.jsを用いたフルスタック開発を経験し、チームでのタスク管理やAPI設計、テスト工程などを実践的に学びました。分からないことがあっても、まず自分で調べ、次にチーム内で相談し、より良い解決方法を見つけるという「報連相」の習慣を身につけています。また、日本語でのコミュニケーション力にも自信があります。学校や実習先での発表や打合せでは、相手に伝わりやすい言葉を意識しながら会話を行い、チームメンバーとの信頼関係を築いてきました。新しい技術への関心が高く、Microsoft Azure Fundamentalsなどの資格も取得しています。今後も継続的にスキルを磨き、チームに貢献できるエンジニアとして成長していきたいです。",
+    "hobbies_skills": "趣味は音楽を聴くことで、特にリズムやメロディーを通じて気分をリフレッシュしています。特技はスポーツで、バドミントンやサッカーが得意です。体を動かすことで集中力とチームワークの大切さを学びました。",
+"motivation": "私は「技術を通して人の生活をより便利にしたい」という思いから、IT分野を志しました。専門学校で学んだプログラミングやシステム開発の知識を活かしながら、実際の現場で経験を積み、エンジニアとして成長したいと考えています。貴社は「未経験者からプロのエンジニアへ育てる」という明確な育成方針と、多様な人材が活躍できる環境を整えておられ、私の目指すキャリアと一致しております。また、貴社の“成長と挑戦を楽しむ”という理念にも強く共感し、自分自身もその一員として、新しい技術に積極的に挑戦しながらチームに貢献したいと考えています。将来的には、バックエンドやインフラ分野の知識も身につけ、システム設計・開発の両面で活躍できるエンジニアを目指します。",
+    "current_salary": 3000000,
+    "expected_salary": null,
+    "desired_role": "IT業界",
+    "desired_location": null,
+    "available_start_date": "2026年4月"
+  },
+  "shokumu_keirekisho": {
+    "creation_date": "2025年11月11日",
+    "full_name": "HO NGOC HOANG ANH",
+    "summary": "大学在学中よりソフトウェア開発に携わり、フロントエンドからバックエンドまで幅広く対応できるフルスタックエンジニアとして実践経験を積みました。2021年〜2022年に Everrise Vietnam有限会社 にてフロントエンドデベロッパーとして勤務し、HTML/CSS/JavaScript を用いたWebサイト開発およびUI最適化を担当。ユーザー体験向上やレスポンシブデザイン実装などを通じて、基礎的な開発スキルを習得しました。その後、2025年には リッケイソフト株式会社（日本）にて学生管理システム開発プロジェクトに参加し、Java（Spring Boot）×React.js によるフルスタック開発を経験。要件定義からテスト・デプロイまで一貫して担当し、Dockerを用いた開発環境構築やSpring Securityによる認証機能実装など、実務レベルの開発力を身につけました。日本企業でのインターン経験を通じて、報連相・品質意識・チーム協調性を重視した開発姿勢を体得しており、今後はこれらの経験を活かしてユーザー視点で価値を生み出すエンジニアとして成長していきたいと考えています。",
+    "job_history": [
+      {
+        "period_start": "2021年06月",
+        "period_end": "2022年02月",
+        "company_name": "Everrise Vietnam有限会社",
+        "business_objective": "Webアプリケーション開発、ソフトウェア設計・保守運用、ITソリューションおよびオフショア開発事業を展開。日本企業向けに高品質なシステム開発支援を提供",
+        "team_size_role": "フロントエンドデベロッパー",
+        "responsibilities": "ユーザーインターフェースの開発および保守を担当。HTML5、CSS3、JavaScript（ES6+）を用いたUI構築と最適化、API連携による動的機能実装、レスポンシブデザインの適用などを行いました。",
+"tools": [
+          "HTML/CSS",
+          "JavaScript",
+          "Git",
+          "レスポンシブデザイン",
+          "API連携",
+          "コード最適化"
+        ]
+      },
+      {
+        "period_start": "2025年04月",
+        "period_end": "2025年07月",
+        "company_name": "リッケイソフト株式会社",
+        "business_objective": "ソフトウェア開発、システム設計・保守、ITコンサルティング事業を展開。ベトナム本社と連携し、オフショア開発やラボ型開発を通じて日本企業のDX推進を支援",
+        "team_size_role": "フルスタックエンジニア",
+        "responsibilities": "学生管理システムの開発プロジェクトに参加し、フルスタックエンジニアとして開発全般を担当。主に Java（Spring Boot） を用いたバックエンドAPI開発と、React.js を用いたフロントエンド開発を担当し、要件定義からテスト・デプロイまで一連の工程を経験しました。",
+        "tools": [
+          "Java (Spring Boot)",
+          "React.js",
+          "MySQL",
+          "Spring Security",
+          "Docker",
+          "Git"
+        ]
+      }
+    ],
+    "skills_and_knowledge": [
+      "Webアプリケーション開発の実践経験",
+      "Java（Spring Boot）、React.js を用いたフルスタック開発経験",
+      "要件定義からテスト・デプロイまでの一連工程を経験",
+      "RESTful API 設計・実装、DB 設計、認証・認可機能開発",
+      "Docker を活用した開発環境構築・運用",
+      "HTML5／CSS3／JavaScript（ES6+）を用いたUI設計・最適化",
+      "レスポンシブデザイン、API連携処理、パフォーマンス改善",
+      "ページ読み込み速度25％改善、再利用可能なUIコンポーネント開発",
+      "Git を用いたバージョン管理、チーム開発・コードレビュー経験",
+      "アジャイル開発手法の理解と実践経験",
+      "クライアント要件の把握と仕様調整スキル",
+      "日本語（JLPT N1相当）、 英語 T（OEIC 680点）、ベトナム語ネイティブ"
+    ],
+    "qualifications": [
+      {
+        "name": "（日本）TOEIC公開テスト680点取得",
+        "acquired_date": "2020年12月"
+      },
+      {
+        "name": "（日本）Microsoft Certified: Azure Fundamentals (AZ-900)",
+        "acquired_date": "2022年04月"
+      },
+      {
+        "name": "（日本）Microsoft Certified: Security, Compliance, and Identity Fundamentals (SC-900)",
+        "acquired_date": "2022年11月"
+      },
+      {
+"name": "（日本）日本語能力試験 JLPT N2",
+        "acquired_date": "2023年07月"
+      }
+    ],
+    "self_pr": "私は自ら課題を見つけ、積極的に学びながら解決していく姿勢を大切にしています。ベトナムおよび日本での開発インターンシップでは、JavaやReact.jsを用いたフルスタック開発を経験し、チームでのタスク管理やAPI設計、テスト工程などを実践的に学びました。分からないことがあっても、まず自分で調べ、次にチーム内で相談し、より良い解決方法を見つけるという「報連相」の習慣を身につけています。また、日本語でのコミュニケーション力にも自信があります。学校や実習先での発表や打合せでは、相手に伝わりやすい言葉を意識しながら会話を行い、チームメンバーとの信頼関係を築いてきました。新しい技術への関心が高く、Microsoft Azure Fundamentalsなどの資格も取得しています。今後も継続的にスキルを磨き、チームに貢献できるエンジニアとして成長していきたいです。"
+  }
+}

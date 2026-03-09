@@ -1,0 +1,42 @@
+{
+  "name": "Sáng tạo (Truyền thông / Thiết kế thời trang)",
+  "children": [
+    {
+      "name": "Truyền thông – Xuất bản – Quảng cáo",
+      "children": [
+        { "name": "Sản xuất & quản lý nội dung truyền thông" },
+        { "name": "Thiết kế đồ họa – mỹ thuật ứng dụng" },
+        { "name": "Biên tập – viết nội dung – chế bản" }
+      ]
+    },
+    {
+      "name": "Sáng tạo nội dung đa phương tiện",
+      "children": [
+        { "name": "Sản xuất & điều phối nội dung hình ảnh – sự kiện" },
+        { "name": "Biên kịch – sáng tác – nội dung kịch bản" },
+        { "name": "Kỹ thuật hình ảnh – âm thanh – sân khấu" }
+      ]
+    },
+    {
+      "name": "Thiết kế thời trang & phong cách",
+      "children": [
+        { "name": "Thiết kế thời trang – phụ kiện – dệt may" },
+        { "name": "Tạo mẫu – stylist – định hướng trưng bày" }
+      ]
+    },
+    {
+      "name": "Sáng tạo Game - Công nghệ giải trí",
+      "children": [
+        { "name": "Thiết kế & sản xuất game" },
+        { "name": "Thiết kế đồ họa – minh họa – CG" },
+        { "name": "Âm thanh & trải nghiệm người dùng game" }
+      ]
+    },
+    {
+      "name": "Khác",
+      "children": [
+        { "name": "Công việc sáng tạo khác" }
+      ]
+    }
+  ]
+}

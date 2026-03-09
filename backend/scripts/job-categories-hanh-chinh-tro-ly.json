@@ -1,0 +1,54 @@
+{
+  "name": "Hành chính - Trợ lý",
+  "children": [
+    {
+      "name": "Hành chính – Văn phòng",
+      "children": [
+        { "name": "Hành chính tổng hợp / văn phòng" },
+        { "name": "Thư ký / lễ tân / tiếp nhận hồ sơ" }
+      ]
+    },
+    {
+      "name": "Kế toán – Tài chính",
+      "children": [
+        { "name": "Trợ lý kế toán" },
+        { "name": "Trợ lý tài chính / giao dịch ngân hàng" }
+      ]
+    },
+    {
+      "name": "Nhân sự – Tuyển dụng",
+      "children": [
+        { "name": "Nhân sự tổng hợp" },
+        { "name": "Tuyển dụng / quản lý hồ sơ nhân sự" }
+      ]
+    },
+    {
+      "name": "Mua hàng – Logistics – Thương mại",
+      "children": [
+        { "name": "Mua hàng / thu mua" },
+        { "name": "Logistics / xuất nhập khẩu" }
+      ]
+    },
+    {
+      "name": "Kinh doanh – Marketing",
+      "children": [
+        { "name": "Hỗ trợ kinh doanh / bán hàng" },
+        { "name": "Marketing / truyền thông nội bộ" }
+      ]
+    },
+    {
+      "name": "Hành chính chuyên ngành",
+      "children": [
+        { "name": "Hành chính y tế" },
+        { "name": "Hành chính giáo dục / thư viện / cơ quan công" }
+      ]
+    },
+    {
+      "name": "Ngôn ngữ – Hỗ trợ chuyên môn",
+      "children": [
+        { "name": "Phiên dịch / biên dịch" },
+        { "name": "Trợ lý ngôn ngữ / hỗ trợ song ngữ" }
+      ]
+    }
+  ]
+}

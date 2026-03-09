@@ -1,0 +1,113 @@
+{
+  "name": "Kỹ thuật (cơ khí, điện – điện tử)",
+  "children": [
+    {
+      "name": "R&D / phát triển công nghệ nền (cơ khí / điện)",
+      "children": [
+        { "name": "R&D / phát triển công nghệ nền (cơ khí)" },
+        { "name": "R&D / phát triển công nghệ nền (điện)" }
+      ]
+    },
+    {
+      "name": "Thiết kế cơ khí",
+      "children": [
+        { "name": "Thiết kế máy / thiết bị công nghiệp" },
+        { "name": "Thiết kế chi tiết, cụm chi tiết (CAD cơ khí)" },
+        { "name": "Thiết kế khuôn (ép nhựa / dập / đúc)" }
+      ]
+    },
+    {
+      "name": "Sản xuất & công nghệ sản xuất",
+      "children": [
+        { "name": "Kỹ thuật sản xuất / kỹ thuật công nghệ" },
+        { "name": "Thiết kế công đoạn – cải tiến quy trình (IE)" },
+        { "name": "Lập kế hoạch & quản lý sản xuất" }
+      ]
+    },
+    {
+      "name": "Gia công – chế tạo – lắp ráp",
+      "children": [
+        { "name": "Gia công cơ khí (tiện, phay, mài, CNC)" },
+        { "name": "Lắp ráp máy / thiết bị / dây chuyền" },
+        { "name": "Chế tạo – thử nghiệm sản phẩm" }
+      ]
+    },
+    {
+      "name": "Vận hành & bảo trì",
+      "children": [
+        { "name": "Vận hành máy móc / dây chuyền" },
+        { "name": "Bảo trì cơ khí / bảo trì thiết bị" },
+        { "name": "Khắc phục sự cố hiện trường" }
+      ]
+    },
+    {
+      "name": "Phân tích – mô phỏng",
+      "children": [
+        { "name": "Phân tích CAE (kết cấu, nhiệt, rung, va đập)" },
+        { "name": "Đánh giá độ bền – thử nghiệm cơ khí" }
+      ]
+    },
+    {
+      "name": "Thiết kế điện",
+      "children": [
+        { "name": "Thiết kế điện máy / điện công nghiệp" },
+        { "name": "Thiết kế tủ điện – sơ đồ điện" },
+        { "name": "Thiết kế điện cho thiết bị / dây chuyền" }
+      ]
+    },
+    {
+      "name": "Lập trình PLC & điều khiển",
+      "children": [
+        { "name": "Lập trình PLC" },
+        { "name": "Thiết kế & vận hành hệ thống điều khiển" },
+        { "name": "Điều khiển trình tự / tự động hóa" }
+      ]
+    },
+    {
+      "name": "Lắp đặt & đi dây",
+      "children": [
+        { "name": "Lắp đặt thiết bị điện" },
+        { "name": "Đi dây tủ điện / dây chuyền sản xuất" },
+        { "name": "Cải tạo – nâng cấp hệ thống điện" }
+      ]
+    },
+    {
+      "name": "Điện tử – bán dẫn",
+      "children": [
+        { "name": "Kỹ thuật điện tử công nghiệp" },
+        { "name": "Thiết bị bán dẫn / thiết bị sản xuất bán dẫn" },
+        { "name": "Bảo trì & vận hành thiết bị điện tử" }
+      ]
+    },
+    {
+      "name": "CAD Operator",
+      "children": [
+        { "name": "CAD Operator (Cơ khí)" },
+        { "name": "CAD Operator (Điện - điện tử)" }
+      ]
+    },
+    {
+      "name": "Đánh giá - kiểm thử",
+      "children": [
+        { "name": "Đánh giá điện / điện tử" },
+        { "name": "Kiểm tra, test, nghiệm thu hệ thống" }
+      ]
+    },
+    {
+      "name": "Field Engineer - Kỹ sư hiện trường / bảo trì",
+      "children": [
+        { "name": "Kỹ sư lắp đặt – chạy thử" },
+        { "name": "Kỹ sư hỗ trợ kỹ thuật tại nhà máy" },
+        { "name": "Kỹ sư bảo trì bảo dưỡng" }
+      ]
+    },
+    {
+      "name": "Quản lý kỹ thuật",
+      "children": [
+        { "name": "Quản lý kỹ thuật / quản lý sản xuất" },
+        { "name": "Cải tạo – nâng cấp hệ thống điện" },
+        { "name": "Trưởng nhóm / tổ trưởng kỹ thuật" }
+      ]
+    }
+  ]
+}

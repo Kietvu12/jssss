@@ -1,0 +1,72 @@
+{
+  "name": "Kỹ thuật xây dựng - hạ tầng - kiến trúc",
+  "children": [
+    {
+      "name": "Nghiên cứu – Phát triển kỹ thuật & Phân tích",
+      "children": [
+        { "name": "Phát triển kỹ thuật / công pháp xây dựng" },
+        { "name": "Phân tích kết cấu / địa chất / khảo sát" }
+      ]
+    },
+    {
+      "name": "Thiết kế xây dựng – kiến trúc",
+      "children": [
+        { "name": "Thiết kế kiến trúc / kết cấu" },
+        { "name": "Thiết kế nội thất / không gian" },
+        { "name": "CAD / BIM xây dựng" }
+      ]
+    },
+    {
+      "name": "Quản lý thi công",
+      "children": [
+        { "name": "Quản lý thi công xây dựng / dân dụng" },
+        { "name": "Quản lý thi công MEP (điện, nước, HVAC, PCCC)" },
+        { "name": "Quản lý công trình hạ tầng" }
+      ]
+    },
+    {
+      "name": "Plant / Nhà máy (Thiết kế – Thi công – Vận hành)",
+      "children": [
+        { "name": "Thiết kế plant / nhà máy" },
+        { "name": "Quản lý thi công plant / nhà máy" },
+        { "name": "Vận hành – bảo trì plant / nhà máy" }
+      ]
+    },
+    {
+      "name": "Thiết kế & quản lý thiết bị – MEP",
+      "children": [
+        { "name": "Thiết kế hệ thống điện / HVAC / viễn thông" },
+        { "name": "Quản lý thiết bị – hệ thống kỹ thuật" }
+      ]
+    },
+    {
+      "name": "Bất động sản – Quản lý dự án & vận hành",
+      "children": [
+        { "name": "Phát triển dự án bất động sản" },
+        { "name": "Quản lý dự án xây dựng (bên chủ đầu tư)" },
+        { "name": "Quản lý tòa nhà / công trình sau xây dựng" }
+      ]
+    },
+    {
+      "name": "Sản xuất – An toàn – Vận hành công trình",
+      "children": [
+        { "name": "Quản lý nhà máy / công trường" },
+        { "name": "An toàn lao động – EHS / HSE" }
+      ]
+    },
+    {
+      "name": "Bóc tách – Dự toán – Kiểm soát chi phí",
+      "children": [
+        { "name": "Bóc tách khối lượng" },
+        { "name": "Dự toán / kiểm soát chi phí xây dựng" }
+      ]
+    },
+    {
+      "name": "Nhân sự hiện trường (lao động kỹ thuật)",
+      "children": [
+        { "name": "Kỹ thuật viên hiện trường" },
+        { "name": "Thợ xây dựng / lắp đặt thiết bị" }
+      ]
+    }
+  ]
+}

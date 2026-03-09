@@ -1,0 +1,66 @@
+{
+  "name": "Bán hàng - Dịch vụ",
+  "children": [
+    {
+      "name": "Bán hàng - Quản lý cửa hàng",
+      "children": [
+        { "name": "Quản lý cửa hàng / cửa hàng trưởng" },
+        { "name": "Nhân viên bán hàng – tư vấn – thu ngân" },
+        { "name": "Nhân viên sàn bán hàng / showroom" }
+      ]
+    },
+    {
+      "name": "Nhà hàng – Khách sạn – Dịch vụ ăn uống",
+      "children": [
+        { "name": "Nhân viên nhà hàng / phục vụ / bếp" },
+        { "name": "Lễ tân – đặt phòng – vận hành khách sạn" },
+        { "name": "Quản lý ca / quản lý nhà hàng – khách sạn" }
+      ]
+    },
+    {
+      "name": "Dịch vụ khách hàng / Chăm sóc khách hàng",
+      "children": [
+        { "name": "Chăm sóc khách hàng / hỗ trợ khách hàng" },
+        { "name": "Tổng đài / call center / operator" },
+        { "name": "Giám sát ca / tổ trưởng dịch vụ" }
+      ]
+    },
+    {
+      "name": "Vận hành – kho vận – giao nhận",
+      "children": [
+        { "name": "Nhân viên kho / đóng gói / phân loại" },
+        { "name": "Lái xe giao hàng / tài xế" },
+        { "name": "Vận hành logistics cơ bản" }
+      ]
+    },
+    {
+      "name": "Dịch vụ cá nhân – chăm sóc",
+      "children": [
+        { "name": "Làm đẹp / spa / thẩm mỹ" },
+        { "name": "Massage – chăm sóc sức khỏe" },
+        { "name": "Dịch vụ cá nhân khác" }
+      ]
+    },
+    {
+      "name": "An ninh – vệ sinh – bảo trì cơ bản",
+      "children": [
+        { "name": "Bảo vệ / giám sát" },
+        { "name": "Vệ sinh – làm sạch" },
+        { "name": "Bảo trì đơn giản" }
+      ]
+    },
+    {
+      "name": "Giáo dục – chăm sóc trẻ",
+      "children": [
+        { "name": "Giáo viên / trợ giảng" },
+        { "name": "Nhân viên hỗ trợ trường – lớp" }
+      ]
+    },
+    {
+      "name": "Khác",
+      "children": [
+        { "name": "Công việc dịch vụ khác" }
+      ]
+    }
+  ]
+}

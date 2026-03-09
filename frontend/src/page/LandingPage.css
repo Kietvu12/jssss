@@ -1,0 +1,107 @@
+/* Landing page: Montserrat + sakura + scroll animation */
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800;900&display=swap');
+
+.landing-page {
+  font-family: 'Montserrat', sans-serif;
+}
+
+/* Ghi đè màu xanh mặc định của thẻ a/Link trong index.css - link dùng đúng màu theo thiết kế */
+.landing-page a {
+  color: #212529;
+}
+.landing-page a:hover {
+  color: #212529;
+}
+.landing-page footer a {
+  color: #ADB5BD;
+}
+.landing-page footer a:hover {
+  color: #fff;
+}
+
+/* Container chung: đẩy nội dung đều 2 lề, match style (max-width 1300px, padding 40px như mẫu) */
+.landing-container {
+  max-width: 1300px;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: 24px;
+  padding-right: 24px;
+}
+@media (min-width: 1024px) {
+  .landing-container {
+    padding-left: 40px;
+    padding-right: 40px;
+  }
+}
+
+/* Sakura container & petals */
+.sakura-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 9999;
+  overflow: hidden;
+}
+
+.sakura-petal {
+  position: absolute;
+  background: #ED212F;
+  border-radius: 50% 0 50% 50%;
+  transform: rotate(45deg);
+  animation: sakura-fall linear forwards;
+}
+
+@keyframes sakura-fall {
+  0% {
+    transform: translateY(-100px) rotate(45deg) rotateZ(0deg);
+    opacity: 0.8;
+  }
+  100% {
+    transform: translateY(100vh) rotate(45deg) rotateZ(360deg);
+    opacity: 0;
+  }
+}
+
+/* Fade-in on scroll */
+.landing-fade-in {
+  opacity: 0;
+  transform: translateY(30px);
+  transition: opacity 0.6s ease, transform 0.6s ease;
+}
+
+.landing-fade-in.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Nav link underline on hover */
+.landing-nav-link {
+  position: relative;
+}
+.landing-nav-link::after {
+  content: '';
+  position: absolute;
+  bottom: -4px;
+  left: 0;
+  width: 0;
+  height: 2px;
+  background: #ED212F;
+  transition: width 0.3s ease;
+}
+.landing-nav-link:hover::after {
+  width: 100%;
+}
+
+.landing-nav-link:hover {
+  color: #ED212F !important;
+}
+
+/* Đảm bảo hero luôn nằm dưới navbar (fixed header) */
+@media (min-width: 768px) {
+  .landing-hero-section {
+    padding-top: 200px !important;
+  }
+}

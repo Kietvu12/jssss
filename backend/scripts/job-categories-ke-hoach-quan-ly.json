@@ -1,0 +1,68 @@
+{
+  "name": "Kế hoạch - Quản lý",
+  "children": [
+    {
+      "name": "Nhân sự (HR)",
+      "children": [
+        { "name": "HR tuyển dụng / đào tạo" },
+        { "name": "HR lương & phúc lợi / quan hệ lao động" }
+      ]
+    },
+    {
+      "name": "Truyền thông – IR",
+      "children": [
+        { "name": "Truyền thông / PR" },
+        { "name": "IR (quan hệ nhà đầu tư)" }
+      ]
+    },
+    {
+      "name": "Kế toán – Tài chính",
+      "children": [
+        { "name": "Kế toán quản trị" },
+        { "name": "Kiểm soát nội bộ" }
+      ]
+    },
+    {
+      "name": "Tổng vụ – Pháp chế – SHTT",
+      "children": [
+        { "name": "Tổng vụ / Pháp chế" },
+        { "name": "Kiểm soát / kiểm toán nội bộ" }
+      ]
+    },
+    {
+      "name": "Phân tích dữ liệu / Nghiên cứu",
+      "children": [
+        { "name": "Phân tích dữ liệu" },
+        { "name": "Nghiên cứu thị trường" }
+      ]
+    },
+    {
+      "name": "Kế hoạch kinh doanh / Chiến lược",
+      "children": [
+        { "name": "Kế hoạch kinh doanh" },
+        { "name": "Chiến lược / phát triển dự án" }
+      ]
+    },
+    {
+      "name": "Marketing / Sản phẩm",
+      "children": [
+        { "name": "Marketing" },
+        { "name": "Quản lý sản phẩm / dịch vụ" }
+      ]
+    },
+    {
+      "name": "Chuỗi cung ứng / Mua hàng / Logistics",
+      "children": [
+        { "name": "Mua hàng / SCM" },
+        { "name": "Logistics / kho vận" }
+      ]
+    },
+    {
+      "name": "Quản lý cấp cao / Điều hành",
+      "children": [
+        { "name": "Điều hành / Ban lãnh đạo (CEO / CFO / COO)" },
+        { "name": "Quản lý tổng thể (Business Manager)" }
+      ]
+    }
+  ]
+}

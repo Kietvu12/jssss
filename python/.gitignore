@@ -1,0 +1,23 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+.idea/
+.vscode/
+
+/qdrant_data
+
+docs
+.env
+a.py
+ab.txt
+jobs_index.faiss
+payloads.pkl
+faiss_data
+qdrant_storage

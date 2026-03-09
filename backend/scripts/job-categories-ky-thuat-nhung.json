@@ -1,0 +1,57 @@
+{
+  "name": "Kỹ thuật (Lập trình nhúng)",
+  "children": [
+    {
+      "name": "Nghiên cứu – Phát triển (R&D) - Quản lý dự án nhúng",
+      "children": [
+        { "name": "R&D nhúng / phát triển lõi" },
+        { "name": "Phát triển công nghệ mới / thuật toán" },
+        { "name": "PM nhúng" }
+      ]
+    },
+    {
+      "name": "Phát triển nhúng",
+      "children": [
+        { "name": "Kỹ sư nhúng (Firmware / Driver / Middleware)" },
+        { "name": "Kỹ sư nhúng theo thiết bị (MCU / SoC)" }
+      ]
+    },
+    {
+      "name": "Nhúng theo lĩnh vực thiết bị",
+      "children": [
+        { "name": "Nhúng ô tô / xe điện" },
+        { "name": "Nhúng thiết bị công nghiệp / robot" },
+        { "name": "Nhúng điện tử / gia dụng / y tế" }
+      ]
+    },
+    {
+      "name": "Mobile / Network / IoT",
+      "children": [
+        { "name": "Nhúng iOS / Android / thiết bị thông minh" },
+        { "name": "Network / IoT" }
+      ]
+    },
+    {
+      "name": "Hỗ trợ kỹ thuật / Debug / Đánh giá",
+      "children": [
+        { "name": "QA / Test nhúng" },
+        { "name": "Technical support nhúng" },
+        { "name": "Debug / Verification" }
+      ]
+    },
+    {
+      "name": "Giao diện – Xử lý tín hiệu",
+      "children": [
+        { "name": "UI nhúng" },
+        { "name": "Xử lý ảnh / tín hiệu / âm thanh" }
+      ]
+    },
+    {
+      "name": "Presales / Tư vấn",
+      "children": [
+        { "name": "Presales nhúng" },
+        { "name": "Tư vấn quy trình / chất lượng phát triển" }
+      ]
+    }
+  ]
+}

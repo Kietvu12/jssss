@@ -1,0 +1,36 @@
+{
+  "name": "Kỹ thuật (hóa học, vật liệu, mỹ phẩm, sản phẩm tiêu dùng)",
+  "children": [
+    {
+      "name": "Nghiên cứu – Phát triển & Công nghệ",
+      "children": [
+        { "name": "R&D hóa học / vật liệu / mỹ phẩm" },
+        { "name": "Phát triển sản phẩm" },
+        { "name": "Phát triển quy trình / công nghệ (công thức, phối trộn)" }
+      ]
+    },
+    {
+      "name": "Phân tích – Đo lường – Thử nghiệm",
+      "children": [
+        { "name": "Phân tích / đánh giá tính chất" },
+        { "name": "Thử nghiệm sản phẩm / nguyên liệu" }
+      ]
+    },
+    {
+      "name": "Quản lý chất lượng & Pháp chế (QA / QC / RA)",
+      "children": [
+        { "name": "QA / QC hóa học – vật liệu – mỹ phẩm" },
+        { "name": "Đảm bảo chất lượng / giám sát" },
+        { "name": "Pháp chế – đăng ký sản phẩm (RA)" }
+      ]
+    },
+    {
+      "name": "Sản xuất – Vận hành – Hỗ trợ kỹ thuật",
+      "children": [
+        { "name": "Kỹ sư ứng dụng / hỗ trợ kỹ thuật" },
+        { "name": "Kỹ thuật sản xuất / vận hành" },
+        { "name": "Tổ trưởng / quản lý sản xuất – nhà máy" }
+      ]
+    }
+  ]
+}

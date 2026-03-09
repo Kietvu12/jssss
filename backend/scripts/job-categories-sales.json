@@ -1,0 +1,84 @@
+{
+  "name": "Kinh doanh - Sales",
+  "children": [
+    {
+      "name": "IT",
+      "children": [
+        { "name": "Sales IT (B2B – trực tiếp)" },
+        { "name": "Sales IT (B2B – qua đại lý)" },
+        { "name": "Sales giải pháp IT / Web" },
+        { "name": "Sales IT cá nhân" }
+      ]
+    },
+    {
+      "name": "Bán dẫn – điện tử",
+      "children": [
+        { "name": "Sales bán dẫn / linh kiện điện tử (nội địa)" },
+        { "name": "Sales bán dẫn / linh kiện điện tử (quốc tế)" }
+      ]
+    },
+    {
+      "name": "Ô tô – máy móc",
+      "children": [
+        { "name": "Sales máy móc / thiết bị công nghiệp" },
+        { "name": "Sales máy chính xác / thiết bị đo" },
+        { "name": "Sales ô tô / máy xây dựng" }
+      ]
+    },
+    {
+      "name": "Nguyên liệu – hóa chất",
+      "children": [
+        { "name": "Sales nguyên liệu / vật liệu" },
+        { "name": "Sales hóa chất" }
+      ]
+    },
+    {
+      "name": "Quảng cáo – truyền thông",
+      "children": [
+        { "name": "Sales quảng cáo B2B" },
+        { "name": "Sales quảng cáo B2C" },
+        { "name": "Sales đại lý quảng cáo" },
+        { "name": "Sales quảng cáo quốc tế" }
+      ]
+    },
+    {
+      "name": "Nhân sự",
+      "children": [
+        { "name": "Sales nhân sự / phái cử" },
+        { "name": "Sales tuyển dụng / giới thiệu nhân sự" },
+        { "name": "Career consultant / Headhunter" }
+      ]
+    },
+    {
+      "name": "Y tế",
+      "children": [
+        { "name": "Sales dược (MR)" },
+        { "name": "Sales thiết bị y tế" },
+        { "name": "Sales dược OTC" },
+        { "name": "Sales life science" }
+      ]
+    },
+    {
+      "name": "Hàng tiêu dùng",
+      "children": [
+        { "name": "Sales thực phẩm / đồ uống" },
+        { "name": "Sales hàng tiêu dùng / mỹ phẩm" },
+        { "name": "Sales FMCG quốc tế" }
+      ]
+    },
+    {
+      "name": "Xây dựng – bất động sản",
+      "children": [
+        { "name": "Sales xây dựng / bất động sản (B2B)" },
+        { "name": "Sales nhà ở / bất động sản cá nhân" }
+      ]
+    },
+    {
+      "name": "Tài chính",
+      "children": [
+        { "name": "Sales tài chính doanh nghiệp" },
+        { "name": "Sales tài chính cá nhân" }
+      ]
+    }
+  ]
+}

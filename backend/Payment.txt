@@ -1,0 +1,34 @@
+trường hợp collaborator tiến cử:
+Mỗi collaborator sẽ có 1 rank level id
+Mỗi ranh level sẽ có số % tiền hoa hồng mà CTV đó sẽ được hưởng
+1. Nếu job không thuộc campaign nào
+Nếu  `job_commission_type` enum('fixed','percent') được tính theo percent
+Dựa vào điều kiện job_value và các điều kiện ở cv_storage như jplt level và experience_year để có thể tính được % hoa hồng mà SÀN được nhận (monthly_salary * 12 * % tương ứng )
+Sau đó lấy % theo level của CTV để nhân với số tiền mà sàn được nhận để tính ra được số tiền mà CTV được nhận
+
+Nếu  `job_commission_type` enum('fixed','percent') được tính theo fixed
+Đơn giản là lấy % theo level của cộng tác viên nhân với số tiền đó để ra được hoa hồng của cộng tác viên
+
+Ngoại lệ nếu id_type = 2 và id_value = 6 
+-> CTV trực tiếp nhận được số tiền bằng % theo level nhân với (monthly_salary * 12) hoặc trực tiếp số tiền nếu job_commission_type là fixed( không cần nhân %)
+Ngoại lệ nếu id_type= 2 và id_value =7
+Không cần so sánh jplt hay gì cả
+Số tiền CTV nhận được = ( monthly_salary * 12 ) * % trong job_value * % theo level ( nếu job_commission_type = percent)
+Số tiền CTV nhận được = số tiền trong job_value * % theo level của CTV nếu job_commission_type = fixed
+
+2. Nếu job thuộc campaign
+
+Nếu job thuộc campaign thì các điều kiện job_value và cả job_commission_type sẽ bị ghi đè bởi percent trong `campaign` đó
+
+số tiền CTV nhận được = (monthly_salary * 12) * percent * % theo level của CTV
+
+trường hợp là admin tiến cử ( admin tiến cử hồ sơ thuộc về admin đó thôi )
+Thì ăn đúng theo % tiền sàn, không cần nhân theo % level nữa
+
+Mỗi khi ứng cử thì sẽ mặc định tạo ra 1 payment_request. Update monthly_salary trong bảng job_applications thì sẽ tính ra tiền của payment_request đó. Nhưng status sẽ là đang chờ ( chỉ CTV ).
+Sau 3 tháng kể từ khi, cập nhật trạng thái của job_applications đó sang nyusha mà không cập nhật gì khác. Thì sẽ chuyển trạng thái của job_applications đó sang 10
+Trạng thái : 1. Admin đang xử lý hồ sơ, 2. Đang tiến cử, 3. Đang xếp lịch phỏng vấn, 4. Đang phỏng vấn, 5. Đang đợi naitei, 6. Đang thương lượng naitei, 7. Đang đợi nyusha, 8. Đã nyusha, 9. Đang chờ thanh toán với công ty, 10. Gửi yêu cầu thanh toán, 11. Đã thanh toán, 12. Hồ sơ không hợp lệ, 13. Hồ sơ bị trùng, 14. Hồ sơ không đạt, 15. Kết quả trượt, 16. Hủy giữa chừng, 17. Không shodaku|
+Và trạng thái của payment request đó sang Đã duyệt.
+status` tinyint(4) NOT NULL DEFAULT 0 COMMENT '0: Chỉ duyệt, 1: Đã duyệt, 2: Từ chối, 3: Đã thanh toán',
+Khi admin cập nhật đã thanh toán -> job_applications tự động chuyển sang trạng thái 11.
+

@@ -1,0 +1,43 @@
+{
+  "name": "Kỹ thuật (thực phẩm, hương liệu, thức ăn chăn nuôi)",
+  "children": [
+    {
+      "name": "Nghiên cứu – Phát triển & Công nghệ",
+      "children": [
+        { "name": "R&D thực phẩm / hương liệu / thức ăn chăn nuôi" },
+        { "name": "Phát triển sản phẩm / ứng dụng" },
+        { "name": "Phát triển quy trình / công nghệ sản xuất" }
+      ]
+    },
+    {
+      "name": "Quản lý chất lượng & Pháp chế (QA / QC / RA)",
+      "children": [
+        { "name": "QA / QC thực phẩm – hương liệu – thức ăn chăn nuôi" },
+        { "name": "Đảm bảo chất lượng / giám sát" },
+        { "name": "Pháp chế – tiêu chuẩn – đăng ký sản phẩm" }
+      ]
+    },
+    {
+      "name": "Sản xuất – Vận hành – Hỗ trợ kỹ thuật",
+      "children": [
+        { "name": "Kỹ thuật sản xuất / vận hành" },
+        { "name": "Hỗ trợ kỹ thuật / kỹ sư ứng dụng" },
+        { "name": "Tổ trưởng / leader sản xuất" }
+      ]
+    },
+    {
+      "name": "Phân tích – Kiểm nghiệm – Đánh giá",
+      "children": [
+        { "name": "Phân tích / kiểm nghiệm nguyên liệu & sản phẩm" },
+        { "name": "Đánh giá chất lượng / thử nghiệm" }
+      ]
+    },
+    {
+      "name": "Quản lý sản xuất – Nhà máy",
+      "children": [
+        { "name": "Quản lý sản xuất" },
+        { "name": "Trưởng xưởng / quản lý nhà máy" }
+      ]
+    }
+  ]
+}
