@@ -1,6 +1,7 @@
 import express from 'express';
 import { messageController } from '../controllers/collaborator/messageController.js';
 import { authenticateCTV } from '../middleware/ctvAuth.js';
+import { uploadMessageAttachment } from '../middleware/messageAttachmentUploadMiddleware.js';
 
 const router = express.Router();
 
@@ -37,7 +38,7 @@ router.get('/admins', authenticateCTV, messageController.getAdminsForMessage);
  * @desc    Create new message
  * @access  Private (CTV)
  */
-router.post('/', authenticateCTV, messageController.createMessage);
+router.post('/', authenticateCTV, uploadMessageAttachment, messageController.createMessage);
 
 /**
  * @route   PATCH /api/ctv/messages/:id/mark-read

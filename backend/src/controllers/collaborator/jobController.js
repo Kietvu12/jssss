@@ -356,22 +356,32 @@ export const jobController = {
 
   /**
    * Lấy URL xem/tải file JD hoặc required CV form (S3 signed URL hoặc URL tĩnh)
-   * GET /api/ctv/jobs/:id/view-url?fileType=jdFile|requiredCvForm&purpose=view|download
+   * GET /api/ctv/jobs/:id/view-url?fileType=jdFile|jdFileEn|jdFileJp|jdOriginalFile|requiredCvForm&purpose=view|download
    */
   getJobFileUrl: async (req, res, next) => {
     try {
       const { id } = req.params;
       const { fileType = 'jdFile', purpose = 'view' } = req.query;
 
-      const job = await Job.findByPk(id, { attributes: ['id', 'jdFile', 'requiredCvForm'] });
+      const job = await Job.findByPk(id, {
+        attributes: ['id', 'jdFile', 'jdFileEn', 'jdFileJp', 'jdOriginalFile', 'requiredCvForm']
+      });
       if (!job) {
         return res.status(404).json({ success: false, message: 'Không tìm thấy việc làm' });
       }
 
-      // Lấy path file (Sequelize map jd_file -> jdFile, dùng get() để fallback)
-      const filePath = fileType === 'requiredCvForm'
-        ? (job.requiredCvForm ?? job.get?.('required_cv_form'))
-        : (job.jdFile ?? job.get?.('jd_file'));
+      let filePath;
+      if (fileType === 'requiredCvForm') {
+        filePath = job.requiredCvForm ?? job.get?.('required_cv_form');
+      } else if (fileType === 'jdFileEn') {
+        filePath = job.jdFileEn ?? job.get?.('jd_file_en');
+      } else if (fileType === 'jdFileJp') {
+        filePath = job.jdFileJp ?? job.get?.('jd_file_jp');
+      } else if (fileType === 'jdOriginalFile') {
+        filePath = job.jdOriginalFile ?? job.get?.('jd_original_file');
+      } else {
+        filePath = job.jdFile ?? job.get?.('jd_file');
+      }
       if (!filePath) {
         return res.status(404).json({ success: false, message: 'File không tồn tại' });
       }
@@ -744,17 +754,22 @@ export const jobController = {
         1
       );
 
-      console.log(`[GetJobsByCampaign] Campaign ID: ${campaignId}, Jobs returned: ${jobsWithFavorite.length}, Total: ${count}`);
+      // Dùng jobIds.length làm total vì findAndCountAll với include có thể đếm sai
+      const total = jobIds.length;
+      const limitNum = parseInt(limit);
+      const totalPages = Math.ceil(total / limitNum);
+
+      console.log(`[GetJobsByCampaign] Campaign ID: ${campaignId}, Jobs returned: ${jobsWithFavorite.length}, Total: ${total}`);
 
       res.json({
         success: true,
         data: {
           jobs: jobsWithFavorite,
           pagination: {
-            total: count,
+            total,
             page: parseInt(page),
-            limit: parseInt(limit),
-            totalPages: Math.ceil(count / parseInt(limit))
+            limit: limitNum,
+            totalPages
           }
         }
       });
@@ -932,17 +947,22 @@ export const jobController = {
         return jobData;
       });
 
-      console.log(`[GetJobsByJobPickup] Job Pickup ID: ${jobPickupId}, Jobs returned: ${jobsWithFavorite.length}, Total: ${count}`);
+      // Dùng jobIds.length làm total vì findAndCountAll với include có thể đếm sai (đếm theo bảng join)
+      const total = jobIds.length;
+      const limitNum = parseInt(limit);
+      const totalPages = Math.ceil(total / limitNum);
+
+      console.log(`[GetJobsByJobPickup] Job Pickup ID: ${jobPickupId}, Jobs returned: ${jobsWithFavorite.length}, Total: ${total}`);
 
       res.json({
         success: true,
         data: {
           jobs: jobsWithFavorite,
           pagination: {
-            total: count,
+            total,
             page: parseInt(page),
-            limit: parseInt(limit),
-            totalPages: Math.ceil(count / parseInt(limit))
+            limit: limitNum,
+            totalPages
           }
         }
       });

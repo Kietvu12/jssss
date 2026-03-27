@@ -4,10 +4,12 @@ import {
   JobApplication,
   Job,
   Company,
+  CVStorage,
   Admin,
   ActionLog
 } from '../../models/index.js';
 import { createPaymentUpdateMessage } from '../../services/paymentMessageService.js';
+import { collaboratorNotificationService } from '../../services/collaboratorNotificationService.js';
 import { Op } from 'sequelize';
 
 // Helper function to map model field names to database column names
@@ -135,13 +137,19 @@ export const paymentRequestController = {
             model: JobApplication,
             as: 'jobApplication',
             required: false,
-            attributes: ['id', 'title', 'status', 'nyushaDate', 'expectedPaymentDate'],
+            attributes: ['id', 'cvCode', 'jobId', 'title', 'status', 'nyushaDate', 'expectedPaymentDate'],
             include: [
+              {
+                model: CVStorage,
+                as: 'cv',
+                required: false,
+                attributes: ['id', 'code', 'name']
+              },
               {
                 model: Job,
                 as: 'job',
                 required: false,
-                attributes: ['id', 'jobCode', 'title'],
+                attributes: ['id', 'jobCode', 'title', 'slug'],
                 include: [
                   {
                     model: Company,
@@ -289,6 +297,25 @@ export const paymentRequestController = {
           amount: paymentRequest.amount,
           note: note || null
         });
+
+        try {
+          const detail = await JobApplication.findByPk(paymentRequest.jobApplicationId, {
+            include: [
+              { model: Job, as: 'job', required: false, attributes: ['id', 'jobCode', 'title'] },
+              { model: CVStorage, as: 'cv', required: false, attributes: ['id', 'name', 'code'] }
+            ]
+          });
+          await collaboratorNotificationService.notifyPaymentApprovedOrPaid({
+            collaboratorId: paymentRequest.collaboratorId,
+            candidateName: detail?.cv?.name || null,
+            jobCode: detail?.job?.jobCode || String(paymentRequest.jobApplicationId),
+            jobId: detail?.jobId || null,
+            jobApplicationId: paymentRequest.jobApplicationId,
+            action: 'approved'
+          });
+        } catch (notificationError) {
+          console.error('[Payment approve] Error creating notification:', notificationError);
+        }
       }
 
       // Log action
@@ -376,6 +403,25 @@ export const paymentRequestController = {
           rejectedReason,
           note: note || null
         });
+
+        try {
+          const detail = await JobApplication.findByPk(paymentRequest.jobApplicationId, {
+            include: [
+              { model: Job, as: 'job', required: false, attributes: ['id', 'jobCode', 'title'] },
+              { model: CVStorage, as: 'cv', required: false, attributes: ['id', 'name', 'code'] }
+            ]
+          });
+          await collaboratorNotificationService.notifyPaymentApprovedOrPaid({
+            collaboratorId: paymentRequest.collaboratorId,
+            candidateName: detail?.cv?.name || null,
+            jobCode: detail?.job?.jobCode || String(paymentRequest.jobApplicationId),
+            jobId: detail?.jobId || null,
+            jobApplicationId: paymentRequest.jobApplicationId,
+            action: 'paid'
+          });
+        } catch (notificationError) {
+          console.error('[Payment mark_paid] Error creating notification:', notificationError);
+        }
       }
 
       // Log action

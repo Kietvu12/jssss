@@ -1,5 +1,22 @@
-import { Post, Category, Admin, ActionLog } from '../../models/index.js';
+import { Post, Category, Admin, ActionLog, PostEvent } from '../../models/index.js';
 import { Op } from 'sequelize';
+import path from 'path';
+import fs from 'fs/promises';
+import { fileURLToPath } from 'url';
+import config from '../../config/index.js';
+import {
+  uploadBufferToS3,
+  getSignedUrlForFile,
+  buildPostImageKey,
+  buildPostTempImageKey,
+  buildPostThumbnailKey,
+  buildPostTempThumbnailKey,
+  copyPostTempThumbnailToPost,
+  s3Enabled
+} from '../../services/s3Service.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Helper function to map model field names to database column names
 const mapOrderField = (fieldName) => {
@@ -12,6 +29,35 @@ const mapOrderField = (fieldName) => {
   };
   return fieldMap[fieldName] || fieldName;
 };
+
+// DB uses title_jp, content_jp, ...; frontend expects titleJa, contentJa, ...
+const serializePostForFrontend = (p, eventIdValue = null) => {
+  const j = p && typeof p.toJSON === 'function' ? p.toJSON() : { ...p };
+  const out = {
+    ...j,
+    titleJa: j.titleJp,
+    contentJa: j.contentJp,
+    metaTitleJa: j.metaTitleJp,
+    metaDescriptionJa: j.metaDescriptionJp,
+    slugEn: j.slugEn ?? '',
+    slugJa: j.slugJa ?? ''
+  };
+  if (eventIdValue !== undefined && eventIdValue !== null) {
+    out.eventId = eventIdValue;
+  }
+  return out;
+};
+
+/** Trả về URL hiển thị cho thumbnail: nếu là S3 key thì lấy signed URL, không thì giữ nguyên (path local hoặc URL). */
+async function resolvePostThumbnailUrl(thumbnail) {
+  if (!thumbnail || typeof thumbnail !== 'string') return thumbnail;
+  if (thumbnail.startsWith('http://') || thumbnail.startsWith('https://')) return thumbnail;
+  if (s3Enabled()) {
+    const url = await getSignedUrlForFile(thumbnail, 'view');
+    return url || thumbnail;
+  }
+  return thumbnail;
+}
 
 /**
  * Post Management Controller (Admin)
@@ -115,12 +161,15 @@ export const postController = {
         } else {
           post.dataValues.category = null;
         }
+        if (post.thumbnail) {
+          post.dataValues.thumbnail = await resolvePostThumbnailUrl(post.thumbnail);
+        }
       }
 
       res.json({
         success: true,
         data: {
-          posts: rows,
+          posts: rows.map(serializePostForFrontend),
           pagination: {
             total: count,
             page: parseInt(page),
@@ -166,10 +215,18 @@ export const postController = {
       } else {
         post.dataValues.category = null;
       }
+      if (post.thumbnail) {
+        post.dataValues.thumbnail = await resolvePostThumbnailUrl(post.thumbnail);
+      }
+
+      // Linked event (first PostEvent for this post)
+      let eventIdForFrontend = null;
+      const postEvent = await PostEvent.findOne({ where: { postId: id } });
+      if (postEvent) eventIdForFrontend = postEvent.eventId;
 
       res.json({
         success: true,
-        data: { post }
+        data: { post: serializePostForFrontend(post, eventIdForFrontend) }
       });
     } catch (error) {
       next(error);
@@ -187,28 +244,50 @@ export const postController = {
         content,
         slug,
         image,
+        thumbnail,
         status = 1,
         type = 1,
         categoryId,
+        eventId: bodyEventId,
         tag,
         metaTitle,
         metaDescription,
         metaKeywords,
         metaImage,
         metaUrl,
-        publishedAt
+        publishedAt,
+        titleEn,
+        titleJa,
+        titleJp,
+        contentEn,
+        contentJa,
+        contentJp,
+        metaTitleEn,
+        metaTitleJa,
+        metaTitleJp,
+        metaDescriptionEn,
+        metaDescriptionJa,
+        metaDescriptionJp
       } = req.body;
 
-      // Validate required fields
-      if (!title || !content || !slug) {
+      const _titleJp = titleJp ?? titleJa;
+      const _contentJp = contentJp ?? contentJa;
+      const _metaTitleJp = metaTitleJp ?? metaTitleJa;
+      const _metaDescriptionJp = metaDescriptionJp ?? metaDescriptionJa;
+
+      const hasTitle = !!(title?.trim() || titleEn?.trim() || _titleJp?.trim());
+      const hasContent = !!(content?.trim() || contentEn?.trim() || _contentJp?.trim());
+      const hasSlug = !!(slug?.trim());
+      if (!hasTitle || !hasContent || !hasSlug) {
         return res.status(400).json({
           success: false,
-          message: 'Tiêu đề, nội dung và slug là bắt buộc'
+          message: 'Cần ít nhất một ngôn ngữ cho tiêu đề, nội dung và slug (VI)'
         });
       }
+      const mainSlug = (slug && slug.trim()) || '';
 
       // Check if slug already exists
-      const existingPost = await Post.findOne({ where: { slug } });
+      const existingPost = await Post.findOne({ where: { slug: mainSlug } });
       if (existingPost) {
         return res.status(409).json({
           success: false,
@@ -227,11 +306,14 @@ export const postController = {
         }
       }
 
+      let thumbnailToSave = thumbnail?.trim() || null;
+
       const post = await Post.create({
-        title,
-        content,
-        slug,
+        title: (title && title.trim()) || (titleEn && titleEn.trim()) || (_titleJp && _titleJp.trim()) || mainSlug,
+        content: (content && content.trim()) || contentEn?.trim() || _contentJp?.trim() || '',
+        slug: mainSlug,
         image,
+        thumbnail: thumbnailToSave,
         status,
         type,
         categoryId: categoryId ? categoryId.toString() : null,
@@ -242,8 +324,37 @@ export const postController = {
         metaKeywords,
         metaImage,
         metaUrl,
-        publishedAt: publishedAt ? new Date(publishedAt) : null
+        publishedAt: publishedAt ? new Date(publishedAt) : null,
+        titleEn: titleEn?.trim() || null,
+        titleJp: _titleJp?.trim() || null,
+        contentEn: contentEn?.trim() || null,
+        contentJp: _contentJp?.trim() || null,
+        metaTitleEn: metaTitleEn?.trim() || null,
+        metaTitleJp: _metaTitleJp?.trim() || null,
+        metaDescriptionEn: metaDescriptionEn?.trim() || null,
+        metaDescriptionJp: _metaDescriptionJp?.trim() || null
       });
+
+      // Nếu thumbnail là key temp (posts/temp/thumb_xxx), copy sang folder bài viết posts/{id}/
+      if (thumbnailToSave && s3Enabled() && thumbnailToSave.includes('posts/temp/') && thumbnailToSave.includes('thumb_')) {
+        try {
+          const newKey = await copyPostTempThumbnailToPost(thumbnailToSave, post.id);
+          if (newKey) {
+            post.thumbnail = newKey;
+            await post.save({ fields: ['thumbnail'] });
+          }
+        } catch (err) {
+          // Giữ nguyên temp key nếu copy lỗi
+        }
+      }
+
+      // Link event if provided
+      if (bodyEventId) {
+        const eventId = parseInt(bodyEventId, 10);
+        if (Number.isInteger(eventId) && eventId > 0) {
+          await PostEvent.create({ postId: post.id, eventId });
+        }
+      }
 
       // Reload with relations
       await post.reload({
@@ -261,6 +372,9 @@ export const postController = {
         const category = await Category.findByPk(post.categoryId);
         post.dataValues.category = category;
       }
+      if (post.thumbnail) {
+        post.dataValues.thumbnail = await resolvePostThumbnailUrl(post.thumbnail);
+      }
 
       // Log action
       await ActionLog.create({
@@ -275,7 +389,7 @@ export const postController = {
       res.status(201).json({
         success: true,
         message: 'Tạo bài viết thành công',
-        data: { post }
+        data: { post: serializePostForFrontend(post) }
       });
     } catch (error) {
       next(error);
@@ -300,6 +414,31 @@ export const postController = {
       }
 
       const oldData = post.toJSON();
+
+      // Không lưu signed URL vào DB: nếu client gửi thumbnail là URL (từ lần load trước) thì giữ nguyên key cũ
+      if (updateData.thumbnail && (updateData.thumbnail.startsWith('http://') || updateData.thumbnail.startsWith('https://'))) {
+        delete updateData.thumbnail;
+      }
+
+      // Map JA → Jp (DB columns are title_jp, content_jp, ...) and drop slug_en/slug_ja
+      if (updateData.titleJa !== undefined) {
+        updateData.titleJp = updateData.titleJp ?? updateData.titleJa;
+        delete updateData.titleJa;
+      }
+      if (updateData.contentJa !== undefined) {
+        updateData.contentJp = updateData.contentJp ?? updateData.contentJa;
+        delete updateData.contentJa;
+      }
+      if (updateData.metaTitleJa !== undefined) {
+        updateData.metaTitleJp = updateData.metaTitleJp ?? updateData.metaTitleJa;
+        delete updateData.metaTitleJa;
+      }
+      if (updateData.metaDescriptionJa !== undefined) {
+        updateData.metaDescriptionJp = updateData.metaDescriptionJp ?? updateData.metaDescriptionJa;
+        delete updateData.metaDescriptionJa;
+      }
+      delete updateData.slugEn;
+      delete updateData.slugJa;
 
       // Check if new slug already exists (excluding current post)
       if (updateData.slug && updateData.slug !== post.slug) {
@@ -327,6 +466,9 @@ export const postController = {
         }
       }
 
+      const eventIdFromBody = updateData.eventId !== undefined ? updateData.eventId : null;
+      delete updateData.eventId;
+
       // Update fields
       Object.keys(updateData).forEach(key => {
         if (updateData[key] !== undefined) {
@@ -341,6 +483,15 @@ export const postController = {
       });
 
       await post.save();
+
+      // Sync post–event link: replace all with single event if provided
+      await PostEvent.destroy({ where: { postId: id } });
+      if (eventIdFromBody) {
+        const eventId = parseInt(eventIdFromBody, 10);
+        if (Number.isInteger(eventId) && eventId > 0) {
+          await PostEvent.create({ postId: id, eventId });
+        }
+      }
 
       // Reload with relations
       await post.reload({
@@ -358,6 +509,9 @@ export const postController = {
         const category = await Category.findByPk(post.categoryId);
         post.dataValues.category = category;
       }
+      if (post.thumbnail) {
+        post.dataValues.thumbnail = await resolvePostThumbnailUrl(post.thumbnail);
+      }
 
       // Log action
       await ActionLog.create({
@@ -373,7 +527,7 @@ export const postController = {
       res.json({
         success: true,
         message: 'Cập nhật bài viết thành công',
-        data: { post }
+        data: { post: serializePostForFrontend(post) }
       });
     } catch (error) {
       next(error);
@@ -465,6 +619,149 @@ export const postController = {
         success: true,
         message: 'Xóa bài viết thành công'
       });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  /**
+   * Upload image for post (S3: posts/{id}/{uuid}.ext)
+   * POST /api/admin/posts/:id/upload-image
+   */
+  uploadPostImage: async (req, res, next) => {
+    try {
+      if (!req.file || !req.file.buffer) {
+        return res.status(400).json({ success: false, message: 'Vui lòng chọn file ảnh' });
+      }
+      const { id } = req.params;
+      const post = await Post.findByPk(id);
+      if (!post) {
+        return res.status(404).json({ success: false, message: 'Không tìm thấy bài viết' });
+      }
+
+      let url;
+      if (s3Enabled()) {
+        const key = buildPostImageKey(id, req.file.originalname);
+        await uploadBufferToS3(req.file.buffer, key, req.file.mimetype);
+        url = await getSignedUrlForFile(key, 'view');
+        if (!url) url = key;
+        return res.json({ success: true, data: { url, key } });
+      }
+
+      const uploadDir = path.join(process.cwd(), config.upload.dir, 'posts', String(id));
+      await fs.mkdir(uploadDir, { recursive: true });
+      const ext = path.extname(req.file.originalname) || '.jpg';
+      const filename = `${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`;
+      const filePath = path.join(uploadDir, filename);
+      await fs.writeFile(filePath, req.file.buffer);
+      url = `/uploads/posts/${id}/${filename}`;
+      res.json({ success: true, data: { url, key: url } });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  /**
+   * Upload image temp (khi tạo bài viết mới chưa có id). S3: posts/temp/{uuid}.ext
+   * POST /api/admin/posts/upload-temp
+   */
+  uploadPostTempImage: async (req, res, next) => {
+    try {
+      if (!req.file || !req.file.buffer) {
+        return res.status(400).json({ success: false, message: 'Vui lòng chọn file ảnh' });
+      }
+
+      let url;
+      if (s3Enabled()) {
+        const key = buildPostTempImageKey(req.file.originalname);
+        await uploadBufferToS3(req.file.buffer, key, req.file.mimetype);
+        url = await getSignedUrlForFile(key, 'view');
+        if (!url) url = key;
+        return res.json({ success: true, data: { url, key } });
+      }
+
+      const uploadDir = path.join(process.cwd(), config.upload.dir, 'posts', 'temp');
+      await fs.mkdir(uploadDir, { recursive: true });
+      const ext = path.extname(req.file.originalname) || '.jpg';
+      const filename = `${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`;
+      const filePath = path.join(uploadDir, filename);
+      await fs.writeFile(filePath, req.file.buffer);
+      url = `/uploads/posts/temp/${filename}`;
+      res.json({ success: true, data: { url, key: url } });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  /**
+   * Upload thumbnail cho bài viết (đã có id). S3: posts/{id}/thumb_{uuid}.ext
+   * POST /api/admin/posts/:id/upload-thumbnail
+   * Trả về { url, key }: lưu key vào DB, dùng url để preview.
+   */
+  uploadPostThumbnail: async (req, res, next) => {
+    try {
+      if (!req.file || !req.file.buffer) {
+        return res.status(400).json({ success: false, message: 'Vui lòng chọn file ảnh' });
+      }
+      const { id } = req.params;
+      const post = await Post.findByPk(id);
+      if (!post) {
+        return res.status(404).json({ success: false, message: 'Không tìm thấy bài viết' });
+      }
+
+      let url;
+      let key;
+      if (s3Enabled()) {
+        key = buildPostThumbnailKey(id, req.file.originalname);
+        await uploadBufferToS3(req.file.buffer, key, req.file.mimetype);
+        url = await getSignedUrlForFile(key, 'view');
+        if (!url) url = key;
+        return res.json({ success: true, data: { url, key } });
+      }
+
+      const uploadDir = path.join(process.cwd(), config.upload.dir, 'posts', String(id));
+      await fs.mkdir(uploadDir, { recursive: true });
+      const ext = path.extname(req.file.originalname) || '.jpg';
+      const filename = `thumb_${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`;
+      const filePath = path.join(uploadDir, filename);
+      await fs.writeFile(filePath, req.file.buffer);
+      url = `/uploads/posts/${id}/${filename}`;
+      key = url;
+      res.json({ success: true, data: { url, key } });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  /**
+   * Upload thumbnail tạm (khi tạo bài viết mới chưa có id). S3: posts/temp/thumb_{uuid}.ext
+   * POST /api/admin/posts/upload-thumbnail-temp
+   */
+  uploadPostTempThumbnail: async (req, res, next) => {
+    try {
+      if (!req.file || !req.file.buffer) {
+        return res.status(400).json({ success: false, message: 'Vui lòng chọn file ảnh' });
+      }
+
+      let url;
+      let key;
+      if (s3Enabled()) {
+        key = buildPostTempThumbnailKey(req.file.originalname);
+        await uploadBufferToS3(req.file.buffer, key, req.file.mimetype);
+        url = await getSignedUrlForFile(key, 'view');
+        if (!url) url = key;
+        return res.json({ success: true, data: { url, key } });
+      }
+
+      const uploadDir = path.join(process.cwd(), config.upload.dir, 'posts', 'temp');
+      await fs.mkdir(uploadDir, { recursive: true });
+      const ext = path.extname(req.file.originalname) || '.jpg';
+      const filename = `thumb_${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`;
+      const filePath = path.join(uploadDir, filename);
+      await fs.writeFile(filePath, req.file.buffer);
+      url = `/uploads/posts/temp/${filename}`;
+      key = url;
+      res.json({ success: true, data: { url, key } });
     } catch (error) {
       next(error);
     }

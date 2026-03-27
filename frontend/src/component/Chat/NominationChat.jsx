@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Send, Calendar, Clock, MessageCircle, Plus, X, DollarSign, CheckCircle, XCircle, ChevronDown, ChevronUp } from 'lucide-react';
+import { Send, Calendar, Clock, MessageCircle, Plus, X, DollarSign, CheckCircle, XCircle, ChevronDown, ChevronUp, RefreshCw, Paperclip } from 'lucide-react';
 import apiService from '../../services/api';
 import { getJobApplicationStatus, getJobApplicationStatusOptionsByLanguage, getJobApplicationStatusLabelByLanguage } from '../../utils/jobApplicationStatus';
 import { useLanguage } from '../../context/LanguageContext';
@@ -32,19 +32,55 @@ function parseStatusMessageContent(content) {
   return { isStatusChange: true, statusName, reason, paymentAmount };
 }
 
-const PINK_BORDER = '#fbc4c4';
-const PINK_HEADER_BG = '#fce7e7';
-const PINK_CARD_BG = '#fdf2f2';
+function getAttachmentKind(message) {
+  const mime = String(message?.attachmentMimeType || '').toLowerCase();
+  const name = String(message?.attachmentName || '').toLowerCase();
+  const ext = name.includes('.') ? name.split('.').pop() : '';
 
-const GREEN_BORDER = '#86efac';
-const GREEN_HEADER_BG = '#dcfce7';
-const GREEN_CARD_BG = '#f0fdf4';
+  if (mime.startsWith('image/') || ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'].includes(ext)) {
+    return 'image';
+  }
+  if (mime.startsWith('video/') || ['mp4', 'webm', 'mov', 'm4v', 'avi', 'mkv'].includes(ext)) {
+    return 'video';
+  }
+  return 'document';
+}
 
-const NominationChat = ({ jobApplicationId, userType = 'admin', onScheduleInterview, onScheduleNyusha, collaboratorId, currentStatus, onStatusUpdated }) => {
+const CARD_BORDER = '#f3f4f6';
+const CARD_HEADER_BG = '#f9fafb';
+const CARD_BG = '#ffffff';
+
+/** Trạng thái bắt buộc nhập lý do từ chối (4, 6, 10, 13, 16) */
+const STATUSES_REQUIRE_REJECTION = [4, 6, 10, 13, 16];
+/** Trạng thái 8: Đang chờ phỏng vấn – cần nhập ngày phỏng vấn + tạo lịch calendar */
+const STATUS_INTERVIEW_SCHEDULE = 8;
+
+/** Nền khu vực tin nhắn (trắng; trước đây chia 2 nửa xanh/hồng) */
+const CHAT_BG_LEFT = '#ffffff';
+const CHAT_BG_RIGHT = '#ffffff';
+const BUBBLE_LEFT_BG = '#f0f2f5';
+const BUBBLE_LEFT_BORDER = '#f0f2f5';
+const BUBBLE_RIGHT_BG = '#0084ff';
+const BUBBLE_RIGHT_BORDER = '#0084ff';
+const BUBBLE_SYSTEM_BG = '#ffedd5';
+const BUBBLE_SYSTEM_BORDER = '#ea580c';
+
+const NominationChat = ({
+  jobApplicationId,
+  userType = 'admin',
+  onScheduleInterview,
+  onScheduleNyusha,
+  collaboratorId,
+  currentStatus,
+  onStatusUpdated,
+  introCandidateName = '—',
+  introJobTitle = '—',
+}) => {
   const { language } = useLanguage();
   const t = translations[language] || translations.vi;
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
+  const [selectedAttachment, setSelectedAttachment] = useState(null);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [showInterviewModal, setShowInterviewModal] = useState(false);
@@ -81,6 +117,16 @@ const NominationChat = ({ jobApplicationId, userType = 'admin', onScheduleInterv
   const [hoveredInterviewModalConfirm, setHoveredInterviewModalConfirm] = useState(false);
   const [hoveredNyushaModalCancel, setHoveredNyushaModalCancel] = useState(false);
   const [hoveredNyushaModalConfirm, setHoveredNyushaModalConfirm] = useState(false);
+
+  // Modal thay đổi trạng thái (admin) – trong header chat
+  const [showChangeStatusModal, setShowChangeStatusModal] = useState(false);
+  const [changeStatusSelected, setChangeStatusSelected] = useState(() => (currentStatus != null && currentStatus >= 1 && currentStatus <= 16) ? Number(currentStatus) : 2);
+  const [changeStatusReason, setChangeStatusReason] = useState('');
+  const [changeStatusAmount, setChangeStatusAmount] = useState('');
+  const [changeStatusInterviewDate, setChangeStatusInterviewDate] = useState('');
+  const [changeStatusInterviewTime, setChangeStatusInterviewTime] = useState('');
+  const [changeStatusSubmitting, setChangeStatusSubmitting] = useState(false);
+  const attachmentInputRef = useRef(null);
 
   useEffect(() => {
     loadMessages();
@@ -240,15 +286,24 @@ const NominationChat = ({ jobApplicationId, userType = 'admin', onScheduleInterv
 
   const handleSendMessage = async (e) => {
     e.preventDefault();
-    if (!newMessage.trim() || sending) return;
+    if ((!newMessage.trim() && !selectedAttachment) || sending) return;
 
     try {
       setSending(true);
-      const messageData = {
-        jobApplicationId: parseInt(jobApplicationId),
-        content: newMessage.trim(),
-        type: 'text'
-      };
+      let messageData;
+      if (selectedAttachment) {
+        messageData = new FormData();
+        messageData.append('jobApplicationId', String(parseInt(jobApplicationId, 10)));
+        messageData.append('content', newMessage.trim());
+        messageData.append('type', 'text');
+        messageData.append('attachment', selectedAttachment);
+      } else {
+        messageData = {
+          jobApplicationId: parseInt(jobApplicationId, 10),
+          content: newMessage.trim(),
+          type: 'text'
+        };
+      }
 
       const response = userType === 'admin'
         ? await apiService.createAdminMessage(messageData)
@@ -256,6 +311,8 @@ const NominationChat = ({ jobApplicationId, userType = 'admin', onScheduleInterv
 
       if (response.success) {
         setNewMessage('');
+        setSelectedAttachment(null);
+        if (attachmentInputRef.current) attachmentInputRef.current.value = '';
         loadMessages();
       } else {
         alert(response.message || t.chatErrorSendMessage);
@@ -266,6 +323,17 @@ const NominationChat = ({ jobApplicationId, userType = 'admin', onScheduleInterv
     } finally {
       setSending(false);
     }
+  };
+
+  const handleSelectAttachment = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setSelectedAttachment(file);
+  };
+
+  const removeSelectedAttachment = () => {
+    setSelectedAttachment(null);
+    if (attachmentInputRef.current) attachmentInputRef.current.value = '';
   };
 
   const handleScheduleInterview = async () => {
@@ -463,6 +531,99 @@ const NominationChat = ({ jobApplicationId, userType = 'admin', onScheduleInterv
     }
   };
 
+  const handleConfirmChangeStatus = async () => {
+    if (!jobApplicationId || changeStatusSubmitting) return;
+    const statusNum = Number(changeStatusSelected);
+    if (Number.isNaN(statusNum) || statusNum < 1 || statusNum > 16) {
+      alert(t.selectValidStatus);
+      return;
+    }
+    if (STATUSES_REQUIRE_REJECTION.includes(statusNum)) {
+      if (!changeStatusReason.trim()) {
+        alert(t.chatReasonRequired || 'Vui lòng nhập lý do từ chối.');
+        return;
+      }
+    }
+    if (statusNum === STATUS_INTERVIEW_SCHEDULE) {
+      if (!changeStatusInterviewDate || !changeStatusInterviewTime) {
+        alert(t.chatErrorInterviewRequired);
+        return;
+      }
+    }
+    if (statusNum === STATUS_PAID) {
+      const amount = parseFloat(changeStatusAmount);
+      if (Number.isNaN(amount) || amount < 0) {
+        alert(t.chatErrorPaymentAmountRequired);
+        return;
+      }
+    }
+
+    try {
+      setChangeStatusSubmitting(true);
+      if (statusNum === STATUS_INTERVIEW_SCHEDULE) {
+        const dateTime = new Date(`${changeStatusInterviewDate}T${changeStatusInterviewTime}`);
+        const calendarData = {
+          jobApplicationId: parseInt(jobApplicationId),
+          eventType: 1,
+          startAt: dateTime.toISOString(),
+          title: 'Phỏng vấn ứng viên',
+          description: `Lịch phỏng vấn cho đơn ứng tuyển #${jobApplicationId}`,
+          ...(collaboratorId && { collaboratorId: parseInt(collaboratorId) })
+        };
+        const calendarResponse = await apiService.createAdminCalendar(calendarData);
+        if (!calendarResponse?.success) {
+          alert(calendarResponse?.message || t.chatErrorCreateSchedule);
+          return;
+        }
+        const updateResponse = await apiService.updateAdminJobApplication(jobApplicationId, {
+          interviewDate: dateTime.toISOString(),
+          status: STATUS_INTERVIEW_SCHEDULE
+        });
+        if (!updateResponse.success) {
+          alert(updateResponse.message || t.chatErrorUpdateApplication);
+          return;
+        }
+        await apiService.createAdminMessage({
+          jobApplicationId: parseInt(jobApplicationId),
+          content: `Đã đặt lịch phỏng vấn: ${changeStatusInterviewDate} ${changeStatusInterviewTime}`,
+          type: 'system'
+        });
+        setShowChangeStatusModal(false);
+        setChangeStatusInterviewDate('');
+        setChangeStatusInterviewTime('');
+        loadMessages();
+        if (onScheduleInterview) onScheduleInterview();
+        if (onStatusUpdated) onStatusUpdated();
+        alert(t.chatSuccessInterviewScheduled);
+      } else {
+        const rejectNote = STATUSES_REQUIRE_REJECTION.includes(statusNum) ? changeStatusReason.trim() : null;
+        const paymentAmount = statusNum === STATUS_PAID ? parseFloat(changeStatusAmount) : null;
+        const response = await apiService.updateJobApplicationStatus(
+          parseInt(jobApplicationId),
+          statusNum,
+          rejectNote,
+          paymentAmount
+        );
+        if (response.success) {
+          setShowChangeStatusModal(false);
+          setChangeStatusReason('');
+          setChangeStatusAmount('');
+          loadMessages();
+          if (userType === 'admin') await loadPaymentRequest();
+          if (onStatusUpdated) onStatusUpdated();
+          alert(response.message || (t.updateSuccess || 'Cập nhật trạng thái thành công.'));
+        } else {
+          alert(response.message || t.chatErrorStatusChangeFailed);
+        }
+      }
+    } catch (err) {
+      const msg = err?.data?.message || err?.message || t.chatErrorStatusChangeFailed;
+      alert(msg);
+    } finally {
+      setChangeStatusSubmitting(false);
+    }
+  };
+
   const handleSendStatusMessage = async (e) => {
     e.preventDefault();
     if (!jobApplicationId || sendingStatusMessage) return;
@@ -564,75 +725,48 @@ const NominationChat = ({ jobApplicationId, userType = 'admin', onScheduleInterv
   const statusLabel = getJobApplicationStatusLabelByLanguage(statusFormStatus, language);
 
   return (
-    <div className="flex flex-col h-full rounded-lg border" style={{ backgroundColor: 'white', borderColor: '#e5e7eb' }}>
+    <div className="flex flex-col h-full rounded-lg border shadow-sm" style={{ backgroundColor: 'white', borderColor: CARD_BORDER }}>
       {/* Header */}
-      <div className="p-4 border-b" style={{ borderColor: '#e5e7eb', backgroundColor: '#f9fafb' }}>
+      <div className="p-4 border-b" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_HEADER_BG }}>
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-bold flex items-center gap-2" style={{ color: '#111827' }}>
-            <MessageCircle className="w-4 h-4" />
+            <MessageCircle className="w-4 h-4 flex-shrink-0" style={{ color: '#6b7280' }} />
             {t.chatTitle}
           </h3>
-          <div className="flex gap-2">
-            {userType === 'admin' && (
-              <>
-                <button
-                  type="button"
-                  onClick={() => setShowStatusMessageForm((v) => !v)}
-                  className="px-3 py-1.5 text-xs font-medium rounded-lg transition-colors flex items-center gap-1"
-                  style={{
-                    color: '#be185d',
-                    backgroundColor: showStatusMessageForm ? '#fce7f3' : '#fdf2f8',
-                    border: `1px solid ${PINK_BORDER}`
-                  }}
-                >
-                  <MessageCircle className="w-3.5 h-3.5" />
-                  {t.chatChangeStatusSend}
-                </button>
-                <button
-                  onClick={() => setShowInterviewModal(true)}
-                  onMouseEnter={() => setHoveredInterviewButton(true)}
-                  onMouseLeave={() => setHoveredInterviewButton(false)}
-                  className="px-3 py-1.5 text-xs font-medium rounded-lg transition-colors flex items-center gap-1"
-                  style={{
-                    color: '#2563eb',
-                    backgroundColor: hoveredInterviewButton ? '#dbeafe' : '#eff6ff'
-                  }}
-                >
-                  <Calendar className="w-3.5 h-3.5" />
-                  {t.chatScheduleInterview}
-                </button>
-                <button
-                  onClick={() => setShowNyushaModal(true)}
-                  onMouseEnter={() => setHoveredNyushaButton(true)}
-                  onMouseLeave={() => setHoveredNyushaButton(false)}
-                  className="px-3 py-1.5 text-xs font-medium rounded-lg transition-colors flex items-center gap-1"
-                  style={{
-                    color: '#16a34a',
-                    backgroundColor: hoveredNyushaButton ? '#bbf7d0' : '#f0fdf4'
-                  }}
-                >
-                  <Clock className="w-3.5 h-3.5" />
-                  {t.chatScheduleNyusha}
-                </button>
-              </>
-            )}
-          </div>
+          {userType === 'admin' && (
+            <button
+              type="button"
+              onClick={() => {
+                setChangeStatusSelected((currentStatus != null && currentStatus >= 1 && currentStatus <= 16) ? Number(currentStatus) : 2);
+                setChangeStatusReason('');
+                setChangeStatusAmount('');
+                setChangeStatusInterviewDate('');
+                setChangeStatusInterviewTime('');
+                setShowChangeStatusModal(true);
+              }}
+              className="px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors flex items-center gap-1"
+              style={{ color: '#374151', backgroundColor: 'white', borderColor: '#e5e7eb' }}
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+              {t.chatChangeStatusSend}
+            </button>
+          )}
         </div>
       </div>
 
-      {/* Section Yêu cầu thanh toán (admin only) - đồng bộ với trang thanh toán */}
+      {/* Section Yêu cầu thanh toán (admin only) */}
       {userType === 'admin' && (
-        <div className="border-b" style={{ borderColor: '#e5e7eb', backgroundColor: '#f0fdf4' }}>
+        <div className="border-b rounded-none" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_HEADER_BG }}>
           <button
             type="button"
             onClick={() => setShowPaymentSection(!showPaymentSection)}
             className="w-full px-4 py-2 flex items-center justify-between text-left"
           >
-            <span className="text-xs font-bold flex items-center gap-2" style={{ color: '#166534' }}>
-              <DollarSign className="w-4 h-4" />
+            <span className="text-xs font-bold flex items-center gap-2" style={{ color: '#111827' }}>
+              <DollarSign className="w-4 h-4 flex-shrink-0" style={{ color: '#6b7280' }} />
               {t.chatPaymentRequest}
               {paymentRequest && (
-                <span className="px-1.5 py-0.5 rounded text-[10px]" style={{ backgroundColor: '#dcfce7', color: '#166534' }}>
+                <span className="px-1.5 py-0.5 rounded text-[10px] border" style={{ backgroundColor: '#f3f4f6', color: '#374151', borderColor: '#e5e7eb' }}>
                   {paymentStatusLabel(paymentRequest.status)}
                 </span>
               )}
@@ -744,13 +878,13 @@ const NominationChat = ({ jobApplicationId, userType = 'admin', onScheduleInterv
         </div>
       )}
 
-      {/* Form tin nhắn đổi trạng thái (admin) – xanh khi Đã thanh toán, hồng khi khác */}
+      {/* Form tin nhắn đổi trạng thái (admin) */}
       {userType === 'admin' && showStatusMessageForm && (
-        <form onSubmit={handleSendStatusMessage} className="mx-4 mt-3 mb-2 rounded-xl overflow-hidden flex-shrink-0" style={{ border: `2px solid ${statusFormStatus === STATUS_PAID ? GREEN_BORDER : PINK_BORDER}` }}>
-          <div className="px-4 py-3 text-center font-bold text-sm" style={{ backgroundColor: statusFormStatus === STATUS_PAID ? GREEN_HEADER_BG : PINK_HEADER_BG, color: '#1f2937' }}>
+        <form onSubmit={handleSendStatusMessage} className="mx-4 mt-3 mb-2 rounded-xl overflow-hidden flex-shrink-0 border shadow-sm" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }}>
+          <div className="px-4 py-3 text-center font-bold text-sm border-b" style={{ backgroundColor: CARD_HEADER_BG, color: '#111827', borderColor: CARD_BORDER }}>
             {statusLabel}
           </div>
-          <div className="p-4 space-y-4" style={{ backgroundColor: statusFormStatus === STATUS_PAID ? GREEN_CARD_BG : PINK_CARD_BG }}>
+          <div className="p-4 space-y-4" style={{ backgroundColor: CARD_BG }}>
             <div>
               <label className="block text-sm font-medium mb-1" style={{ color: '#374151' }}>
                 {t.chatStatusLabel}
@@ -808,7 +942,7 @@ const NominationChat = ({ jobApplicationId, userType = 'admin', onScheduleInterv
                 <Plus className="w-4 h-4" /> {t.chatAddTag}
               </button>
               {statusFormTags.map((tag, tagIndex) => (
-                <div key={tagIndex} className="pl-4 space-y-1 border-l-2" style={{ borderColor: PINK_BORDER }}>
+                <div key={tagIndex} className="pl-4 space-y-1 border-l-2" style={{ borderColor: '#e5e7eb' }}>
                   <div className="flex gap-2 items-center">
                     <input
                       type="text"
@@ -855,7 +989,7 @@ const NominationChat = ({ jobApplicationId, userType = 'admin', onScheduleInterv
                 type="submit"
                 disabled={sendingStatusMessage || (statusFormStatus === STATUS_PAID && !statusFormPaymentAmount.trim())}
                 className="px-4 py-2 rounded-lg text-sm font-medium"
-                style={{ backgroundColor: statusFormStatus === STATUS_PAID ? '#16a34a' : '#be185d', color: '#fff', opacity: sendingStatusMessage ? 0.7 : 1 }}
+                style={{ backgroundColor: '#2563eb', color: '#fff', opacity: sendingStatusMessage ? 0.7 : 1 }}
               >
                 {sendingStatusMessage ? t.chatSending : t.chatSendToCtv}
               </button>
@@ -864,98 +998,364 @@ const NominationChat = ({ jobApplicationId, userType = 'admin', onScheduleInterv
         </form>
       )}
 
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-3">
-        {loading ? (
-          <div className="flex items-center justify-center h-full">
-            <div className="animate-spin rounded-full h-6 w-6 border-b-2" style={{ borderColor: '#2563eb' }}></div>
+      {/* Messages: 2 block nền trái/phải + thẻ màu */}
+      <div className="flex-1 min-h-0 flex flex-col mx-3 my-2 rounded-xl overflow-hidden border" style={{ borderColor: '#cbd5e1' }}>
+        <div className="relative flex-1 min-h-0 flex">
+          <div className="absolute inset-0 flex pointer-events-none" aria-hidden>
+            <div className="w-1/2" style={{ backgroundColor: CHAT_BG_LEFT }} />
+            <div className="w-1/2" style={{ backgroundColor: CHAT_BG_RIGHT }} />
           </div>
-        ) : messages.length === 0 ? (
-          <div className="text-center text-sm py-8" style={{ color: '#6b7280' }}>
-            {t.chatNoMessages}
-          </div>
-        ) : (
-          messages.map((message) => {
-            // senderType: 1 = Admin, 2 = Collaborator, 3 = System
-            const isSender = userType === 'admin' 
-              ? message.senderType === 1 
-              : message.senderType === 2;
-
-            // Tin nhắn đổi trạng thái (admin gửi) → thẻ hồng, căn bên phải khi admin xem, bên trái khi CTV xem
-            const statusParsed = parseStatusMessageContent(message.content);
-            if (message.senderType === 3 && statusParsed.isStatusChange) {
-              return (
-                <div key={message.id} className={`flex ${userType === 'admin' ? 'justify-end' : 'justify-start'}`}>
-                  <StatusChangeMessageCard
-                    statusName={statusParsed.statusName}
-                    reason={statusParsed.reason}
-                    paymentAmount={statusParsed.paymentAmount}
-                    createdAt={message.createdAt}
-                    formatDate={formatDate}
-                  />
-                </div>
-              );
-            }
-            
-            let messageStyle = {};
-            if (isSender) {
-              messageStyle = { backgroundColor: '#2563eb', color: 'white' };
-            } else if (message.senderType === 3 || message.type === 'system') {
-              messageStyle = { backgroundColor: '#fef9c3', color: '#854d0e', borderColor: '#fde047', borderWidth: '1px', borderStyle: 'solid' };
-            } else {
-              messageStyle = { backgroundColor: '#f3f4f6', color: '#111827' };
-            }
-            
-            return (
-              <div
-                key={message.id}
-                className={`flex ${isSender ? 'justify-end' : 'justify-start'}`}
-              >
-                <div
-                  className="max-w-[70%] rounded-lg px-3 py-2"
-                  style={messageStyle}
-                >
-                  <p className="text-xs whitespace-pre-wrap">{message.content}</p>
-                  <p className="text-xs mt-1" style={{ opacity: 0.7 }}>
-                    {formatDate(message.createdAt)}
-                  </p>
-                </div>
+          <div className="relative z-[1] flex-1 overflow-y-auto p-3 space-y-3 min-h-[200px]">
+            {loading ? (
+              <div className="flex items-center justify-center min-h-[160px]">
+                <div className="animate-spin rounded-full h-6 w-6 border-2 border-transparent border-t-gray-400" style={{ borderTopColor: '#6b7280' }} />
               </div>
-            );
-          })
-        )}
-        <div ref={messagesEndRef} />
+            ) : (
+              <>
+                {messages.length === 0 && (
+                  <div className="text-center text-xs py-6 rounded-lg border border-dashed" style={{ color: '#64748b', backgroundColor: 'rgba(255,255,255,0.65)', borderColor: '#94a3b8' }}>
+                    {t.chatNoMessages}
+                  </div>
+                )}
+                {messages.map((message) => {
+                  const statusParsed = parseStatusMessageContent(message.content);
+                  const isNominationIntroMessage =
+                    typeof message.content === 'string' &&
+                    message.content.trim().startsWith('Cảm ơn bạn đã tiến cử');
+                  const effectiveSenderType = isNominationIntroMessage ? 1 : message.senderType;
+                  const isSender =
+                    userType === 'admin' ? effectiveSenderType === 1 : effectiveSenderType === 2;
+                  if (message.senderType === 3 && statusParsed.isStatusChange) {
+                    return (
+                      <div
+                        key={message.id}
+                        className={`flex w-full ${userType === 'admin' ? 'justify-end' : 'justify-start'}`}
+                      >
+                        <StatusChangeMessageCard
+                          statusName={statusParsed.statusName}
+                          reason={statusParsed.reason}
+                          paymentAmount={statusParsed.paymentAmount}
+                          createdAt={message.createdAt}
+                          formatDate={formatDate}
+                          variant={userType === 'admin' ? 'adminSide' : 'ctvSide'}
+                        />
+                      </div>
+                    );
+                  }
+
+                  const isSystem = (message.senderType === 3 || message.type === 'system') && !isNominationIntroMessage;
+                  if (isSystem && !statusParsed.isStatusChange) {
+                    const displayContent = message.content === '[Attachment]' ? '' : message.content;
+                    return (
+                      <div key={message.id} className="flex justify-center w-full">
+                        <div
+                          className="max-w-[90%] rounded-xl px-3 py-2 border-2 shadow-sm"
+                          style={{
+                            backgroundColor: BUBBLE_SYSTEM_BG,
+                            borderColor: BUBBLE_SYSTEM_BORDER,
+                          }}
+                        >
+                          {!!displayContent && (
+                            <p className="text-xs whitespace-pre-wrap font-medium" style={{ color: '#9a3412' }}>
+                              {displayContent}
+                            </p>
+                          )}
+                          {message.attachmentUrl && (
+                            (() => {
+                              const kind = getAttachmentKind(message);
+                              if (kind === 'image') {
+                                return (
+                                  <a href={message.attachmentUrl} target="_blank" rel="noreferrer" className="block mt-1">
+                                    <img
+                                      src={message.attachmentUrl}
+                                      alt={message.attachmentName || 'attachment'}
+                                      className="max-w-[220px] max-h-[220px] rounded-lg border"
+                                      style={{ borderColor: 'rgba(154,52,18,0.35)' }}
+                                    />
+                                  </a>
+                                );
+                              }
+                              if (kind === 'video') {
+                                return (
+                                  <video
+                                    controls
+                                    className="mt-1 max-w-[220px] max-h-[220px] rounded-lg border"
+                                    style={{ borderColor: 'rgba(154,52,18,0.35)' }}
+                                    src={message.attachmentUrl}
+                                  />
+                                );
+                              }
+                              return (
+                                <a
+                                  href={message.attachmentUrl}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="inline-flex items-center gap-1.5 text-xs font-semibold underline mt-1"
+                                  style={{ color: '#9a3412' }}
+                                >
+                                  <Paperclip className="w-3 h-3" />
+                                  {message.attachmentName || 'attachment'}
+                                </a>
+                              );
+                            })()
+                          )}
+                          <p className="text-[10px] mt-1" style={{ color: '#c2410c' }}>
+                            {formatDate(message.createdAt)}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  const cardStyle = isSender
+                    ? {
+                        backgroundColor: BUBBLE_RIGHT_BG,
+                        border: `1px solid ${BUBBLE_RIGHT_BORDER}`,
+                        boxShadow: '0 1px 4px rgba(0, 132, 255, 0.25)',
+                      }
+                    : {
+                        backgroundColor: BUBBLE_LEFT_BG,
+                        border: `1px solid ${BUBBLE_LEFT_BORDER}`,
+                        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.08)',
+                      };
+
+                  return (
+                    <div
+                      key={message.id}
+                      className={`flex w-full ${isSender ? 'justify-end' : 'justify-start'}`}
+                    >
+                      <div className="max-w-[72%] rounded-2xl px-3 py-2" style={cardStyle}>
+                        {message.content !== '[Attachment]' && (
+                          <p className="text-xs whitespace-pre-wrap font-medium" style={{ color: isSender ? '#ffffff' : '#050505' }}>
+                            {message.content}
+                          </p>
+                        )}
+                        {message.attachmentUrl && (
+                          (() => {
+                            const kind = getAttachmentKind(message);
+                            if (kind === 'image') {
+                              return (
+                                <a href={message.attachmentUrl} target="_blank" rel="noreferrer" className="block mt-1">
+                                  <img
+                                    src={message.attachmentUrl}
+                                    alt={message.attachmentName || 'attachment'}
+                                    className="max-w-[240px] max-h-[240px] rounded-lg border"
+                                    style={{ borderColor: isSender ? 'rgba(255,255,255,0.45)' : '#d1d5db' }}
+                                  />
+                                </a>
+                              );
+                            }
+                            if (kind === 'video') {
+                              return (
+                                <video
+                                  controls
+                                  className="mt-1 max-w-[240px] max-h-[240px] rounded-lg border"
+                                  style={{ borderColor: isSender ? 'rgba(255,255,255,0.45)' : '#d1d5db' }}
+                                  src={message.attachmentUrl}
+                                />
+                              );
+                            }
+                            return (
+                              <a
+                                href={message.attachmentUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex items-center gap-1.5 text-xs font-semibold underline mt-1"
+                                style={{ color: isSender ? '#ffffff' : '#111827' }}
+                              >
+                                <Paperclip className="w-3 h-3" />
+                                {message.attachmentName || 'attachment'}
+                              </a>
+                            );
+                          })()
+                        )}
+                        <p className="text-[10px] mt-1 opacity-80" style={{ color: isSender ? 'rgba(255,255,255,0.85)' : '#65676b' }}>
+                          {formatDate(message.createdAt)}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </>
+            )}
+            <div ref={messagesEndRef} />
+          </div>
+        </div>
       </div>
 
       {/* Input */}
-      <form onSubmit={handleSendMessage} className="p-4 border-t" style={{ borderColor: '#e5e7eb' }}>
+      <form onSubmit={handleSendMessage} className="p-4 border-t" style={{ borderColor: CARD_BORDER }}>
+        {selectedAttachment && (
+          <div className="mb-2 flex items-center justify-between rounded-lg border px-3 py-1.5" style={{ borderColor: '#d1d5db', backgroundColor: '#f9fafb' }}>
+            <div className="flex items-center gap-2 min-w-0">
+              <Paperclip className="w-3.5 h-3.5 text-gray-500" />
+              <span className="text-xs truncate" style={{ color: '#111827' }}>{selectedAttachment.name}</span>
+            </div>
+            <button type="button" onClick={removeSelectedAttachment} className="p-1" style={{ color: '#6b7280' }}>
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
         <div className="flex gap-2">
+          <input
+            ref={attachmentInputRef}
+            type="file"
+            onChange={handleSelectAttachment}
+            className="hidden"
+            disabled={sending}
+          />
+          <button
+            type="button"
+            onClick={() => attachmentInputRef.current?.click()}
+            className="px-3 py-2 rounded-xl border text-sm"
+            style={{ borderColor: '#e5e7eb', color: '#4b5563', backgroundColor: '#fff' }}
+            disabled={sending}
+          >
+            <Paperclip className="w-4 h-4" />
+          </button>
           <input
             type="text"
             value={newMessage}
             onChange={(e) => setNewMessage(e.target.value)}
             placeholder={t.chatMessagePlaceholder}
-            className="flex-1 px-3 py-2 border rounded-lg text-sm focus:outline-none"
-            style={{ borderColor: '#d1d5db' }}
+            className="flex-1 px-3 py-2 rounded-xl text-sm focus:outline-none"
+            style={{ backgroundColor: '#f3f4f6', border: '1px solid #e5e7eb', color: '#111827' }}
             disabled={sending}
           />
           <button
             type="submit"
-            disabled={!newMessage.trim() || sending}
+            disabled={(!newMessage.trim() && !selectedAttachment) || sending}
             onMouseEnter={() => setHoveredSendButton(true)}
             onMouseLeave={() => setHoveredSendButton(false)}
-            className="px-4 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+            className="px-4 py-2 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1"
             style={{
-              backgroundColor: hoveredSendButton ? '#2563eb' : '#2563eb',
+              backgroundColor: hoveredSendButton ? '#1d4ed8' : '#2563eb',
               color: 'white',
-              opacity: (!newMessage.trim() || sending) ? 0.5 : 1,
-              cursor: (!newMessage.trim() || sending) ? 'not-allowed' : 'pointer'
+              opacity: ((!newMessage.trim() && !selectedAttachment) || sending) ? 0.5 : 1,
+              cursor: ((!newMessage.trim() && !selectedAttachment) || sending) ? 'not-allowed' : 'pointer'
             }}
           >
             <Send className="w-4 h-4" />
           </button>
         </div>
       </form>
+
+      {/* Modal thay đổi trạng thái */}
+      {showChangeStatusModal && (
+        <div className="fixed inset-0 flex items-center justify-center z-50" style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}>
+          <div className="rounded-xl shadow-lg border w-full max-w-md mx-4 p-5 bg-white" style={{ borderColor: CARD_BORDER }}>
+            <h3 className="text-lg font-bold mb-4" style={{ color: '#111827' }}>{t.changeStatusModalTitle || 'Thay đổi trạng thái'}</h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-1" style={{ color: '#374151' }}>{t.newStatusLabel || 'Trạng thái mới'}</label>
+                <select
+                  value={changeStatusSelected}
+                  onChange={(e) => {
+                    setChangeStatusSelected(parseInt(e.target.value, 10));
+                    setChangeStatusReason('');
+                    setChangeStatusAmount('');
+                    setChangeStatusInterviewDate('');
+                    setChangeStatusInterviewTime('');
+                  }}
+                  className="w-full px-3 py-2 border rounded-lg text-sm"
+                  style={{ borderColor: '#e5e7eb' }}
+                >
+                  {getJobApplicationStatusOptionsByLanguage(language).map((opt) => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+              </div>
+              {STATUSES_REQUIRE_REJECTION.includes(changeStatusSelected) && (
+                <div>
+                  <label className="block text-sm font-medium mb-1" style={{ color: '#374151' }}>
+                    {t.reasonNoteOptional || 'Lý do từ chối'} <span className="text-red-500">*</span>
+                  </label>
+                  <textarea
+                    value={changeStatusReason}
+                    onChange={(e) => setChangeStatusReason(e.target.value)}
+                    placeholder={t.placeholderReasonStatus || 'Nhập lý do từ chối...'}
+                    rows={3}
+                    className="w-full px-3 py-2 border rounded-lg text-sm"
+                    style={{ borderColor: '#e5e7eb' }}
+                  />
+                </div>
+              )}
+              {changeStatusSelected === STATUS_INTERVIEW_SCHEDULE && (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium mb-1" style={{ color: '#374151' }}>{t.chatDate || 'Ngày'}</label>
+                    <input
+                      type="date"
+                      value={changeStatusInterviewDate}
+                      onChange={(e) => setChangeStatusInterviewDate(e.target.value)}
+                      className="w-full px-3 py-2 border rounded-lg text-sm"
+                      style={{ borderColor: '#e5e7eb' }}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1" style={{ color: '#374151' }}>{t.chatTime || 'Giờ'}</label>
+                    <input
+                      type="time"
+                      value={changeStatusInterviewTime}
+                      onChange={(e) => setChangeStatusInterviewTime(e.target.value)}
+                      className="w-full px-3 py-2 border rounded-lg text-sm"
+                      style={{ borderColor: '#e5e7eb' }}
+                    />
+                  </div>
+                </>
+              )}
+              {changeStatusSelected === STATUS_PAID && (
+                <div>
+                  <label className="block text-sm font-medium mb-1" style={{ color: '#374151' }}>
+                    {t.chatPaymentAmount || 'Số tiền thanh toán'} <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="1000"
+                    value={changeStatusAmount}
+                    onChange={(e) => setChangeStatusAmount(e.target.value)}
+                    placeholder={t.chatPaymentAmountPlaceholder || 'VD: 500000'}
+                    className="w-full px-3 py-2 border rounded-lg text-sm"
+                    style={{ borderColor: '#e5e7eb' }}
+                  />
+                  <p className="text-xs mt-1" style={{ color: '#6b7280' }}>
+                    {t.chatPaymentRequestCreatedPaid || 'Sẽ tạo đơn thanh toán với trạng thái Đã thanh toán.'}
+                  </p>
+                </div>
+              )}
+            </div>
+            <div className="flex gap-2 mt-5 justify-end">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowChangeStatusModal(false);
+                  setChangeStatusReason('');
+                  setChangeStatusAmount('');
+                  setChangeStatusInterviewDate('');
+                  setChangeStatusInterviewTime('');
+                }}
+                className="px-4 py-2 rounded-lg border text-sm font-medium"
+                style={{ borderColor: '#e5e7eb', color: '#374151', backgroundColor: 'white' }}
+              >
+                {t.cancel}
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmChangeStatus}
+                disabled={changeStatusSubmitting ||
+                  (STATUSES_REQUIRE_REJECTION.includes(changeStatusSelected) && !changeStatusReason.trim()) ||
+                  (changeStatusSelected === STATUS_INTERVIEW_SCHEDULE && (!changeStatusInterviewDate || !changeStatusInterviewTime)) ||
+                  (changeStatusSelected === STATUS_PAID && (Number.isNaN(parseFloat(changeStatusAmount)) || parseFloat(changeStatusAmount) < 0))}
+                className="px-4 py-2 rounded-lg text-sm font-medium text-white disabled:opacity-50"
+                style={{ backgroundColor: '#2563eb' }}
+              >
+                {changeStatusSubmitting ? (t.updating || 'Đang cập nhật...') : (t.updateButton || 'Cập nhật')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Interview Modal */}
       {showInterviewModal && (

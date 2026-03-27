@@ -1,5 +1,6 @@
 @import "tailwindcss";
-/* Đường dẫn font tuyệt đối từ base để tránh resolve sai khi ở route con (ví dụ /jobshare/admin/candidates/3399/edit). */
+
+/* Font local dùng cho component cụ thể (datepicker, v.v.). Đường dẫn tuyệt đối từ base. */
 @font-face {
   font-family: 'Baloo Bhaijaan 2';
   src: url('/jobshare/assets/Baloo_Bhaijaan_2/static/BalooBhaijaan2-Regular.ttf') format('truetype');
@@ -109,25 +110,29 @@
   font-style: italic;
 }
 
-body {
-  font-family: 'Baloo Bhaijaan 2', sans-serif;
-}
 html, body {
   width: 100%;
   height: 100%;
   margin: 0;
   padding: 0;
   overflow-x: hidden;
+  min-width: 320px;
+  min-height: 100vh;
 }
 
 :root {
-  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   line-height: 1.5;
   font-weight: 400;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  font-family: inherit;
+  background-color: #FFFAFA;
 }
 
 a {
@@ -137,12 +142,6 @@ a {
 }
 a:hover {
   color: #535bf2;
-}
-
-body {
-  min-width: 320px;
-  min-height: 100vh;
-  overflow-x: hidden;
 }
 
 * {
@@ -365,4 +364,31 @@ button:focus-visible {
 
 .react-datepicker__close-icon::after:hover {
   background-color: #ef4444;
+}
+
+/* Admin dashboard – animated line chart */
+.dashboard-line-path {
+  stroke-dasharray: 4000;
+  stroke-dashoffset: 4000;
+  animation: dashboardLineDraw 0.8s ease-out forwards;
+}
+
+@keyframes dashboardLineDraw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* Màn dưới 1500px: zoom out 67% cho toàn bộ giao diện */
+@media (max-width: 1499px) {
+  .app-viewport-zoom {
+    transform: scale(0.67);
+    transform-origin: 0 0;
+    width: calc(100vw / 0.67);
+    min-height: calc(100vh / 0.67);
+  }
+  #root {
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
 }

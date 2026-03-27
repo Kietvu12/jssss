@@ -2,6 +2,7 @@ import express from 'express';
 import { messageController } from '../controllers/admin/messageController.js';
 import { authenticate } from '../middleware/auth.js';
 import { isSuperAdminOrBackoffice } from '../middleware/auth.js';
+import { uploadMessageAttachment } from '../middleware/messageAttachmentUploadMiddleware.js';
 
 const router = express.Router();
 
@@ -45,7 +46,7 @@ router.get('/:id', authenticate, isSuperAdminOrBackoffice, messageController.get
  * @desc    Create new message
  * @access  Private (Super Admin, Backoffice)
  */
-router.post('/', authenticate, isSuperAdminOrBackoffice, messageController.createMessage);
+router.post('/', authenticate, isSuperAdminOrBackoffice, uploadMessageAttachment, messageController.createMessage);
 
 /**
  * @route   PATCH /api/admin/messages/:id/mark-read-admin

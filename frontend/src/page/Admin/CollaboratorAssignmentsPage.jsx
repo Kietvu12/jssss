@@ -14,6 +14,7 @@ import {
   ChevronRight,
   ChevronsLeft,
   ChevronsRight,
+  ChevronDown,
   X,
   Check,
   UserPlus,
@@ -90,12 +91,18 @@ const CollaboratorAssignmentsPage = () => {
   const [expandedAssignmentId, setExpandedAssignmentId] = useState(null);
   const [applicationsByAssignmentId, setApplicationsByAssignmentId] = useState({});
   const [loadingApplicationsId, setLoadingApplicationsId] = useState(null);
+  const [isAdminFilterOpen, setIsAdminFilterOpen] = useState(false);
+  const [isStatusFilterOpen, setIsStatusFilterOpen] = useState(false);
 
   useEffect(() => {
     loadAssignments();
     loadAdmins();
     loadUnassignedCvStorages();
-  }, [currentPage, itemsPerPage, adminFilter, statusFilter]);
+  }, [currentPage, itemsPerPage, adminFilter, statusFilter, searchQuery]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery]);
 
   // Close dropdowns when clicking outside
   useEffect(() => {
@@ -104,11 +111,16 @@ const CollaboratorAssignmentsPage = () => {
       const inCollaborator = event.target.closest('.collaborator-dropdown-container');
       const inBulkCollaborator = event.target.closest('.bulk-collaborator-search-container');
       const inBulkOwnerAdmin = event.target.closest('.bulk-owner-admin-search-container');
+      const inAssignFilters = event.target.closest('.assign-filters-container');
 
       if (!inAdmin) setShowAdminDropdown(false);
       if (!inCollaborator) setShowCollaboratorDropdown(false);
       if (!inBulkCollaborator) setShowBulkCollaboratorDropdown(false);
       if (!inBulkOwnerAdmin) setShowBulkOwnerAdminDropdown(false);
+      if (!inAssignFilters) {
+        setIsAdminFilterOpen(false);
+        setIsStatusFilterOpen(false);
+      }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => {
@@ -278,8 +290,13 @@ const CollaboratorAssignmentsPage = () => {
     }
   };
 
-  const handleSearch = () => {
+  const handleReset = () => {
+    setSearchQuery('');
+    setAdminFilter('');
+    setStatusFilter('');
     setCurrentPage(1);
+    setIsAdminFilterOpen(false);
+    setIsStatusFilterOpen(false);
     loadAssignments();
   };
 
@@ -536,56 +553,59 @@ const CollaboratorAssignmentsPage = () => {
   };
 
   return (
-    <div className="space-y-4">
-      {/* Header */}
-      <div className="rounded-lg p-4 border flex items-center justify-between" style={{ backgroundColor: 'white', borderColor: '#e5e7eb' }}>
-        <div>
-          <h1 className="text-xl font-bold flex items-center gap-2" style={{ color: '#111827' }}>
-            <UserCheck className="w-6 h-6" style={{ color: '#2563eb' }} />
-            {t.assignPageTitle || 'Phân công hồ sơ ứng viên cho AdminBackOffice'}
-          </h1>
-          <p className="text-sm mt-1" style={{ color: '#6b7280' }}>{t.assignPageSubtitle || 'Giao hồ sơ ứng viên cho AdminBackOffice phụ trách'}</p>
+    <div className="h-full flex flex-col overflow-hidden">
+      <div className="flex-1 overflow-y-auto min-h-0 px-2 sm:px-3 py-1.5 space-y-3">
+        <div className="rounded-lg p-3 border flex items-center justify-between flex-shrink-0" style={{ backgroundColor: 'white', borderColor: '#e5e7eb' }}>
+          <div className="flex items-center gap-2">
+            <UserCheck className="w-5 h-5" style={{ color: '#2563eb' }} />
+            <div>
+              <h1 className="text-lg font-bold" style={{ color: '#111827' }}>
+                {t.assignPageTitle || 'Phân công hồ sơ ứng viên cho AdminBackOffice'}
+              </h1>
+              <p className="text-[10px] sm:text-xs mt-0.5" style={{ color: '#6b7280' }}>{t.assignPageSubtitle || 'Giao hồ sơ ứng viên cho AdminBackOffice phụ trách'}</p>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setBulkMode(!bulkMode)}
+              onMouseEnter={() => setHoveredBulkModeButton(true)}
+              onMouseLeave={() => setHoveredBulkModeButton(false)}
+              className="px-3 py-1.5 rounded-full text-[11px] sm:text-xs font-semibold transition-colors flex items-center gap-1.5"
+              style={{
+                backgroundColor: bulkMode
+                  ? (hoveredBulkModeButton ? '#d1d5db' : '#e5e7eb')
+                  : (hoveredBulkModeButton ? '#1d4ed8' : '#2563eb'),
+                color: bulkMode ? '#374151' : 'white'
+              }}
+            >
+              <UserPlus className="w-3.5 h-3.5" />
+              {bulkMode ? (t.assignBulkModeClose || 'Đóng phân công hàng loạt') : (t.assignBulkMode || 'Phân công hàng loạt')}
+            </button>
+          </div>
         </div>
-        <div className="flex gap-2">
-          <button
-            onClick={() => setBulkMode(!bulkMode)}
-            onMouseEnter={() => setHoveredBulkModeButton(true)}
-            onMouseLeave={() => setHoveredBulkModeButton(false)}
-            className="px-4 py-2 rounded-lg text-sm font-semibold transition-colors flex items-center gap-2"
-            style={{
-              backgroundColor: bulkMode
-                ? (hoveredBulkModeButton ? '#d1d5db' : '#e5e7eb')
-                : (hoveredBulkModeButton ? '#1d4ed8' : '#2563eb'),
-              color: bulkMode ? '#374151' : 'white'
-            }}
-          >
-            <UserPlus className="w-4 h-4" />
-            {bulkMode ? (t.assignBulkModeClose || 'Đóng phân công hàng loạt') : (t.assignBulkMode || 'Phân công hàng loạt')}
-          </button>
-        </div>
-      </div>
 
-      {/* Quick Assign Form */}
-      <div className="rounded-lg p-4 border" style={{ backgroundColor: 'white', borderColor: '#e5e7eb' }}>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-sm font-bold flex items-center gap-2" style={{ color: '#111827' }}>
-            <Plus className="w-4 h-4" style={{ color: '#16a34a' }} />
-            {t.assignQuickTitle || 'Phân công hồ sơ nhanh'}
-          </h2>
-          <button
-            type="button"
-            onClick={() => setShowQuickAssign(prev => !prev)}
-            className="flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-800"
-          >
-            {showQuickAssign ? (t.assignCollapse || 'Thu gọn') : (t.assignExpand || 'Mở rộng')}
-            <ChevronRight className={`w-3 h-3 transition-transform ${showQuickAssign ? 'rotate-90' : ''}`} />
-          </button>
-        </div>
+        {/* Quick Assign Form */}
+        <div className="rounded-lg p-3 border" style={{ backgroundColor: 'white', borderColor: '#e5e7eb' }}>
+          <div className="flex items-center justify-between mb-2">
+            <h2 className="text-xs font-bold flex items-center gap-1.5" style={{ color: '#111827' }}>
+              <Plus className="w-3.5 h-3.5" style={{ color: '#16a34a' }} />
+              {t.assignQuickTitle || 'Phân công hồ sơ nhanh'}
+            </h2>
+            <button
+              type="button"
+              onClick={() => setShowQuickAssign(prev => !prev)}
+              className="flex items-center gap-1 text-[10px] sm:text-xs font-medium text-blue-600 hover:text-blue-800"
+            >
+              {showQuickAssign ? (t.assignCollapse || 'Thu gọn') : (t.assignExpand || 'Mở rộng')}
+              <ChevronRight className={`w-3 h-3 transition-transform ${showQuickAssign ? 'rotate-90' : ''}`} />
+            </button>
+          </div>
         {showQuickAssign && (
           <>
             <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
               <div className="md:col-span-2">
-                <label className="block text-xs font-semibold mb-1" style={{ color: '#374151' }}>
+                <label className="block text-[10px] sm:text-xs font-semibold mb-1" style={{ color: '#374151' }}>
                   {t.assignSelectAdmin || 'Chọn AdminBackOffice'} <span style={{ color: '#ef4444' }}>*</span>
                 </label>
                 <div className="relative admin-dropdown-container">
@@ -607,7 +627,7 @@ const CollaboratorAssignmentsPage = () => {
                       e.target.style.borderColor = '#d1d5db';
                       e.target.style.boxShadow = 'none';
                     }}
-                    className="w-full pl-10 pr-3 py-2 border rounded-lg text-sm"
+                    className="w-full pl-9 pr-2.5 py-1.5 border rounded-lg text-xs"
                     style={{
                       borderColor: '#d1d5db',
                       outline: 'none'
@@ -665,7 +685,7 @@ const CollaboratorAssignmentsPage = () => {
                 </div>
               </div>
               <div className="md:col-span-2">
-                <label className="block text-xs font-semibold mb-1" style={{ color: '#374151' }}>
+                <label className="block text-[10px] sm:text-xs font-semibold mb-1" style={{ color: '#374151' }}>
                   {t.assignSelectCandidate || 'Chọn hồ sơ ứng viên'} <span style={{ color: '#ef4444' }}>*</span>
                 </label>
                 <div className="relative collaborator-dropdown-container">
@@ -687,7 +707,7 @@ const CollaboratorAssignmentsPage = () => {
                       e.target.style.borderColor = '#d1d5db';
                       e.target.style.boxShadow = 'none';
                     }}
-                    className="w-full pl-10 pr-3 py-2 border rounded-lg text-sm"
+                    className="w-full pl-9 pr-2.5 py-1.5 border rounded-lg text-xs"
                     style={{
                       borderColor: '#d1d5db',
                       outline: 'none'
@@ -757,7 +777,7 @@ const CollaboratorAssignmentsPage = () => {
                   disabled={assigning || !selectedAdminId || !selectedCvStorageId}
                   onMouseEnter={() => !(assigning || !selectedAdminId || !selectedCvStorageId) && setHoveredAssignButton(true)}
                   onMouseLeave={() => setHoveredAssignButton(false)}
-                  className="w-full px-4 py-2 rounded-lg text-sm font-semibold transition-colors flex items-center justify-center gap-2"
+                  className="w-full px-3 py-1.5 rounded-full text-[11px] sm:text-xs font-semibold transition-colors flex items-center justify-center gap-1.5"
                   style={{
                     backgroundColor: (assigning || !selectedAdminId || !selectedCvStorageId)
                       ? '#86efac'
@@ -769,12 +789,12 @@ const CollaboratorAssignmentsPage = () => {
                 >
                   {assigning ? (
                     <>
-                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                       {t.assignAssigning || 'Đang phân công...'}
                     </>
                   ) : (
                     <>
-                      <Plus className="w-4 h-4" />
+                      <Plus className="w-3.5 h-3.5" />
                       {t.assignButton || 'Phân công'}
                     </>
                   )}
@@ -807,119 +827,100 @@ const CollaboratorAssignmentsPage = () => {
         )}
       </div>
 
-      {/* Filters */}
-      <div className="rounded-lg p-4 border" style={{ backgroundColor: 'white', borderColor: '#e5e7eb' }}>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div>
-            <label className="block text-xs font-semibold mb-1" style={{ color: '#374151' }}>{t.assignFilterSearch || 'Tìm kiếm'}</label>
+        {/* Filters */}
+        <div className="assign-filters-container flex items-center gap-2.5 flex-wrap justify-between flex-shrink-0">
+          <div className="flex items-center px-3 py-1.5 rounded-full bg-white text-[12px] sm:text-[13px] min-w-[220px] flex-1" style={{ border: '1px solid #e5e7eb' }}>
+            <Search className="w-3.5 h-3.5 mr-2 flex-shrink-0" style={{ color: '#9ca3af' }} />
+            <input
+              type="text"
+              placeholder={t.assignFilterSearchPlaceholder || 'Tên, email, mã hồ sơ...'}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full bg-transparent outline-none min-w-0 text-[12px] sm:text-[13px]"
+            />
+          </div>
+          <div className="flex items-center gap-2.5 flex-wrap">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4" style={{ color: '#9ca3af' }} />
-              <input
-                type="text"
-                placeholder={t.assignFilterSearchPlaceholder || 'Tên, email, mã hồ sơ...'}
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-                className="w-full pl-10 pr-3 py-2 border rounded-lg text-sm"
-                style={{
-                  borderColor: '#d1d5db',
-                  outline: 'none'
+              <button
+                type="button"
+                onClick={() => {
+                  setIsAdminFilterOpen(!isAdminFilterOpen);
+                  setIsStatusFilterOpen(false);
                 }}
-                onFocus={(e) => {
-                  e.target.style.borderColor = '#2563eb';
-                  e.target.style.boxShadow = '0 0 0 2px rgba(37, 99, 235, 0.5)';
-                }}
-                onBlur={(e) => {
-                  e.target.style.borderColor = '#d1d5db';
-                  e.target.style.boxShadow = 'none';
-                }}
-              />
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white text-[11px] sm:text-xs font-semibold"
+                style={{ color: '#374151', border: '1px solid #e5e7eb' }}
+              >
+                {adminFilter ? (admins.find(a => a.id == adminFilter)?.name || t.assignFilterAdmin) : (t.assignFilterAdmin || 'AdminBackOffice')}
+                <ChevronDown className="w-3 h-3" />
+              </button>
+              {isAdminFilterOpen && (
+                <div className="absolute right-0 mt-2 w-52 rounded-xl border bg-white p-3 z-20 text-[11px] sm:text-xs" style={{ borderColor: '#e5e7eb' }}>
+                  <label className="flex items-center gap-1.5 cursor-pointer py-0.5">
+                    <input type="radio" name="assign-admin" checked={adminFilter === ''} onChange={() => { setAdminFilter(''); setCurrentPage(1); }} className="w-3.5 h-3.5" />
+                    <span>{t.allStatus || 'Tất cả'}</span>
+                  </label>
+                  {admins.map(admin => (
+                    <label key={admin.id} className="flex items-center gap-1.5 cursor-pointer py-0.5">
+                      <input type="radio" name="assign-admin" checked={String(adminFilter) === String(admin.id)} onChange={() => { setAdminFilter(admin.id); setCurrentPage(1); }} className="w-3.5 h-3.5" />
+                      <span>{admin.name}</span>
+                    </label>
+                  ))}
+                </div>
+              )}
             </div>
-          </div>
-          <div>
-            <label className="block text-xs font-semibold mb-1" style={{ color: '#374151' }}>{t.assignFilterAdmin || 'AdminBackOffice'}</label>
-            <select
-              value={adminFilter}
-              onChange={(e) => {
-                setAdminFilter(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="w-full px-3 py-2 border rounded-lg text-sm"
-              style={{
-                borderColor: '#d1d5db',
-                outline: 'none'
-              }}
-              onFocus={(e) => {
-                e.target.style.borderColor = '#2563eb';
-                e.target.style.boxShadow = '0 0 0 2px rgba(37, 99, 235, 0.5)';
-              }}
-              onBlur={(e) => {
-                e.target.style.borderColor = '#d1d5db';
-                e.target.style.boxShadow = 'none';
-              }}
-            >
-              <option value="">{t.allStatus || 'Tất cả'}</option>
-              {admins.map(admin => (
-                <option key={admin.id} value={admin.id}>{admin.name}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-xs font-semibold mb-1" style={{ color: '#374151' }}>{t.assignFilterStatus || 'Trạng thái'}</label>
-            <select
-              value={statusFilter}
-              onChange={(e) => {
-                setStatusFilter(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="w-full px-3 py-2 border rounded-lg text-sm"
-              style={{
-                borderColor: '#d1d5db',
-                outline: 'none'
-              }}
-              onFocus={(e) => {
-                e.target.style.borderColor = '#2563eb';
-                e.target.style.boxShadow = '0 0 0 2px rgba(37, 99, 235, 0.5)';
-              }}
-              onBlur={(e) => {
-                e.target.style.borderColor = '#d1d5db';
-                e.target.style.boxShadow = 'none';
-              }}
-            >
-              <option value="">{t.allStatus || 'Tất cả'}</option>
-              <option value="1">{t.assignStatusActive || 'Đang hoạt động'}</option>
-              <option value="0">{t.assignStatusCancelled || 'Đã hủy'}</option>
-            </select>
-          </div>
-          <div className="flex items-end">
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsStatusFilterOpen(!isStatusFilterOpen);
+                  setIsAdminFilterOpen(false);
+                }}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white text-[11px] sm:text-xs font-semibold"
+                style={{ color: '#374151', border: '1px solid #e5e7eb' }}
+              >
+                {statusFilter === '1' ? (t.assignStatusActive || 'Đang hoạt động') : statusFilter === '0' ? (t.assignStatusCancelled || 'Đã hủy') : (t.assignFilterStatus || 'Trạng thái')}
+                <ChevronDown className="w-3 h-3" />
+              </button>
+              {isStatusFilterOpen && (
+                <div className="absolute right-0 mt-2 w-52 rounded-xl border bg-white p-3 z-20 text-[11px] sm:text-xs" style={{ borderColor: '#e5e7eb' }}>
+                  <label className="flex items-center gap-1.5 cursor-pointer py-0.5">
+                    <input type="radio" name="assign-status" checked={statusFilter === ''} onChange={() => { setStatusFilter(''); setCurrentPage(1); }} className="w-3.5 h-3.5" />
+                    <span>{t.allStatus || 'Tất cả'}</span>
+                  </label>
+                  <label className="flex items-center gap-1.5 cursor-pointer py-0.5">
+                    <input type="radio" name="assign-status" checked={statusFilter === '1'} onChange={() => { setStatusFilter('1'); setCurrentPage(1); }} className="w-3.5 h-3.5" />
+                    <span>{t.assignStatusActive || 'Đang hoạt động'}</span>
+                  </label>
+                  <label className="flex items-center gap-1.5 cursor-pointer py-0.5">
+                    <input type="radio" name="assign-status" checked={statusFilter === '0'} onChange={() => { setStatusFilter('0'); setCurrentPage(1); }} className="w-3.5 h-3.5" />
+                    <span>{t.assignStatusCancelled || 'Đã hủy'}</span>
+                  </label>
+                </div>
+              )}
+            </div>
             <button
-              onClick={handleSearch}
-              onMouseEnter={() => setHoveredSearchButton(true)}
-              onMouseLeave={() => setHoveredSearchButton(false)}
-              className="w-full px-4 py-2 rounded-lg text-sm font-semibold transition-colors"
-              style={{
-                backgroundColor: hoveredSearchButton ? '#1d4ed8' : '#2563eb',
-                color: 'white'
-              }}
+              type="button"
+              onClick={handleReset}
+              className="px-3 py-1.5 rounded-full text-[11px] sm:text-xs font-semibold transition-colors"
+              style={{ backgroundColor: '#f3f4f6', color: '#374151' }}
             >
-              {t.searchButton || 'Tìm kiếm'}
+              {t.resetFilter || 'Xóa lọc'}
             </button>
           </div>
         </div>
-      </div>
 
-      {/* Assignments - multiple level dropdown by AdminBackOffice */}
-      <div className="rounded-lg border overflow-hidden" style={{ backgroundColor: 'white', borderColor: '#e5e7eb' }}>
-        {loading ? (
-          <div className="p-8 text-center">
-            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2" style={{ borderColor: '#2563eb' }}></div>
-            <p className="mt-2 text-sm" style={{ color: '#6b7280' }}>{t.loadingData || 'Đang tải...'}</p>
-          </div>
-        ) : assignments.length === 0 ? (
-          <div className="p-8 text-center">
-            <UserCheck className="w-12 h-12 mx-auto mb-2" style={{ color: '#9ca3af' }} />
-            <p className="text-sm" style={{ color: '#6b7280' }}>{t.assignNoAssignments || 'Chưa có phân công nào'}</p>
-          </div>
+        {/* Assignments - multiple level dropdown by AdminBackOffice */}
+        <div className="rounded-lg border overflow-hidden flex-1 min-h-0 flex flex-col" style={{ backgroundColor: 'white', borderColor: '#e5e7eb' }}>
+          {loading ? (
+            <div className="p-6 text-center flex-1 flex flex-col items-center justify-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2" style={{ borderColor: '#2563eb' }}></div>
+              <p className="mt-2 text-xs" style={{ color: '#6b7280' }}>{t.loadingData || 'Đang tải...'}</p>
+            </div>
+          ) : assignments.length === 0 ? (
+            <div className="p-6 text-center flex-1 flex flex-col items-center justify-center">
+              <UserCheck className="w-10 h-10 mb-2" style={{ color: '#9ca3af' }} />
+              <p className="text-xs" style={{ color: '#6b7280' }}>{t.assignNoAssignments || 'Chưa có phân công nào'}</p>
+            </div>
         ) : (
           <>
             {Object.values(
@@ -941,44 +942,44 @@ const CollaboratorAssignmentsPage = () => {
                 <button
                   type="button"
                   onClick={() => setExpandedAdminId((prev) => (prev === group.adminId ? null : group.adminId))}
-                  className="w-full px-4 py-3 flex items-center justify-between text-left hover:bg-gray-50"
+                  className="w-full px-2.5 py-2 flex items-center justify-between text-left hover:bg-gray-50"
                 >
-                  <div className="flex items-center gap-2">
-                    <UserCheck className="w-4 h-4" style={{ color: '#2563eb' }} />
+                  <div className="flex items-center gap-1.5">
+                    <UserCheck className="w-3.5 h-3.5" style={{ color: '#2563eb' }} />
                     <div>
-                      <div className="text-sm font-semibold" style={{ color: '#111827' }}>
+                      <div className="text-[10px] sm:text-xs font-semibold" style={{ color: '#111827' }}>
                         {group.adminName}
                       </div>
                       {group.adminEmail && (
-                        <div className="text-xs" style={{ color: '#6b7280' }}>
+                        <div className="text-[10px]" style={{ color: '#6b7280' }}>
                           {group.adminEmail}
                         </div>
                       )}
                     </div>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium" style={{ backgroundColor: '#eff6ff', color: '#1d4ed8' }}>
+                  <div className="flex items-center gap-2">
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium" style={{ backgroundColor: '#eff6ff', color: '#1d4ed8' }}>
                       {group.assignments.length} {t.assignProfilesCount || 'hồ sơ'}
                     </span>
                     <ChevronRight
-                      className={`w-4 h-4 transition-transform ${expandedAdminId === group.adminId ? 'transform rotate-90' : ''}`}
+                      className={`w-3.5 h-3.5 transition-transform ${expandedAdminId === group.adminId ? 'transform rotate-90' : ''}`}
                       style={{ color: '#6b7280' }}
                     />
                   </div>
                 </button>
                 {expandedAdminId === group.adminId && (
-                  <div className="px-4 pb-3">
-                    <div className="mt-2 rounded-lg border" style={{ borderColor: '#e5e7eb', backgroundColor: '#f9fafb' }}>
-                      <div className="max-h-80 overflow-y-auto">
-                        <table className="w-full text-xs">
+                  <div className="px-2.5 pb-2">
+                    <div className="mt-1.5 rounded border" style={{ borderColor: '#e5e7eb', backgroundColor: '#f9fafb' }}>
+                      <div className="max-h-72 overflow-y-auto">
+                        <table className="w-full text-[10px] sm:text-xs">
                           <thead>
                             <tr className="border-b" style={{ borderColor: '#e5e7eb' }}>
-                              <th className="px-3 py-2 text-left font-semibold" style={{ color: '#374151' }}>{t.assignColCandidate || 'Hồ sơ ứng viên'}</th>
-                              <th className="px-3 py-2 text-left font-semibold" style={{ color: '#374151' }}>{t.assignColAssignedBy || 'Người phân công'}</th>
-                              <th className="px-3 py-2 text-left font-semibold" style={{ color: '#374151' }}>{t.assignColAssignedDate || 'Ngày phân công'}</th>
-                              <th className="px-3 py-2 text-left font-semibold" style={{ color: '#374151' }}>{t.assignColNotes || 'Ghi chú'}</th>
-                              <th className="px-3 py-2 text-left font-semibold" style={{ color: '#374151' }}>{t.assignColStatus || 'Trạng thái'}</th>
-                              <th className="px-3 py-2 text-left font-semibold" style={{ color: '#374151' }}>{t.colActions || 'Thao tác'}</th>
+                              <th className="px-2.5 py-1.5 text-left font-semibold" style={{ color: '#374151' }}>{t.assignColCandidate || 'Hồ sơ ứng viên'}</th>
+                              <th className="px-2.5 py-1.5 text-left font-semibold" style={{ color: '#374151' }}>{t.assignColAssignedBy || 'Người phân công'}</th>
+                              <th className="px-2.5 py-1.5 text-left font-semibold" style={{ color: '#374151' }}>{t.assignColAssignedDate || 'Ngày phân công'}</th>
+                              <th className="px-2.5 py-1.5 text-left font-semibold" style={{ color: '#374151' }}>{t.assignColNotes || 'Ghi chú'}</th>
+                              <th className="px-2.5 py-1.5 text-left font-semibold" style={{ color: '#374151' }}>{t.assignColStatus || 'Trạng thái'}</th>
+                              <th className="px-2.5 py-1.5 text-left font-semibold" style={{ color: '#374151' }}>{t.colActions || 'Thao tác'}</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -993,40 +994,40 @@ const CollaboratorAssignmentsPage = () => {
                                     onMouseEnter={() => setHoveredRowIndex(assignment.id)}
                                     onMouseLeave={() => setHoveredRowIndex(null)}
                                   >
-                                    <td className="px-3 py-2">
-                                      <div className="flex items-center gap-2">
-                                        <User className="w-3.5 h-3.5" style={{ color: '#9ca3af' }} />
-                                        <div>
-                                          <div className="text-xs font-medium" style={{ color: '#111827' }}>
+                                    <td className="px-2.5 py-1.5">
+                                      <div className="flex items-center gap-1.5">
+                                        <User className="w-3 h-3" style={{ color: '#9ca3af' }} />
+                                        <div className="min-w-0">
+                                          <div className="text-[10px] sm:text-xs font-medium truncate" style={{ color: '#111827' }}>
                                             {assignment.cvStorage?.name || assignment.cvStorage?.code || '—'}
                                           </div>
-                                          <div className="text-[11px]" style={{ color: '#6b7280' }}>
+                                          <div className="text-[10px] truncate" style={{ color: '#6b7280' }}>
                                             {assignment.cvStorage?.email || '—'} {assignment.cvStorage?.code && `• ${assignment.cvStorage.code}`}
                                           </div>
                                         </div>
                                       </div>
                                     </td>
-                                    <td className="px-3 py-2">
-                                      <div className="text-xs" style={{ color: '#111827' }}>
+                                    <td className="px-2.5 py-1.5">
+                                      <div className="text-[10px] sm:text-xs" style={{ color: '#111827' }}>
                                         {assignment.assignedByAdmin?.name || '—'}
                                       </div>
-                                      <div className="text-[11px]" style={{ color: '#6b7280' }}>
+                                      <div className="text-[10px]" style={{ color: '#6b7280' }}>
                                         {assignment.assignedByAdmin?.email || '—'}
                                       </div>
                                     </td>
-                                    <td className="px-3 py-2">
-                                      <div className="text-xs" style={{ color: '#111827' }}>
+                                    <td className="px-2.5 py-1.5">
+                                      <div className="text-[10px] sm:text-xs" style={{ color: '#111827' }}>
                                         {formatDate(assignment.createdAt || assignment.created_at)}
                                       </div>
                                     </td>
-                                    <td className="px-3 py-2">
-                                      <div className="text-xs max-w-xs truncate" style={{ color: '#4b5563' }}>
+                                    <td className="px-2.5 py-1.5">
+                                      <div className="text-[10px] max-w-xs truncate" style={{ color: '#4b5563' }}>
                                         {assignment.notes || '—'}
                                       </div>
                                     </td>
-                                    <td className="px-3 py-2">
+                                    <td className="px-2.5 py-1.5">
                                       <span
-                                        className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium"
+                                        className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium"
                                         style={{
                                           backgroundColor: assignment.status === 1 ? '#dcfce7' : '#f3f4f6',
                                           color: assignment.status === 1 ? '#166534' : '#1f2937'
@@ -1035,12 +1036,12 @@ const CollaboratorAssignmentsPage = () => {
                                         {assignment.status === 1 ? (t.assignStatusActive || 'Đang hoạt động') : (t.assignStatusCancelled || 'Đã hủy')}
                                       </span>
                                     </td>
-                                    <td className="px-3 py-2">
-                                      <div className="flex items-center gap-1.5">
+                                    <td className="px-2.5 py-1.5">
+                                      <div className="flex items-center gap-1">
                                         <button
                                           type="button"
                                           onClick={() => loadApplicationsForAssignment(assignment, group.adminId)}
-                                          className="px-2 py-1 rounded text-[11px] font-semibold border transition-colors"
+                                          className="px-2 py-0.5 rounded-full text-[10px] font-semibold border transition-colors"
                                           style={{
                                             borderColor: '#bfdbfe',
                                             backgroundColor: isExpanded ? '#eff6ff' : '#ffffff',
@@ -1050,17 +1051,18 @@ const CollaboratorAssignmentsPage = () => {
                                           {t.assignNominationsButton || 'Đơn tiến cử'}
                                         </button>
                                         <button
+                                          type="button"
                                           onClick={() => handleUnassign(assignment.id)}
                                           onMouseEnter={() => setHoveredUnassignButtonIndex(assignment.id)}
                                           onMouseLeave={() => setHoveredUnassignButtonIndex(null)}
-                                          className="p-1.5 rounded transition-colors"
+                                          className="px-2 py-1 rounded-full text-[11px] sm:text-xs font-semibold transition-colors"
                                           style={{
                                             color: hoveredUnassignButtonIndex === assignment.id ? '#991b1b' : '#dc2626',
                                             backgroundColor: hoveredUnassignButtonIndex === assignment.id ? '#fef2f2' : 'transparent'
                                           }}
                                           title={t.assignUnassignTooltip || 'Hủy phân công'}
                                         >
-                                          <Trash2 className="w-4 h-4" />
+                                          <Trash2 className="w-3 h-3" />
                                         </button>
                                       </div>
                                     </td>
@@ -1143,82 +1145,66 @@ const CollaboratorAssignmentsPage = () => {
 
             {/* Pagination */}
             {pagination.totalPages > 1 && (
-              <div className="px-4 py-3 border-t flex items-center justify-between" style={{ borderColor: '#e5e7eb' }}>
-                <div className="text-sm" style={{ color: '#374151' }}>
+              <div className="px-2 py-2 border-t flex items-center justify-between flex-wrap gap-2" style={{ borderColor: '#e5e7eb', backgroundColor: '#f9fafb' }}>
+                <div className="text-[10px] font-semibold" style={{ color: '#374151' }}>
                   {t.myAssignedPaginationShow || 'Hiển thị'} {(currentPage - 1) * itemsPerPage + 1} - {Math.min(currentPage * itemsPerPage, pagination.total)} {t.myAssignedPaginationOf || 'của'} {pagination.total}
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1">
                   <button
+                    type="button"
                     onClick={() => setCurrentPage(1)}
                     disabled={currentPage === 1}
                     onMouseEnter={() => currentPage !== 1 && setHoveredPaginationNavButton('first')}
                     onMouseLeave={() => setHoveredPaginationNavButton(null)}
-                    className="p-1.5 border rounded transition-colors"
-                    style={{
-                      borderColor: '#d1d5db',
-                      backgroundColor: hoveredPaginationNavButton === 'first' ? '#f9fafb' : 'transparent',
-                      opacity: currentPage === 1 ? 0.5 : 1,
-                      cursor: currentPage === 1 ? 'not-allowed' : 'pointer'
-                    }}
+                    className="w-7 h-7 flex items-center justify-center border rounded-full text-[10px] font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                    style={{ borderColor: '#d1d5db', backgroundColor: hoveredPaginationNavButton === 'first' ? '#f3f4f6' : 'transparent' }}
                   >
-                    <ChevronsLeft className="w-4 h-4" />
+                    <ChevronsLeft className="w-3 h-3" />
                   </button>
                   <button
+                    type="button"
                     onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
                     disabled={currentPage === 1}
                     onMouseEnter={() => currentPage !== 1 && setHoveredPaginationNavButton('prev')}
                     onMouseLeave={() => setHoveredPaginationNavButton(null)}
-                    className="p-1.5 border rounded transition-colors"
-                    style={{
-                      borderColor: '#d1d5db',
-                      backgroundColor: hoveredPaginationNavButton === 'prev' ? '#f9fafb' : 'transparent',
-                      opacity: currentPage === 1 ? 0.5 : 1,
-                      cursor: currentPage === 1 ? 'not-allowed' : 'pointer'
-                    }}
+                    className="w-7 h-7 flex items-center justify-center border rounded-full text-[10px] font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                    style={{ borderColor: '#d1d5db', backgroundColor: hoveredPaginationNavButton === 'prev' ? '#f3f4f6' : 'transparent' }}
                   >
-                    <ChevronLeft className="w-4 h-4" />
+                    <ChevronLeft className="w-3 h-3" />
                   </button>
-                  <span className="text-sm" style={{ color: '#374151' }}>
-                    {t.myAssignedPageLabel || 'Trang'} {currentPage} / {pagination.totalPages}
+                  <span className="text-[10px] font-semibold px-1.5" style={{ color: '#374151' }}>
+                    {currentPage} / {pagination.totalPages}
                   </span>
                   <button
+                    type="button"
                     onClick={() => setCurrentPage(prev => Math.min(pagination.totalPages, prev + 1))}
                     disabled={currentPage === pagination.totalPages}
                     onMouseEnter={() => currentPage !== pagination.totalPages && setHoveredPaginationNavButton('next')}
                     onMouseLeave={() => setHoveredPaginationNavButton(null)}
-                    className="p-1.5 border rounded transition-colors"
-                    style={{
-                      borderColor: '#d1d5db',
-                      backgroundColor: hoveredPaginationNavButton === 'next' ? '#f9fafb' : 'transparent',
-                      opacity: currentPage === pagination.totalPages ? 0.5 : 1,
-                      cursor: currentPage === pagination.totalPages ? 'not-allowed' : 'pointer'
-                    }}
+                    className="w-7 h-7 flex items-center justify-center border rounded-full text-[10px] font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                    style={{ borderColor: '#d1d5db', backgroundColor: hoveredPaginationNavButton === 'next' ? '#f3f4f6' : 'transparent' }}
                   >
-                    <ChevronRight className="w-4 h-4" />
+                    <ChevronRight className="w-3 h-3" />
                   </button>
                   <button
+                    type="button"
                     onClick={() => setCurrentPage(pagination.totalPages)}
                     disabled={currentPage === pagination.totalPages}
                     onMouseEnter={() => currentPage !== pagination.totalPages && setHoveredPaginationNavButton('last')}
                     onMouseLeave={() => setHoveredPaginationNavButton(null)}
-                    className="p-1.5 border rounded transition-colors"
-                    style={{
-                      borderColor: '#d1d5db',
-                      backgroundColor: hoveredPaginationNavButton === 'last' ? '#f9fafb' : 'transparent',
-                      opacity: currentPage === pagination.totalPages ? 0.5 : 1,
-                      cursor: currentPage === pagination.totalPages ? 'not-allowed' : 'pointer'
-                    }}
+                    className="w-7 h-7 flex items-center justify-center border rounded-full text-[10px] font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                    style={{ borderColor: '#d1d5db', backgroundColor: hoveredPaginationNavButton === 'last' ? '#f3f4f6' : 'transparent' }}
                   >
-                    <ChevronsRight className="w-4 h-4" />
+                    <ChevronsRight className="w-3 h-3" />
                   </button>
                 </div>
               </div>
             )}
           </>
         )}
-      </div>
+        </div>
 
-      {/* Bulk Assign Section */}
+        {/* Bulk Assign Section */}
       {bulkMode && (
         <div className="rounded-lg p-4 border" style={{ backgroundColor: 'white', borderColor: '#e5e7eb' }}>
           <div className="flex items-center justify-between mb-4">
@@ -1566,6 +1552,7 @@ const CollaboratorAssignmentsPage = () => {
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 };

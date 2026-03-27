@@ -3,13 +3,13 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import apiService from '../../services/api';
 import AgentJobsPageSession1 from '../Agent/AgentJobsPageSession1';
 import AgentJobsPageSession2 from '../Agent/AgentJobsPageSession2';
-import { Plus, Settings, Building2, ChevronDown } from 'lucide-react';
+import { Plus, Building2, ChevronDown } from 'lucide-react';
 
 /**
  * Component danh sách việc làm dùng chung cho Agent, Admin, Admin Group.
  * @param {string} jobsBasePath - Base path cho links (vd: '/agent/jobs', '/admin/jobs')
  * @param {boolean} useAdminAPI - Dùng API admin (get jobs admin) hay API CTV
- * @param {boolean} showAdminToolbar - Hiện toolbar Admin (Công ty Nguồn, campaign, Thêm job, Cài đặt)
+ * @param {boolean} showAdminToolbar - Hiện toolbar Admin (Công ty Nguồn, campaign, Thêm job)
  * @param {string} [createPath] - Đường dẫn trang thêm job (vd: '/admin/jobs/create')
  */
 const JobsListPage = ({
@@ -96,39 +96,39 @@ const JobsListPage = ({
     <div className="flex flex-col lg:flex-row gap-3 lg:gap-3 h-[calc(100vh-100px)] lg:h-[calc(100vh-100px)] overflow-hidden">
       <div className="w-full lg:w-1/4 flex-shrink-0 h-auto lg:h-full overflow-hidden flex flex-col gap-2">
         {showAdminToolbar && (
-          <div className="rounded-lg p-3 border flex-shrink-0" style={{ backgroundColor: 'white', borderColor: '#e5e7eb' }}>
-            <div className="space-y-2">
-              <label className="block text-xs font-semibold" style={{ color: '#111827' }}>Công ty Nguồn</label>
+          <div className="rounded p-1.5 border flex-shrink-0" style={{ backgroundColor: 'white', borderColor: '#e5e7eb' }}>
+            <div className="space-y-0.5">
+              <label className="block text-[9px] font-semibold leading-tight" style={{ color: '#111827' }}>Công ty Nguồn</label>
               <div className="relative" ref={companyDropdownRef}>
                 <button
                   type="button"
                   onClick={() => setCompanyDropdownOpen(!companyDropdownOpen)}
-                  className="w-full px-3 py-2 pr-8 border rounded-lg text-xs text-left flex items-center gap-2"
+                  className="w-full px-1.5 py-0.5 pr-5 border rounded text-[9px] text-left flex items-center gap-1"
                   style={{ borderColor: '#d1d5db', outline: 'none' }}
                 >
-                  <Building2 className="w-3.5 h-3.5 flex-shrink-0" style={{ color: '#9ca3af' }} />
+                  <Building2 className="w-2.5 h-2.5 flex-shrink-0" style={{ color: '#9ca3af' }} />
                   <span className="truncate">
                     {selectedCompany ? (companies.find((c) => c.id === selectedCompany)?.name || 'Chọn công ty') : 'Tất cả công ty'}
                   </span>
-                  <ChevronDown className="w-4 h-4 absolute right-2 top-1/2 -translate-y-1/2" style={{ color: '#6b7280' }} />
+                  <ChevronDown className="w-2.5 h-2.5 absolute right-1 top-1/2 -translate-y-1/2" style={{ color: '#6b7280' }} />
                 </button>
                 {companyDropdownOpen && (
-                  <div className="absolute z-20 mt-1 w-full border rounded-lg shadow-lg overflow-hidden" style={{ backgroundColor: 'white', borderColor: '#e5e7eb' }}>
-                    <div className="p-2 border-b" style={{ borderColor: '#e5e7eb' }}>
+                  <div className="absolute z-20 mt-0.5 w-full border rounded shadow-lg overflow-hidden" style={{ backgroundColor: 'white', borderColor: '#e5e7eb' }}>
+                    <div className="p-1 border-b" style={{ borderColor: '#e5e7eb' }}>
                       <input
                         type="text"
-                        placeholder="Gõ để tìm nhanh công ty..."
+                        placeholder="Gõ để tìm..."
                         value={companySearchText}
                         onChange={(e) => setCompanySearchText(e.target.value)}
-                        className="w-full px-3 py-1.5 border rounded text-xs"
+                        className="w-full px-1.5 py-0.5 border rounded text-[9px]"
                         style={{ borderColor: '#d1d5db', outline: 'none' }}
                         autoFocus
                       />
                     </div>
-                    <div className="max-h-48 overflow-y-auto py-1">
+                    <div className="max-h-28 overflow-y-auto py-0.5">
                       <button
                         type="button"
-                        className="w-full text-left px-3 py-2 text-xs hover:bg-gray-50"
+                        className="w-full text-left px-1.5 py-1 text-[9px] hover:bg-gray-50"
                         onClick={() => { setSelectedCompany(''); setCompanySearchText(''); setCompanyDropdownOpen(false); }}
                       >
                         Tất cả công ty
@@ -137,42 +137,36 @@ const JobsListPage = ({
                         <button
                           key={company.id}
                           type="button"
-                          className="w-full text-left px-3 py-2 text-xs hover:bg-gray-50 flex items-center gap-2"
+                          className="w-full text-left px-1.5 py-1 text-[9px] hover:bg-gray-50 flex items-center gap-1"
                           onClick={() => { setSelectedCompany(company.id); setCompanySearchText(''); setCompanyDropdownOpen(false); }}
                         >
-                          <Building2 className="w-3.5 h-3.5 flex-shrink-0" style={{ color: '#9ca3af' }} />
+                          <Building2 className="w-2.5 h-2.5 flex-shrink-0" style={{ color: '#9ca3af' }} />
                           <span className="truncate">{company.name}</span>
                         </button>
                       ))}
-                      {filteredCompanies.length === 0 && <div className="px-3 py-2 text-xs text-gray-500">Không tìm thấy</div>}
+                      {filteredCompanies.length === 0 && <div className="px-1.5 py-1 text-[9px] text-gray-500">Không tìm thấy</div>}
                     </div>
                   </div>
                 )}
               </div>
             </div>
-            <div className="flex flex-wrap gap-2 mt-3">
+            <div className="flex flex-wrap gap-1 mt-1.5">
               <button
                 type="button"
                 onClick={() => setHasCampaignOnly(!hasCampaignOnly)}
-                className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors"
-                style={{ backgroundColor: hasCampaignOnly ? '#2563eb' : '#f3f4f6', color: hasCampaignOnly ? 'white' : '#374151' }}
+                className="px-1.5 py-0.5 rounded text-[9px] font-semibold transition-colors"
+                style={{ backgroundColor: hasCampaignOnly ? '#dc2626' : '#f3f4f6', color: hasCampaignOnly ? 'white' : '#374151' }}
               >
-                Tìm job đang có campaign
+                Tìm job có campaign
               </button>
               <button
                 type="button"
                 onClick={() => navigate(createPath)}
-                className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5"
-                style={{ backgroundColor: '#facc15', color: '#111827' }}
+                className="px-1.5 py-0.5 rounded text-[9px] font-semibold transition-colors flex items-center gap-0.5"
+                style={{ backgroundColor: '#dc2626', color: 'white' }}
               >
-                <Plus className="w-3.5 h-3.5" />+ Thêm job
-              </button>
-              <button
-                type="button"
-                className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5"
-                style={{ backgroundColor: '#1f2937', color: 'white' }}
-              >
-                <Settings className="w-3.5 h-3.5" />Cài đặt
+                <Plus className="w-2.5 h-2.5" />
+                Thêm job
               </button>
             </div>
           </div>

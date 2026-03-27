@@ -5,14 +5,15 @@ import puppeteer from 'puppeteer';
 import { generateJdTemplateHtml } from '../utils/jdTemplateHtml.js';
 
 /**
- * Tạo PDF buffer từ dữ liệu Job (với recruitingCompany, category, salaryRanges, ...)
+ * Tạo PDF buffer từ dữ liệu Job theo ngôn ngữ
  * @param {Object} job - Job model instance đã include đầy đủ (recruitingCompany, category, salaryRanges, requirements, workingLocations, ...)
+ * @param {string} [lang='vi'] - 'vi' | 'en' | 'jp'
  * @returns {Promise<Buffer|null>} PDF buffer hoặc null nếu lỗi
  */
-export async function generateJdPdfBuffer(job) {
+export async function generateJdPdfBuffer(job, lang = 'vi') {
   let browser = null;
   try {
-    const html = generateJdTemplateHtml(job);
+    const html = generateJdTemplateHtml(job, lang);
     browser = await puppeteer.launch({
       headless: true,
       args: [

@@ -332,16 +332,123 @@ export async function copyCvTemplatesToNewSnapshot(cvId, newDateTime, sourceTemp
 }
 
 /**
- * Build S3 key cho JD template PDF - lưu theo folder job.
- * Format: job_descriptions/{jobId}/jd-template.pdf (bucket jshare3, prefix jsshare)
- * Full key: jsshare/job_descriptions/{jobId}/jd-template.pdf
+ * Build S3 key cho JD file theo loại - lưu trong folder job_descriptions/{jobId}/.
+ * @param {number|string} jobId - ID của Job
+ * @param {string} type - 'original' | 'file_vn' | 'file_eng' | 'file_jp'
+ * @returns {string} Full S3 key (e.g. jsshare/job_descriptions/123/file_vn.pdf)
+ */
+export function buildJdFileKey(jobId, type) {
+  const keyPart = `job_descriptions/${jobId}/${type}.pdf`;
+  const prefix = (s3Config.keyPrefix || '').trim();
+  return prefix ? `${prefix}/${keyPart}` : keyPart;
+}
+
+/**
+ * Build S3 key cho JD template PDF (bản Việt) - backward compat.
  * @param {number|string} jobId - ID của Job
  * @returns {string} Full S3 key
  */
 export function buildJdTemplatePdfKey(jobId) {
-  const keyPart = `job_descriptions/${jobId}/jd-template.pdf`;
-  const prefix = (s3Config.keyPrefix || '').trim();
-  return prefix ? `${prefix}/${keyPart}` : keyPart;
+  return buildJdFileKey(jobId, 'file_vn');
+}
+
+/**
+ * Build S3 key cho ảnh bài viết: posts/{postId}/{uuid}.{ext}
+ * @param {number|string} postId
+ * @param {string} [originalFilename] - để lấy extension (vd: image.png)
+ * @returns {string} Full S3 key
+ */
+export function buildPostImageKey(postId, originalFilename = '') {
+  const id = String(postId).trim();
+  if (!id || id === 'undefined' || id === 'null') throw new Error('buildPostImageKey: postId không hợp lệ');
+  const ext = (originalFilename && originalFilename.includes('.'))
+    ? '.' + originalFilename.split('.').pop().toLowerCase().replace(/[^a-z0-9]/g, '')
+    : '.jpg';
+  const safeExt = ext === '.' ? '.jpg' : ext;
+  const keyPart = `posts/${id}/${uuidv4()}${safeExt}`;
+  return withPrefix(keyPart);
+}
+
+/**
+ * Build S3 key cho ảnh tạm (khi tạo bài viết mới chưa có id): posts/temp/{uuid}.{ext}
+ */
+export function buildPostTempImageKey(originalFilename = '') {
+  const ext = (originalFilename && originalFilename.includes('.'))
+    ? '.' + originalFilename.split('.').pop().toLowerCase().replace(/[^a-z0-9]/g, '')
+    : '.jpg';
+  const safeExt = ext === '.' ? '.jpg' : ext;
+  const keyPart = `posts/temp/${uuidv4()}${safeExt}`;
+  return withPrefix(keyPart);
+}
+
+/**
+ * Build S3 key cho thumbnail bài viết (cùng folder bài viết): posts/{postId}/thumb_{uuid}.{ext}
+ */
+export function buildPostThumbnailKey(postId, originalFilename = '') {
+  const id = String(postId).trim();
+  if (!id || id === 'undefined' || id === 'null') throw new Error('buildPostThumbnailKey: postId không hợp lệ');
+  const ext = (originalFilename && originalFilename.includes('.'))
+    ? '.' + originalFilename.split('.').pop().toLowerCase().replace(/[^a-z0-9]/g, '')
+    : '.jpg';
+  const safeExt = ext === '.' ? '.jpg' : ext;
+  const keyPart = `posts/${id}/thumb_${uuidv4()}${safeExt}`;
+  return withPrefix(keyPart);
+}
+
+/**
+ * Build S3 key cho file đính kèm tin nhắn.
+ * Format: attachment/{jobApplicationId}/{uuid}_{safeName}.{ext}
+ */
+export function buildMessageAttachmentKey(jobApplicationId, originalFilename = '') {
+  const id = String(jobApplicationId || '').trim();
+  if (!id || id === 'undefined' || id === 'null') {
+    throw new Error('buildMessageAttachmentKey: jobApplicationId không hợp lệ');
+  }
+  const base = path.basename(originalFilename || 'attachment');
+  const ext = path.extname(base).toLowerCase().replace(/[^a-z0-9.]/g, '') || '';
+  const nameWithoutExt = path.basename(base, ext || undefined);
+  const safeName = (nameWithoutExt || 'attachment')
+    .replace(/[^a-zA-Z0-9\-_.\s]/g, '-')
+    .replace(/-+/g, '-')
+    .trim()
+    .slice(0, 80) || 'attachment';
+  const keyPart = `attachment/${id}/${uuidv4()}_${safeName}${ext || ''}`;
+  return withPrefix(keyPart);
+}
+
+/**
+ * Build S3 key cho thumbnail tạm (chưa có post id): posts/temp/thumb_{uuid}.{ext}
+ */
+export function buildPostTempThumbnailKey(originalFilename = '') {
+  const ext = (originalFilename && originalFilename.includes('.'))
+    ? '.' + originalFilename.split('.').pop().toLowerCase().replace(/[^a-z0-9]/g, '')
+    : '.jpg';
+  const safeExt = ext === '.' ? '.jpg' : ext;
+  const keyPart = `posts/temp/thumb_${uuidv4()}${safeExt}`;
+  return withPrefix(keyPart);
+}
+
+/**
+ * Copy thumbnail từ temp (posts/temp/thumb_xxx) sang folder bài viết posts/{postId}/thumb_xxx.
+ * @param {string} sourceTempKey - key S3 của file temp (vd. posts/temp/thumb_uuid.jpg)
+ * @param {number|string} postId
+ * @returns {Promise<string>} key đích (posts/{id}/thumb_xxx.ext) để lưu DB
+ */
+export async function copyPostTempThumbnailToPost(sourceTempKey, postId) {
+  const client = getClient();
+  if (!client || !sourceTempKey) return null;
+  const id = String(postId).trim();
+  if (!id) return null;
+  const ext = path.extname(sourceTempKey) || '.jpg';
+  const destKey = withPrefix(`posts/${id}/thumb_${uuidv4()}${ext}`);
+  const bucket = s3Config.bucket;
+  const fullSource = resolveS3Key(sourceTempKey);
+  await client.send(new CopyObjectCommand({
+    Bucket: bucket,
+    CopySource: `${bucket}/${fullSource}`,
+    Key: destKey
+  }));
+  return destKey;
 }
 
 /**
@@ -413,6 +520,7 @@ export function isS3Key(storedPath) {
   if (normalized.startsWith('uploads/') || normalized.startsWith('http')) return false;
   return /^apply\//.test(normalized) || /cvs\//.test(normalized) || /jobs\//.test(normalized) ||
     /job_descriptions\//.test(normalized) ||
+    /^posts\//.test(normalized) ||
     /^jsshare\//.test(normalized) ||
     (s3Config.keyPrefix && normalized.startsWith(s3Config.keyPrefix + '/'));
 }
@@ -542,6 +650,8 @@ export default {
   copyCvTemplatesToNewSnapshot,
   listKeysUnderPrefix,
   buildJdTemplatePdfKey,
+  buildJdFileKey,
+  buildMessageAttachmentKey,
   isS3Key,
   makeDownloadDisposition,
   getSignedUrlForFile,

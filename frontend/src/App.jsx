@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import './App.css';
 import { LanguageProvider } from './context/LanguageContext';
+import { NotificationProvider } from './context/NotificationContext';
 import ProtectedRoute from './component/ProtectedRoute';
 import AgentLayout from './component/Layout/AgentLayout';
 import AdminLayout from './component/Layout/AdminLayout';
@@ -12,11 +13,13 @@ import HomePage from './page/Agent/HomePage';
 import CandidatesPage from './page/Agent/CandidatesPage';
 import NominationsPage from './page/Agent/NominationsPage';
 import PaymentHistoryPage from './page/Agent/PaymentHistoryPage';
+import AgentPaymentRequestDetailPage from './page/Agent/PaymentRequestDetailPage';
 import ContactPage from './page/Agent/ContactPage';
 import FAQPage from './page/Agent/FAQPage';
 import TermsPage from './page/Agent/TermsPage';
 import HotlinePage from './page/Agent/HotlinePage';
 import AgentProfilePage from './page/Agent/AgentProfilePage';
+import NotificationsPage from './page/Agent/NotificationsPage';
 import AddCandidateForm from './component/Shared/AddCandidateForm';
 import NominationPage from './page/Agent/NominationPage';
 import CandidateDetail from './page/Agent/CandidateDetail';
@@ -45,7 +48,6 @@ import AccountsPage from './page/Admin/AccountsPage';
 import CampaignsPage from './page/Admin/CampaignsPage';
 import AddCampaignPage from './page/Admin/AddCampaignPage';
 import AdminCampaignDetailPage from './page/Admin/AdminCampaignDetailPage';
-import EmailsPage from './page/Admin/EmailsPage';
 import SettingsPage from './page/Admin/SettingsPage';
 import JobCategoriesPage from './page/Admin/JobCategoriesPage';
 import AddJobCategoryPage from './page/Admin/AddJobCategoryPage';
@@ -58,9 +60,17 @@ import AddGroupPage from './page/Admin/AddGroupPage';
 import AddAdminPage from './page/Admin/AddAdminPage';
 import GroupCandidatesPage from './page/Admin/GroupCandidatesPage';
 import GroupCollaboratorsPage from './page/Admin/GroupCollaboratorsPage';
+import EmailPage from './page/Admin/EmailPage';
+import PostsPage from './page/Admin/PostsPage';
+import EventsPage from './page/Admin/EventsPage';
+import AddEventPage from './page/Admin/AddEventPage';
+import EventDetailPage from './page/Admin/EventDetailPage';
 import LoginPage from './page/LoginPage';
 import RegisterPage from './page/RegisterPage';
+import VerifyEmailPage from './page/VerifyEmailPage';
 import LandingPage from './page/LandingPage';
+import BlogPage from './page/BlogPage';
+import AgentEventDetailPage from './page/Agent/EventDetailPage';
 
 // Admin Job Detail: phân quyền Chỉnh sửa (chỉ SuperAdmin role=1, AdminBackOffice role=2)
 const AdminJobDetailWrapper = () => {
@@ -131,11 +141,13 @@ const RootRoute = () => {
 function App() {
   return (
     <LanguageProvider>
+      <NotificationProvider>
       <BrowserRouter basename="/">
         <Routes>
           {/* Login Routes */}
           <Route path="/login" element={<LoginPage defaultUserType="ctv" />} />
           <Route path="/register" element={<RegisterPage />} />
+          <Route path="/register/verify-email" element={<VerifyEmailPage />} />
           <Route path="/admin/login" element={<LoginPage defaultUserType="admin" />} />
 
           {/* Agent Routes - Yêu cầu đăng nhập với userType = 'ctv' */}
@@ -151,6 +163,7 @@ function App() {
             <Route path="jobs" element={<JobsListPage jobsBasePath="/agent/jobs" useAdminAPI={false} showAdminToolbar={false} />} />
             <Route path="jobs/:jobId" element={<JobDetailPage getJobApi={apiService.getJobById} backPath="/agent/jobs" showEditButton={false} />} />
             <Route path="jobs/:jobId/nominate" element={<NominationPage />} />
+            <Route path="events/:eventId" element={<AgentEventDetailPage />} />
             <Route path="candidates" element={<CandidatesPage />} />
             <Route path="candidates/create" element={<AddCandidateForm />} />
             <Route path="candidates/:candidateId" element={<CandidateDetail />} />
@@ -159,7 +172,9 @@ function App() {
             <Route path="nominations" element={<NominationsPage />} />
             <Route path="nominations/:nominationId" element={<NominationDetail />} />
             <Route path="payment-history" element={<PaymentHistoryPage />} />
+            <Route path="payment-history/:id" element={<AgentPaymentRequestDetailPage />} />
             <Route path="profile" element={<AgentProfilePage />} />
+            <Route path="notifications" element={<NotificationsPage />} />
             <Route path="contact" element={<ContactPage />} />
             <Route path="faq" element={<FAQPage />} />
             <Route path="terms" element={<TermsPage />} />
@@ -223,14 +238,25 @@ function App() {
             <Route path="groups/new" element={<AddGroupPage />} />
             <Route path="groups/:id" element={<GroupDetailPage />} />
             <Route path="groups/:id/edit" element={<AddGroupPage />} />
-            <Route path="emails" element={<EmailsPage />} />
+            <Route path="emails" element={<EmailPage />} />
+            <Route path="events" element={<EventsPage />} />
+            <Route path="events/new" element={<AddEventPage />} />
+            <Route path="events/:eventId" element={<EventDetailPage />} />
+            <Route path="events/:eventId/edit" element={<AddEventPage />} />
+            <Route path="posts" element={<PostsPage />} />
+            <Route path="posts/create" element={<PostsPage />} />
+            <Route path="posts/:id/edit" element={<PostsPage />} />
             <Route path="settings" element={<SettingsPage />} />
           </Route>
+
+          {/* Public Blog (no auth) */}
+          <Route path="/blog" element={<BlogPage />} />
 
           {/* Root route - Landing page (nếu đã đăng nhập thì redirect agent/admin) */}
           <Route path="/" element={<RootRoute />} />
         </Routes>
       </BrowserRouter>
+      </NotificationProvider>
     </LanguageProvider>
   );
 }

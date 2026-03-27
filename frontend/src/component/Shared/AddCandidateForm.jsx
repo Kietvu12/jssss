@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { flushSync } from 'react-dom';
 import { useNavigate, useParams } from 'react-router-dom';
 import CvTemplateCommon from './CvTemplateCommon';
 import CvTemplateIt from './CvTemplateIt';
@@ -10,6 +11,7 @@ import 'react-datepicker/dist/react-datepicker.css';
 registerLocale('vi', vi);
 import apiService from '../../services/api';
 import { useLanguage } from '../../context/LanguageContext';
+import { useNotification } from '../../context/NotificationContext';
 import { translations } from '../../translations/translations';
 import {
   ArrowLeft,
@@ -41,7 +43,84 @@ const AddCandidateForm = ({ isAdmin = false, jobId = null, candidateId: candidat
   const navigate = useNavigate();
   const { candidateId: candidateIdFromParams } = useParams();
   const { language } = useLanguage();
+  const notify = useNotification();
   const t = translations[language] || translations.vi;
+  // Đồng bộ nhãn visa với ô "Tư cách lưu trú" ở AddJobPage (vi/en/ja),
+  // nhưng vẫn giữ value số để tương thích dữ liệu hiện tại trong DB.
+  const RESIDENCE_STATUS_OPTIONS = [
+    {
+      value: '1',
+      vi: 'Visa lao động (kỹ thuật - nhân văn)',
+      en: 'Engineer/Specialist in Humanities/International Services',
+      ja: '技術・人文知識・国際業務',
+    },
+    {
+      value: '2',
+      vi: 'Visa kỹ năng đặc định',
+      en: 'Specified Skilled Worker',
+      ja: '特定技能',
+    },
+    {
+      value: '3',
+      vi: 'Visa du học',
+      en: 'Student',
+      ja: '留学',
+    },
+    {
+      value: '4',
+      vi: 'Vĩnh trú',
+      en: 'Permanent resident',
+      ja: '永住者',
+    },
+    {
+      value: '5',
+      vi: 'Vợ/chồng người Nhật',
+      en: 'Spouse of Japanese national',
+      ja: '日本人の配偶者等',
+    },
+    {
+      value: '6',
+      vi: 'Visa định trú',
+      en: 'Long-term Resident',
+      ja: '定住者',
+    },
+    {
+      value: '7',
+      vi: 'Khác',
+      en: 'Other',
+      ja: 'その他',
+    },
+    // Các tư cách lưu trú bổ sung theo AddJobPage
+    {
+      value: '8',
+      vi: 'Visa chuyên gia trình độ cao',
+      en: 'Highly Skilled Professional',
+      ja: '高度専門職',
+    },
+    {
+      value: '9',
+      vi: 'Visa lao động kỹ năng',
+      en: 'Technical Intern Training',
+      ja: '技能実習',
+    },
+    {
+      value: '10',
+      vi: 'Visa phụ thuộc gia đình',
+      en: 'Dependent',
+      ja: '家族滞在',
+    },
+    {
+      value: '11',
+      vi: 'Visa ngắn hạn',
+      en: 'Short-term stay',
+      ja: '短期滞在',
+    },
+  ];
+  const getResidenceStatusLabel = (opt) => {
+    if (language === 'en') return opt.en;
+    if (language === 'ja') return opt.ja;
+    return opt.vi;
+  };
   const candidateId = candidateIdProp ?? candidateIdFromParams;
   const [formData, setFormData] = useState({
     collaboratorId: '',
@@ -63,10 +142,8 @@ const AddCandidateForm = ({ isAdmin = false, jobId = null, candidateId: candidat
     hasSpouse: '',
     spouseDependent: '',
     passport: '',
-    currentResidence: '',
     jpResidenceStatus: '',
     visaExpirationDate: '',
-    otherCountry: '',
     // Nhật滞在目的 (mục đích ở Nhật) – map ra preview
     stayPurpose: '',
     // 外国語の会話レベル
@@ -84,13 +161,24 @@ const AddCandidateForm = ({ isAdmin = false, jobId = null, candidateId: candidat
     certificates: [],
     learnedTools: [],
     experienceTools: [],
+    toolsSoftwareNotes: {
+      learned: {},
+      experienced: {},
+      experiencedOther: ''
+    },
     jlptLevel: '',
+    jlptAcquiredYear: '',
+    jlptAcquiredMonth: '',
     toeicScore: '',
+    toeicYear: '',
+    toeicMonth: '',
     ieltsScore: '',
+    ieltsYear: '',
+    ieltsMonth: '',
     experienceYears: '',
-    specialization: '',
-    qualification: '',
     hasDrivingLicense: '',
+    drivingLicenseYear: '',
+    drivingLicenseMonth: '',
     // Self Introduction
     careerSummary: '',
     strengths: '',
@@ -117,8 +205,11 @@ const AddCandidateForm = ({ isAdmin = false, jobId = null, candidateId: candidat
   const [parseError, setParseError] = useState(null);
   const [parseSuccess, setParseSuccess] = useState(null);
   const [errors, setErrors] = useState({});
-  const [loading, setLoading] = useState(false);
-  
+  /** Loading khi tải dữ liệu ứng viên (mở form chỉnh sửa) */
+  const [initialLoading, setInitialLoading] = useState(false);
+  /** Loading khi lưu CV (backend tạo 3 bản PDF) */
+  const [saving, setSaving] = useState(false);
+
   // Hover states
   const [hoveredBackButton, setHoveredBackButton] = useState(false);
   const [hoveredCancelButton, setHoveredCancelButton] = useState(false);
@@ -222,7 +313,7 @@ const AddCandidateForm = ({ isAdmin = false, jobId = null, candidateId: candidat
 
   const loadCandidateData = async () => {
     try {
-      setLoading(true);
+      setInitialLoading(true);
       const response = isAdmin
         ? await apiService.getAdminCVById(candidateId)
         : await apiService.getCVStorageById(candidateId);
@@ -250,7 +341,7 @@ const AddCandidateForm = ({ isAdmin = false, jobId = null, candidateId: candidat
           }
           setCollaboratorSearchQuery('');
           setCollaboratorSuggestions([]);
-          setLoading(false);
+          setInitialLoading(false);
           return;
         }
 
@@ -296,23 +387,24 @@ const AddCandidateForm = ({ isAdmin = false, jobId = null, candidateId: candidat
           hasSpouse: cv.hasSpouse === 1 || cv.hasSpouse === '1' || cv.hasSpouse === '有' ? '有' : (cv.hasSpouse === 0 || cv.hasSpouse === '0' || cv.hasSpouse === '無' ? '無' : ''),
           spouseDependent: cv.spouseDependent === 1 || cv.spouseDependent === '1' || cv.spouseDependent === '有' ? '有' : (cv.spouseDependent === 0 || cv.spouseDependent === '0' || cv.spouseDependent === '無' ? '無' : ''),
           passport: cv.passport ? cv.passport.toString() : '',
-          currentResidence: cv.currentResidence ? cv.currentResidence.toString() : '',
           jpResidenceStatus: cv.jpResidenceStatus ? cv.jpResidenceStatus.toString() : '',
           visaExpirationDate: visaExpirationDate,
-          otherCountry: cv.otherCountry || '',
           educations: normalizeEducationsFromLegacy(cv.educations ? (typeof cv.educations === 'string' ? JSON.parse(cv.educations) : cv.educations) : []),
           workExperiences: expandWorkExperiencesFromBlock(cv.workExperiences ? (typeof cv.workExperiences === 'string' ? JSON.parse(cv.workExperiences) : cv.workExperiences) : []),
           technicalSkills: cv.technicalSkills || '',
           certificates: cv.certificates ? (typeof cv.certificates === 'string' ? JSON.parse(cv.certificates) : cv.certificates) : [],
           learnedTools: cv.learnedTools ? (typeof cv.learnedTools === 'string' ? JSON.parse(cv.learnedTools) : cv.learnedTools) : [],
           experienceTools: cv.experienceTools ? (typeof cv.experienceTools === 'string' ? JSON.parse(cv.experienceTools) : cv.experienceTools) : [],
+          toolsSoftwareNotes: cv.toolsSoftwareNotes
+            ? (typeof cv.toolsSoftwareNotes === 'string' ? JSON.parse(cv.toolsSoftwareNotes) : cv.toolsSoftwareNotes)
+            : { learned: {}, experienced: {}, experiencedOther: '' },
           jlptLevel: cv.jlptLevel ? cv.jlptLevel.toString() : '',
           toeicScore: cv.toeicScore != null ? cv.toeicScore.toString() : '',
           ieltsScore: cv.ieltsScore != null ? cv.ieltsScore.toString() : '',
           experienceYears: cv.experienceYears ? cv.experienceYears.toString() : '',
-          specialization: cv.specialization ? cv.specialization.toString() : '',
-          qualification: cv.qualification ? cv.qualification.toString() : '',
           hasDrivingLicense: cv.hasDrivingLicense != null ? cv.hasDrivingLicense.toString() : '',
+          drivingLicenseYear: cv.drivingLicenseYear || '',
+          drivingLicenseMonth: cv.drivingLicenseMonth || '',
           careerSummary: cv.careerSummary || '',
           strengths: cv.strengths || '',
           remarks: cv.notes || '',
@@ -339,10 +431,10 @@ const AddCandidateForm = ({ isAdmin = false, jobId = null, candidateId: candidat
       }
     } catch (error) {
       console.error('Error loading candidate data:', error);
-      alert('Lỗi khi tải thông tin ứng viên');
+      notify.error('Lỗi khi tải thông tin ứng viên');
       setExistingCvOriginalPath('');
     } finally {
-      setLoading(false);
+      setInitialLoading(false);
     }
   };
 
@@ -350,7 +442,7 @@ const AddCandidateForm = ({ isAdmin = false, jobId = null, candidateId: candidat
     const file = e.target.files?.[0];
     if (!file) return;
     if (!file.type.startsWith('image/')) {
-      alert('Vui lòng chọn file ảnh (JPG, PNG, ...)');
+      notify.warning('Vui lòng chọn file ảnh (JPG, PNG, ...)');
       return;
     }
     setAvatarFile(file);
@@ -381,14 +473,14 @@ const AddCandidateForm = ({ isAdmin = false, jobId = null, candidateId: candidat
         ? await apiService.previewAdminCVTemplate(payload)
         : await apiService.previewCTVCVTemplate(payload);
       if (!res.ok) {
-        alert(`Preview thất bại (status ${res.status})`);
+        notify.error(`Preview thất bại (status ${res.status})`);
         setShowPreviewModal(false);
         return;
       }
       setPreviewHtml(res.html || '');
     } catch (e) {
       console.error('Error previewing CV template:', e);
-      alert('Có lỗi khi preview CV template.');
+      notify.error('Có lỗi khi preview CV template.');
       setShowPreviewModal(false);
     } finally {
       setPreviewLoading(false);
@@ -411,14 +503,14 @@ const AddCandidateForm = ({ isAdmin = false, jobId = null, candidateId: candidat
         ? await apiService.previewAdminCVTemplate(payload)
         : await apiService.previewCTVCVTemplate(payload);
       if (!res.ok) {
-        alert(`Preview thất bại (status ${res.status})`);
+        notify.error(`Preview thất bại (status ${res.status})`);
         setShowPreviewModal(false);
         return;
       }
       setPreviewHtml(res.html || '');
     } catch (e) {
       console.error('Error previewing CV template:', e);
-      alert('Có lỗi khi preview CV template.');
+      notify.error('Có lỗi khi preview CV template.');
       setShowPreviewModal(false);
     } finally {
       setPreviewLoading(false);
@@ -721,7 +813,14 @@ const AddCandidateForm = ({ isAdmin = false, jobId = null, candidateId: candidat
       const endStr = parts[1] || '';
       const startYm = parseApiDateToYearMonth(startStr);
       const endYm = parseApiDateToYearMonth(endStr);
-      const base = { business_purpose: we.business_purpose || '', scale_role: we.scale_role || '', description: we.description || '', tools_tech: we.tools_tech || '', period };
+      const base = {
+        business_purpose: we.business_purpose || '',
+        scale_role: we.scale_role || '',
+        description: we.description || '',
+        tools_tech: we.tools_tech || '',
+        period,
+        reason_for_leaving: we.reason_for_leaving || '',
+      };
       result.push({ ...base, year: startYm.year, month: startYm.month, company_name: cn ? `${cn} 入社` : '入社' });
       result.push({ ...base, year: endYm.year, month: endYm.month, company_name: cn ? `${cn} 退社` : '退社' });
     }
@@ -818,7 +917,8 @@ const AddCandidateForm = ({ isAdmin = false, jobId = null, candidateId: candidat
           business_purpose: job.business_objective || '',
           scale_role: job.team_size_role || '',
           description: job.responsibilities || '',
-          tools_tech: Array.isArray(job.tools) ? job.tools.join(', ') : (job.tools || '')
+          tools_tech: Array.isArray(job.tools) ? job.tools.join(', ') : (job.tools || ''),
+          reason_for_leaving: job.reason_for_leaving || '',
         }))
       : null;
     const workFromShokumu = workFromShokumuRaw?.length ? expandWorkExperiencesFromBlock(workFromShokumuRaw) : null;
@@ -1001,6 +1101,7 @@ const AddCandidateForm = ({ isAdmin = false, jobId = null, candidateId: candidat
         team_size_role: we.scale_role || '',
         responsibilities: we.description || '',
         tools: (we.tools_tech || '').split(/[,、]/).map(t => t.trim()).filter(Boolean),
+        reason_for_leaving: we.reason_for_leaving || '',
       };
     });
 
@@ -1256,7 +1357,17 @@ const AddCandidateForm = ({ isAdmin = false, jobId = null, candidateId: candidat
       if (!r || r.type !== 'addWork') return prev;
       cvInsertPendingRef.current = null;
       const nextList = [...(prev.workExperiences || []),
-        { year: '', month: '', period: '', company_name: '', business_purpose: '', scale_role: '', description: '', tools_tech: '' }
+        {
+          year: '',
+          month: '',
+          period: '',
+          company_name: '',
+          business_purpose: '',
+          scale_role: '',
+          description: '',
+          tools_tech: '',
+          reason_for_leaving: '',
+        }
       ];
       const nextBlockCount = (prev.workHistoryCount != null ? prev.workHistoryCount : (prev.workExperiences?.length || 0)) + 1;
       return { ...prev, workExperiences: nextList, workHistoryCount: nextBlockCount };
@@ -1448,12 +1559,12 @@ const AddCandidateForm = ({ isAdmin = false, jobId = null, candidateId: candidat
   const handleAddExperienceTool = () => {
     setFormData(prev => ({
       ...prev,
-      experienceTools: [...prev.experienceTools, '']
+      experienceTools: [...(prev.experienceTools || []), '']
     }));
   };
 
   const updateExperienceTool = (index, value) => {
-    const updated = [...formData.experienceTools];
+    const updated = [...(formData.experienceTools || [])];
     updated[index] = value;
     setFormData(prev => ({ ...prev, experienceTools: updated }));
   };
@@ -1477,7 +1588,7 @@ const AddCandidateForm = ({ isAdmin = false, jobId = null, candidateId: candidat
   const removeExperienceTool = (index) => {
     setFormData(prev => ({
       ...prev,
-      experienceTools: prev.experienceTools.filter((_, i) => i !== index)
+      experienceTools: (prev.experienceTools || []).filter((_, i) => i !== index)
     }));
   };
 
@@ -1487,6 +1598,49 @@ const AddCandidateForm = ({ isAdmin = false, jobId = null, candidateId: candidat
       next.splice(index + 1, 0, '');
       return { ...prev, experienceTools: next };
     });
+  };
+
+  const TECHNICAL_TOOLS = ['AutoCAD', 'CATIA', 'I-DEAS', 'SolidWorks', 'PLC', 'C++', 'NX', 'Java'];
+
+  const handleAddLearnedToolFromSelect = (e) => {
+    const value = e.target.value;
+    if (!value) return;
+    if (value === '__OTHER__') {
+      setFormData(prev => ({
+        ...prev,
+        learnedTools: [...(prev.learnedTools || []), '']
+      }));
+      e.target.value = '';
+      return;
+    }
+    setFormData(prev => {
+      const list = prev.learnedTools || [];
+      if (list.includes(value)) return prev;
+      return { ...prev, learnedTools: [...list, value] };
+    });
+    e.target.value = '';
+  };
+
+  const handleAddExperienceToolFromSelect = (e) => {
+    const value = e.target.value;
+    if (!value) return;
+    setFormData(prev => {
+      const list = prev.experienceTools || [];
+      if (list.includes(value)) return prev;
+      return { ...prev, experienceTools: [...list, value] };
+    });
+    e.target.value = '';
+  };
+
+  const handleAddCertificateOfType = (name) => {
+    if (!name) return;
+    setFormData(prev => ({
+      ...prev,
+      certificates: [
+        ...(prev.certificates || []),
+        { year: '', month: '', name }
+      ]
+    }));
   };
 
   const validateForm = () => {
@@ -1515,14 +1669,15 @@ const AddCandidateForm = ({ isAdmin = false, jobId = null, candidateId: candidat
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = (e) => {
     e.preventDefault();
     if (isAdmin && !validateForm()) {
       return;
     }
-
+    setSaving(true);
+    flushSync(() => {}); // Buộc React commit UI ngay (hiển thị banner + nút "Đang lưu...")
+    setTimeout(async () => {
     try {
-      setLoading(true);
       const submitFormData = new FormData();
       
       // Map frontend field names to backend field names
@@ -1551,14 +1706,12 @@ const AddCandidateForm = ({ isAdmin = false, jobId = null, candidateId: candidat
       if (formData.hasSpouse) submitFormData.append('hasSpouse', formData.hasSpouse === '有' ? '1' : '0');
       if (formData.spouseDependent) submitFormData.append('spouseDependent', formData.spouseDependent === '有' ? '1' : '0');
       if (formData.passport) submitFormData.append('passport', formData.passport);
-      if (formData.currentResidence) submitFormData.append('currentResidence', formData.currentResidence);
       if (formData.jpResidenceStatus) submitFormData.append('jpResidenceStatus', formData.jpResidenceStatus);
       if (formData.stayPurpose) submitFormData.append('stayPurpose', formData.stayPurpose);
       if (formData.jpConversationLevel) submitFormData.append('jpConversationLevel', formData.jpConversationLevel);
       if (formData.enConversationLevel) submitFormData.append('enConversationLevel', formData.enConversationLevel);
       if (formData.otherConversationLevel) submitFormData.append('otherConversationLevel', formData.otherConversationLevel);
       submitFormData.append('visaExpirationDate', formData.visaExpirationDate || '');
-      submitFormData.append('otherCountry', formData.otherCountry || '');
       
       // JSON fields - send as JSON strings (backend will parse)
       submitFormData.append('educations', JSON.stringify(formData.educations || []));
@@ -1570,16 +1723,27 @@ const AddCandidateForm = ({ isAdmin = false, jobId = null, candidateId: candidat
       if (formData.experienceTools && formData.experienceTools.length > 0) {
         submitFormData.append('experienceTools', JSON.stringify(formData.experienceTools));
       }
+      if (formData.toolsSoftwareNotes) {
+        submitFormData.append('toolsSoftwareNotes', JSON.stringify(formData.toolsSoftwareNotes));
+      }
       
       // Skills and summary
       submitFormData.append('technicalSkills', formData.technicalSkills || '');
       if (formData.jlptLevel) submitFormData.append('jlptLevel', formData.jlptLevel);
+      if (formData.jlptAcquiredYear) submitFormData.append('jlptAcquiredYear', formData.jlptAcquiredYear);
       if (formData.toeicScore !== undefined && formData.toeicScore !== '') submitFormData.append('toeicScore', formData.toeicScore);
+      if (formData.toeicYear) submitFormData.append('toeicYear', formData.toeicYear);
+      if (formData.toeicMonth) submitFormData.append('toeicMonth', formData.toeicMonth);
+      if (formData.toeicScore || formData.toeicYear || formData.toeicMonth) submitFormData.append('toeicCertName', 'TOEIC');
       if (formData.ieltsScore !== undefined && formData.ieltsScore !== '') submitFormData.append('ieltsScore', formData.ieltsScore);
+      if (formData.ieltsYear) submitFormData.append('ieltsYear', formData.ieltsYear);
+      if (formData.ieltsMonth) submitFormData.append('ieltsMonth', formData.ieltsMonth);
+      if (formData.ieltsScore || formData.ieltsYear || formData.ieltsMonth) submitFormData.append('ieltsCertName', 'IELTS');
       if (formData.experienceYears) submitFormData.append('experienceYears', formData.experienceYears);
-      if (formData.specialization) submitFormData.append('specialization', formData.specialization);
-      if (formData.qualification) submitFormData.append('qualification', formData.qualification);
       if (formData.hasDrivingLicense !== '') submitFormData.append('hasDrivingLicense', formData.hasDrivingLicense);
+      if (formData.drivingLicenseYear) submitFormData.append('drivingLicenseYear', formData.drivingLicenseYear);
+      if (formData.drivingLicenseMonth) submitFormData.append('drivingLicenseMonth', formData.drivingLicenseMonth);
+      if (formData.hasDrivingLicense === '1' || formData.drivingLicenseYear || formData.drivingLicenseMonth) submitFormData.append('drivingLicenseCertName', '自動車免許');
       submitFormData.append('careerSummary', formData.careerSummary || '');
       submitFormData.append('strengths', formData.strengths || '');
       submitFormData.append('notes', formData.remarks || '');
@@ -1628,11 +1792,11 @@ const AddCandidateForm = ({ isAdmin = false, jobId = null, candidateId: candidat
         ? await apiService.updateAdminCV(candidateId, submitFormData)
         : await apiService.createAdminCV(submitFormData);
       if (response.success) {
-        alert(candidateId ? 'Ứng viên đã được cập nhật thành công!' : 'Ứng viên đã được lưu thành công!');
+        notify.success(candidateId ? 'Ứng viên đã được cập nhật thành công!' : 'Ứng viên đã được lưu thành công!');
         navigate(candidateId ? `/admin/candidates/${candidateId}` : '/admin/candidates');
       } else {
         const errorMsg = response.message || (candidateId ? 'Có lỗi xảy ra khi cập nhật ứng viên' : 'Có lỗi xảy ra khi tạo ứng viên');
-        alert(errorMsg);
+        notify.error(errorMsg);
         if (errorMsg.includes('CTV') || errorMsg.includes('collaborator') || errorMsg.includes('collaborator_id')) {
           setErrors(prev => ({ ...prev, collaboratorId: errorMsg }));
           }
@@ -1651,34 +1815,34 @@ const AddCandidateForm = ({ isAdmin = false, jobId = null, candidateId: candidat
             });
           } catch (nominateError) {
             console.error('Error creating nomination:', nominateError);
-            alert('CV đã được tạo thành công nhưng có lỗi khi tiến cử. Vui lòng thử lại.');
+            notify.warning('CV đã được tạo thành công nhưng có lỗi khi tiến cử. Vui lòng thử lại.');
           }
         }
         if (response.success) {
           if (candidateId) {
-            alert('Ứng viên đã được cập nhật thành công!');
+            notify.success('Ứng viên đã được cập nhật thành công!');
             if (onSuccess) onSuccess();
             else navigate(`/agent/candidates/${candidateId}`);
           } else {
             const isDuplicate = response.data?.duplicateInfo?.isDuplicate ?? response.data?.isDuplicate;
             if (jobId) {
-              alert(isDuplicate ? 'Tiến cử thành công! Hồ sơ đã được đánh dấu trùng với hồ sơ có sẵn trong hệ thống.' : 'Tiến cử thành công!');
+              notify.success(isDuplicate ? 'Tiến cử thành công! Hồ sơ đã được đánh dấu trùng với hồ sơ có sẵn trong hệ thống.' : 'Tiến cử thành công!');
               if (onSuccess) onSuccess();
               else navigate(`/agent/jobs/${jobId}`);
             } else {
-              alert(isDuplicate ? 'Hồ sơ đã được lưu thành công. Lưu ý: trùng với hồ sơ đã có trong hệ thống.' : 'Ứng viên đã được lưu thành công!');
+              notify.success(isDuplicate ? 'Hồ sơ đã được lưu thành công. Lưu ý: trùng với hồ sơ đã có trong hệ thống.' : 'Ứng viên đã được lưu thành công!');
               if (onSuccess) onSuccess();
               else navigate('/agent/candidates');
             }
           }
         } else {
-          alert(response.message || (candidateId ? 'Có lỗi xảy ra khi cập nhật' : 'Có lỗi xảy ra khi lưu thông tin'));
+          notify.error(response.message || (candidateId ? 'Có lỗi xảy ra khi cập nhật' : 'Có lỗi xảy ra khi lưu thông tin'));
         }
       }
     } catch (error) {
       console.error('Error creating candidate:', error);
       const errorMessage = error.message || (isAdmin ? 'Có lỗi xảy ra khi tạo ứng viên' : 'Có lỗi xảy ra khi lưu thông tin');
-      alert(errorMessage);
+      notify.error(errorMessage);
       if (isAdmin && (errorMessage.includes('CTV') || errorMessage.includes('collaborator') || errorMessage.includes('collaborator_id') || errorMessage.includes('foreign key'))) {
         setErrors(prev => ({ 
           ...prev, 
@@ -1686,8 +1850,9 @@ const AddCandidateForm = ({ isAdmin = false, jobId = null, candidateId: candidat
         }));
       }
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
+    }, 0);
   };
 
   const handleCancel = () => {
@@ -1708,59 +1873,40 @@ const AddCandidateForm = ({ isAdmin = false, jobId = null, candidateId: candidat
     return jobId ? `/agent/jobs/${jobId}` : '/agent/candidates';
   };
 
+  const isBusy = initialLoading || saving;
+
   return (
     <div className="space-y-3">
-      {/* Header - ẩn khi Agent ở chế độ tiến cử (có jobId), sticky khi cuộn */}
-      {(!jobId || isAdmin) && (
-      <div className="sticky top-0 z-10 rounded-lg p-4 border flex items-center justify-between" style={{ backgroundColor: 'white', borderColor: '#e5e7eb' }}>
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => (onCancel && jobId ? onCancel() : navigate(getBackPath()))}
-            onMouseEnter={() => setHoveredBackButton(true)}
-            onMouseLeave={() => setHoveredBackButton(false)}
-            className="p-2 rounded-lg transition-colors"
-            style={{
-              backgroundColor: hoveredBackButton ? '#f3f4f6' : 'transparent'
-            }}
-          >
-            <ArrowLeft className="w-4 h-4" style={{ color: '#4b5563' }} />
-          </button>
-          <div>
-            <h1 className="text-lg font-bold" style={{ color: '#111827' }}>{candidateId ? (t.addCandidateTitleEdit || 'Chỉnh sửa ứng viên') : (t.addCandidateTitleNew || 'Tạo ứng viên')}</h1>
-            <p className="text-xs mt-1" style={{ color: '#6b7280' }}>{candidateId ? (t.addCandidateSubtitleEdit || 'Cập nhật thông tin ứng viên') : (t.addCandidateSubtitleNew || 'Thêm thông tin ứng viên mới vào hệ thống')}</p>
-          </div>
+      {/* Loading khi tải ứng viên (đầu trang) */}
+      {initialLoading && (
+        <div className="rounded-lg px-4 py-3 border flex items-center gap-3" style={{ backgroundColor: '#eff6ff', borderColor: '#bfdbfe' }}>
+          <span className="inline-block w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin flex-shrink-0" />
+          <p className="text-xs font-medium" style={{ color: '#1e40af' }}>
+            {t.addCandidateLoadingCandidate || 'Đang tải thông tin ứng viên...'}
+          </p>
         </div>
-        <div className="flex gap-2">
-          <button
-            onClick={handleCancel}
-            onMouseEnter={() => setHoveredCancelButton(true)}
-            onMouseLeave={() => setHoveredCancelButton(false)}
-            className="px-4 py-2 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5"
-            style={{
-              backgroundColor: hoveredCancelButton ? '#e5e7eb' : '#f3f4f6',
-              color: '#374151'
-            }}
-          >
-            <X className="w-3.5 h-3.5" />
-            {t.cancelButton || 'Hủy'}
-          </button>
-          <button
-            onClick={handleSubmit}
-            onMouseEnter={() => setHoveredSaveButton(true)}
-            onMouseLeave={() => setHoveredSaveButton(false)}
-            className="px-4 py-2 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5"
-            style={{
-              backgroundColor: hoveredSaveButton ? '#1d4ed8' : '#2563eb',
-              color: 'white'
-            }}
-          >
-            <Save className="w-3.5 h-3.5" />
-            {candidateId ? (t.addCandidateUpdate || 'Cập nhật ứng viên') : (t.addCandidateSave || 'Lưu ứng viên')}
-          </button>
-        </div>
-      </div>
       )}
-
+      {/* Overlay loading khi đang lưu CV (giống AddJobPage phân tích JD) */}
+      {saving && (
+        <div
+          className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-4"
+          style={{ backgroundColor: 'rgba(255,255,255,0.85)' }}
+          aria-busy="true"
+          aria-live="polite"
+        >
+          <div
+            className="w-12 h-12 rounded-full border-4 border-gray-200 border-t-blue-600 animate-spin"
+            role="status"
+            aria-label={t.addCandidateSaving ?? 'Đang lưu...'}
+          />
+          <p className="text-sm font-semibold" style={{ color: '#111827' }}>
+            {t.addCandidateSavingCv || 'Đang lưu CV (tạo 3 bản PDF)...'}
+          </p>
+          <p className="text-xs" style={{ color: '#6b7280' }}>
+            {t.addCandidateSavingHint || 'Vui lòng đợi trong giây lát'}
+          </p>
+        </div>
+      )}
       {/* Upload CV - block riêng trên cùng */}
       <div className="rounded-lg p-4 border" style={{ backgroundColor: 'white', borderColor: '#e5e7eb' }}>
         <h2 className="text-sm font-bold mb-4 flex items-center gap-2 pb-3 border-b" style={{ color: '#111827', borderColor: '#e5e7eb' }}>
@@ -1795,20 +1941,32 @@ const AddCandidateForm = ({ isAdmin = false, jobId = null, candidateId: candidat
             <p className="text-[10px] mt-1" style={{ color: '#6b7280' }}>{t.addCandidateAddNewFilesOptional || 'Thêm file mới bên dưới (tùy chọn). Khi lưu sẽ tạo bản snapshot mới.'}</p>
           </div>
         )}
-        <div className="mb-3 flex items-center gap-2">
-          <input
-            id="auto-parse-cv"
-            type="checkbox"
-            checked={autoParseCv}
-            onChange={(e) => setAutoParseCv(e.target.checked)}
-            disabled={!!candidateId}
-            className="rounded border-gray-300"
+      <div className="mb-3 flex items-center gap-3">
+        <button
+          type="button"
+          onClick={() => !candidateId && setAutoParseCv((v) => !v)}
+          className="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer items-center rounded-full border px-0.5 transition-colors"
+          style={{
+            borderColor: autoParseCv && !candidateId ? '#2563eb' : '#d1d5db',
+            backgroundColor: autoParseCv && !candidateId ? '#2563eb' : '#e5e7eb',
+            opacity: candidateId ? 0.6 : 1,
+            cursor: candidateId ? 'not-allowed' : 'pointer',
+          }}
+          aria-pressed={autoParseCv}
+          aria-disabled={!!candidateId}
+        >
+          <span
+            className="inline-block h-5 w-5 rounded-full bg-white shadow transform transition-transform"
+            style={{
+              transform: autoParseCv ? 'translateX(16px)' : 'translateX(0px)',
+            }}
           />
-          <label htmlFor="auto-parse-cv" className="text-xs" style={{ color: candidateId ? '#9ca3af' : '#374151' }}>
-            {t.addCandidateAutoParseCv || 'Tự động phân tích CV khi thêm file'}
-            {candidateId && <span className="ml-1" style={{ color: '#6b7280' }}>(tắt khi chỉnh sửa)</span>}
-          </label>
+        </button>
+        <div className="text-xs" style={{ color: candidateId ? '#9ca3af' : '#374151' }}>
+          <span>{t.addCandidateAutoParseCv || 'Tự động phân tích CV khi thêm file'}</span>
+          {candidateId && <span className="ml-1" style={{ color: '#6b7280' }}>(tắt khi chỉnh sửa)</span>}
         </div>
+      </div>
         {cvFiles.length === 0 ? (
           <div 
             className="border-2 border-dashed rounded-lg p-6 text-center transition-colors"
@@ -2035,6 +2193,33 @@ const AddCandidateForm = ({ isAdmin = false, jobId = null, candidateId: candidat
               <User className="w-4 h-4" style={{ color: '#2563eb' }} />
               {t.addCandidateBlock2BasicInfo || 'Thông tin cơ bản của ứng viên'}
             </h2>
+            {/* Ảnh chân dung (証明写真) - nằm trong Block 2 */}
+            <div className="mb-4 pb-3 border-b" style={{ borderColor: '#e5e7eb' }}>
+              <h3 className="text-xs font-bold mb-2 flex items-center gap-2" style={{ color: '#374151' }}>
+                <UserCircle className="w-3.5 h-3.5" style={{ color: '#2563eb' }} />
+                {t.addCandidatePortrait || 'Ảnh chân dung (証明写真)'}
+              </h3>
+              <p className="text-[10px] mb-3" style={{ color: '#6b7280' }}>{t.addCandidatePortraitHint || 'Ảnh sẽ hiển thị đúng vị trí trong template CV và được xuất kèm khi tải PDF.'}</p>
+              {!avatarPreview ? (
+                <label className="block border-2 border-dashed rounded-lg p-4 text-center cursor-pointer transition-colors hover:border-blue-400" style={{ borderColor: '#e5e7eb' }}>
+                  <input type="file" accept="image/*" onChange={handleAvatarChange} className="hidden" />
+                  <Upload className="w-8 h-8 mx-auto mb-2" style={{ color: '#9ca3af' }} />
+                  <span className="text-xs font-medium" style={{ color: '#374151' }}>{t.addCandidateSelectImage || 'Chọn ảnh (JPG, PNG)'}</span>
+                </label>
+              ) : (
+                <div className="flex items-start gap-3">
+                  <div className="rounded border flex-shrink-0 overflow-hidden bg-gray-100" style={{ borderColor: '#e5e7eb', width: 96, height: 128 }}>
+                    <img src={avatarPreview} alt="Chân dung" className="w-full h-full object-cover" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-medium mb-2" style={{ color: '#111827' }}>{t.addCandidatePortraitSelected || 'Đã chọn ảnh chân dung'}</p>
+                    <button type="button" onClick={handleRemoveAvatar} className="text-xs px-3 py-1.5 rounded border transition-colors" style={{ borderColor: '#e5e7eb', color: '#dc2626' }}>
+                      {t.addCandidateRemoveImage || 'Xóa ảnh'}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
             <div className="space-y-3">
               <div className="grid grid-cols-1 gap-3">
                 <div>
@@ -2089,7 +2274,7 @@ const AddCandidateForm = ({ isAdmin = false, jobId = null, candidateId: candidat
                   />
                 </div>
               </div>
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 gap-3">
                 <div>
                   <label className="block text-xs font-semibold mb-2" style={{ color: '#111827' }}>
                     {t.addCandidateBirthDate || 'Ngày sinh - 生年月日'}
@@ -2169,11 +2354,8 @@ const AddCandidateForm = ({ isAdmin = false, jobId = null, candidateId: candidat
 
               {/* Contact Information */}
               <div className="border-t pt-3 mt-3" style={{ borderColor: '#e5e7eb' }}>
-                <h3 className="text-xs font-bold mb-3" style={{ color: '#374151' }}>
-                  {t.addCandidateContactInfo || 'Thông tin liên hệ (連絡先)'}
-                </h3>
                 <div className="space-y-3">
-                  <div className="grid grid-cols-3 gap-3">
+                  <div className="grid grid-cols-1 gap-3">
                     <div>
                       <label className="block text-xs font-semibold mb-2" style={{ color: '#111827' }}>
                         {t.addCandidatePostalCode || 'Mã bưu điện - 〒'}
@@ -2201,7 +2383,7 @@ const AddCandidateForm = ({ isAdmin = false, jobId = null, candidateId: candidat
                     </div>
                     <div>
                       <label className="block text-xs font-semibold mb-2" style={{ color: '#111827' }}>
-                        {t.addCandidateAddress || 'Địa chỉ - 現住所'}
+                        {t.addCandidateAddress || 'Địa chỉ hiện tại - 現住所'}
                       </label>
                       <div className="relative">
                         <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 w-3.5 h-3.5" style={{ color: '#9ca3af' }} />
@@ -2224,6 +2406,32 @@ const AddCandidateForm = ({ isAdmin = false, jobId = null, candidateId: candidat
                             e.target.style.borderColor = '#d1d5db';
                             e.target.style.boxShadow = 'none';
                           }}
+                        />
+                      </div>
+                    </div>
+                    {/* Ga gần nhất - 線・駅: đặt ngay dưới Địa chỉ hiện tại */}
+                    <div className="min-w-0">
+                      <label className="block text-xs font-semibold mb-2" style={{ color: '#111827' }}>
+                        {t.addCandidateNearestStation || 'Ga gần nhất - 線・駅'}
+                      </label>
+                      <div className="flex flex-wrap gap-2 min-w-0">
+                        <input
+                          type="text"
+                          name="nearestStationLine"
+                          value={formData.nearestStationLine}
+                          onChange={handleInputChange}
+                          placeholder={t.addCandidatePlaceholderLine || '線 (VD: 山手線)'}
+                          className="min-w-0 flex-1 px-3 py-2 border rounded-lg text-xs"
+                          style={{ borderColor: '#d1d5db', outline: 'none', minWidth: '120px' }}
+                        />
+                        <input
+                          type="text"
+                          name="nearestStationName"
+                          value={formData.nearestStationName}
+                          onChange={handleInputChange}
+                          placeholder={t.addCandidatePlaceholderStation || '駅 (VD: 渋谷)'}
+                          className="min-w-0 flex-1 px-3 py-2 border rounded-lg text-xs"
+                          style={{ borderColor: '#d1d5db', outline: 'none', minWidth: '120px' }}
                         />
                       </div>
                     </div>
@@ -2298,7 +2506,7 @@ const AddCandidateForm = ({ isAdmin = false, jobId = null, candidateId: candidat
                 <div className="space-y-3">
                   <div>
                     <label className="block text-xs font-semibold mb-2" style={{ color: '#111827' }}>
-                      {t.addCandidateOriginLabel || 'Địa chỉ gốc - 出身地'}
+                      {t.addCandidateOriginLabel || 'Nguyên quán - 出身地'}
                     </label>
                     <input
                       type="text"
@@ -2321,33 +2529,97 @@ const AddCandidateForm = ({ isAdmin = false, jobId = null, candidateId: candidat
                       }}
                     />
                   </div>
-                  {/* 現住所の最寄り駅・扶養家族数・配偶者 (Rirekisho) - tách hàng để tránh chồng chéo khi zoom */}
+                  {/* Passport, Residence status & Visa expiry ngay dưới Nguyên quán - mỗi ô 1 hàng */}
                   <div className="space-y-3">
-                    <div className="min-w-0">
+                    <div>
                       <label className="block text-xs font-semibold mb-2" style={{ color: '#111827' }}>
-                        {t.addCandidateNearestStation || '現住所の最寄り駅 - 線・駅'}
+                        {t.addCandidatePassport || 'Passport - パスポート'}
                       </label>
-                      <div className="flex flex-wrap gap-2 min-w-0">
-                        <input
-                          type="text"
-                          name="nearestStationLine"
-                          value={formData.nearestStationLine}
-                          onChange={handleInputChange}
-                          placeholder={t.addCandidatePlaceholderLine || '線 (VD: 山手線)'}
-                          className="min-w-0 flex-1 px-3 py-2 border rounded-lg text-xs"
-                          style={{ borderColor: '#d1d5db', outline: 'none', minWidth: '120px' }}
-                        />
-                        <input
-                          type="text"
-                          name="nearestStationName"
-                          value={formData.nearestStationName}
-                          onChange={handleInputChange}
-                          placeholder={t.addCandidatePlaceholderStation || '駅 (VD: 渋谷)'}
-                          className="min-w-0 flex-1 px-3 py-2 border rounded-lg text-xs"
-                          style={{ borderColor: '#d1d5db', outline: 'none', minWidth: '120px' }}
-                        />
-                      </div>
+                      <select
+                        name="passport"
+                        value={formData.passport}
+                        onChange={handleInputChange}
+                        className="w-full px-3 py-2 border rounded-lg text-xs"
+                        style={{
+                          borderColor: '#d1d5db',
+                          outline: 'none'
+                        }}
+                        onFocus={(e) => {
+                          e.target.style.borderColor = '#2563eb';
+                          e.target.style.boxShadow = '0 0 0 2px rgba(37, 99, 235, 0.5)';
+                        }}
+                        onBlur={(e) => {
+                          e.target.style.borderColor = '#d1d5db';
+                          e.target.style.boxShadow = 'none';
+                        }}
+                      >
+                        <option value="">{t.addCandidateSelect || 'Chọn'}</option>
+                        <option value="1">{t.addCandidateYes || 'Có'}</option>
+                        <option value="0">{t.addCandidateNo || 'Không'}</option>
+                      </select>
                     </div>
+                    <div>
+                      <label className="block text-xs font-semibold mb-2" style={{ color: '#111827' }}>
+                        {t.addCandidateResidenceStatus || 'Tình trạng cư trú tại Nhật - 在留資格'}
+                      </label>
+                      <select
+                        name="jpResidenceStatus"
+                        value={formData.jpResidenceStatus}
+                        onChange={handleInputChange}
+                        className="w-full px-3 py-2 border rounded-lg text-xs"
+                        style={{
+                          borderColor: '#d1d5db',
+                          outline: 'none'
+                        }}
+                        onFocus={(e) => {
+                          e.target.style.borderColor = '#2563eb';
+                          e.target.style.boxShadow = '0 0 0 2px rgba(37, 99, 235, 0.5)';
+                        }}
+                        onBlur={(e) => {
+                          e.target.style.borderColor = '#d1d5db';
+                          e.target.style.boxShadow = 'none';
+                        }}
+                      >
+                        <option value="">{t.addCandidateSelect || 'Chọn'}</option>
+                        {RESIDENCE_STATUS_OPTIONS.map((opt) => (
+                          <option key={opt.value} value={opt.value}>
+                            {`${opt.value}. ${getResidenceStatusLabel(opt)}`}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold mb-2" style={{ color: '#111827' }}>
+                        {t.addCandidateVisaExpiry || 'Ngày hết hạn Visa - 在留期限'}
+                      </label>
+                      <DatePicker
+                        selected={safeDateForPicker(formData.visaExpirationDate)}
+                        onChange={(date) => {
+                          if (date) {
+                            setFormData(prev => ({
+                              ...prev,
+                              visaExpirationDate: date.toISOString().split('T')[0]
+                            }));
+                          } else {
+                            setFormData(prev => ({
+                              ...prev,
+                              visaExpirationDate: ''
+                            }));
+                          }
+                        }}
+                        dateFormat="yyyy-MM-dd"
+                        placeholderText={t.addCandidateSelectExpiry || 'Chọn ngày hết hạn'}
+                        className="w-full px-3 py-2 border rounded-lg text-xs"
+                        style={{
+                          borderColor: '#d1d5db',
+                          outline: 'none'
+                        }}
+                        isClearable
+                      />
+                    </div>
+                  </div>
+                  {/* 扶養家族数・配偶者 (Rirekisho) - tách hàng để tránh chồng chéo khi zoom */}
+                  <div className="space-y-3">
                     <div className="grid grid-cols-1 gap-3 min-w-0">
                     <div className="min-w-0">
                       <label className="block text-xs font-semibold mb-2" style={{ color: '#111827' }}>
@@ -2398,163 +2670,22 @@ const AddCandidateForm = ({ isAdmin = false, jobId = null, candidateId: candidat
                     </div>
                     </div>
                   </div>
-                  <div className="grid grid-cols-1 gap-3">
-                    <div>
-                      <label className="block text-xs font-semibold mb-2" style={{ color: '#111827' }}>
-                        {t.addCandidatePassport || 'Passport - パスポート'}
-                      </label>
-                      <select
-                        name="passport"
-                        value={formData.passport}
-                        onChange={handleInputChange}
-                        className="w-full px-3 py-2 border rounded-lg text-xs"
-                        style={{
-                          borderColor: '#d1d5db',
-                          outline: 'none'
-                        }}
-                        onFocus={(e) => {
-                          e.target.style.borderColor = '#2563eb';
-                          e.target.style.boxShadow = '0 0 0 2px rgba(37, 99, 235, 0.5)';
-                        }}
-                        onBlur={(e) => {
-                          e.target.style.borderColor = '#d1d5db';
-                          e.target.style.boxShadow = 'none';
-                        }}
-                      >
-                        <option value="">{t.addCandidateSelect || 'Chọn'}</option>
-                        <option value="1">{t.addCandidateYes || 'Có'}</option>
-                        <option value="0">{t.addCandidateNo || 'Không'}</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-xs font-semibold mb-2" style={{ color: '#111827' }}>
-                        {t.addCandidateCurrentResidence || 'Nơi cư trú hiện tại - 現在の居住地'}
-                      </label>
-                      <select
-                        name="currentResidence"
-                        value={formData.currentResidence}
-                        onChange={handleInputChange}
-                        className="w-full px-3 py-2 border rounded-lg text-xs"
-                        style={{
-                          borderColor: '#d1d5db',
-                          outline: 'none'
-                        }}
-                        onFocus={(e) => {
-                          e.target.style.borderColor = '#2563eb';
-                          e.target.style.boxShadow = '0 0 0 2px rgba(37, 99, 235, 0.5)';
-                        }}
-                        onBlur={(e) => {
-                          e.target.style.borderColor = '#d1d5db';
-                          e.target.style.boxShadow = 'none';
-                        }}
-                      >
-                        <option value="">{t.addCandidateSelect || 'Chọn'}</option>
-                        <option value="1">{t.addCandidateJapan || 'Nhật Bản'}</option>
-                        <option value="2">{t.addCandidateVietnam || 'Việt Nam'}</option>
-                        <option value="3">{t.addCandidateOther || 'Khác'}</option>
-                      </select>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-1 gap-3">
-                    <div>
-                      <label className="block text-xs font-semibold mb-2" style={{ color: '#111827' }}>
-                        {t.addCandidateResidenceStatus || 'Tình trạng cư trú tại Nhật - 在留資格'}
-                      </label>
-                      <select
-                        name="jpResidenceStatus"
-                        value={formData.jpResidenceStatus}
-                        onChange={handleInputChange}
-                        className="w-full px-3 py-2 border rounded-lg text-xs"
-                        style={{
-                          borderColor: '#d1d5db',
-                          outline: 'none'
-                        }}
-                        onFocus={(e) => {
-                          e.target.style.borderColor = '#2563eb';
-                          e.target.style.boxShadow = '0 0 0 2px rgba(37, 99, 235, 0.5)';
-                        }}
-                        onBlur={(e) => {
-                          e.target.style.borderColor = '#d1d5db';
-                          e.target.style.boxShadow = 'none';
-                        }}
-                      >
-                        <option value="">{t.addCandidateSelect || 'Chọn'}</option>
-                        <option value="1">{t.addCandidateResStatusTech || '技術・人文知識・国際業務'}</option>
-                        <option value="2">{t.addCandidateResStatusSpecific || '特定技能'}</option>
-                        <option value="3">{t.addCandidateResStatusStudent || '留学'}</option>
-                        <option value="4">{t.addCandidateResStatusPermanent || '永住者'}</option>
-                        <option value="5">{t.addCandidateResStatusSpouse || '日本人の配偶者等'}</option>
-                        <option value="6">{t.addCandidateResStatusSettled || '定住者'}</option>
-                        <option value="7">{t.addCandidateResStatusOther || 'その他'}</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-xs font-semibold mb-2" style={{ color: '#111827' }}>
-                        {t.addCandidateVisaExpiry || 'Ngày hết hạn Visa - 在留期限'}
-                      </label>
-                      <DatePicker
-                        selected={safeDateForPicker(formData.visaExpirationDate)}
-                        onChange={(date) => {
-                          if (date) {
-                            setFormData(prev => ({
-                              ...prev,
-                              visaExpirationDate: date.toISOString().split('T')[0]
-                            }));
-                          } else {
-                            setFormData(prev => ({
-                              ...prev,
-                              visaExpirationDate: ''
-                            }));
-                          }
-                        }}
-                        dateFormat="yyyy-MM-dd"
-                        placeholderText={t.addCandidateSelectExpiry || 'Chọn ngày hết hạn'}
-                        className="w-full px-3 py-2 border rounded-lg text-xs"
-                        style={{
-                          borderColor: '#d1d5db',
-                          outline: 'none'
-                        }}
-                        isClearable
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold mb-2" style={{ color: '#111827' }}>
-                      {t.addCandidateOtherCountryLabel || 'Quốc gia khác - その他の国'}
-                    </label>
-                    <input
-                      type="text"
-                      name="otherCountry"
-                      value={formData.otherCountry}
-                      onChange={handleInputChange}
-                      placeholder={t.addCandidatePlaceholderOtherCountry || 'VD: アメリカ'}
-                      className="w-full px-3 py-2 border rounded-lg text-xs"
-                      style={{
-                        borderColor: '#d1d5db',
-                        outline: 'none'
-                      }}
-                      onFocus={(e) => {
-                        e.target.style.borderColor = '#2563eb';
-                        e.target.style.boxShadow = '0 0 0 2px rgba(37, 99, 235, 0.5)';
-                      }}
-                      onBlur={(e) => {
-                        e.target.style.borderColor = '#d1d5db';
-                        e.target.style.boxShadow = 'none';
-                      }}
-                    />
-                  </div>
+                  {/* Removed field: Nơi cư trú hiện tại - 現在の居住地 */}
+                  {/* Removed field: Quốc gia khác - その他の国 */}
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Block 3: Học vấn & Kinh nghiệm */}
+          {/* Block 3: Thông tin học vấn và kinh nghiệm của ứng viên */}
           <div className="rounded-lg p-4 border" style={{ backgroundColor: 'white', borderColor: '#e5e7eb' }}>
             <h2 className="text-sm font-bold mb-4 flex items-center gap-2 pb-3 border-b" style={{ color: '#111827', borderColor: '#e5e7eb' }}>
               <GraduationCap className="w-4 h-4" style={{ color: '#2563eb' }} />
-              {t.addCandidateBlock3Education || 'Học vấn (学歴)'}
+              <Briefcase className="w-4 h-4" style={{ color: '#2563eb' }} />
+              {t.addCandidateBlock3Title || 'Thông tin học vấn và kinh nghiệm của ứng viên'}
             </h2>
             <div className="space-y-3">
+              <h3 className="text-xs font-bold mb-2" style={{ color: '#374151' }}>{t.addCandidateBlock3Education || 'Học vấn (学歴)'}</h3>
               {formData.educations.map((edu, index) => (
                 <div key={index} className="p-3 rounded-lg border" style={{ backgroundColor: '#f9fafb', borderColor: '#e5e7eb' }}>
                   <div className="flex justify-between items-start mb-2">
@@ -2606,15 +2737,11 @@ const AddCandidateForm = ({ isAdmin = false, jobId = null, candidateId: candidat
                 {t.addCandidateAddEducation || 'Thêm học vấn'}
               </button>
             </div>
-          </div>
 
-          {/* Work Experience — 1 card = 1 kinh nghiệm (cặp 入社 + 退社), bảng 職歴 hiển thị 2 dòng/card */}
-          <div className="rounded-lg p-4 border" style={{ backgroundColor: 'white', borderColor: '#e5e7eb' }}>
-            <h2 className="text-sm font-bold mb-4 flex items-center gap-2 pb-3 border-b" style={{ color: '#111827', borderColor: '#e5e7eb' }}>
-              <Briefcase className="w-4 h-4" style={{ color: '#2563eb' }} />
-              {t.addCandidateBlock3WorkExp || 'Kinh nghiệm làm việc (職歴)'}
-            </h2>
-            <div className="space-y-3">
+            {/* 19. Kinh nghiệm làm việc (職歴) — cùng Block 3 */}
+            <div className="border-t pt-3 mt-3" style={{ borderColor: '#e5e7eb' }}>
+              <h3 className="text-xs font-bold mb-3" style={{ color: '#374151' }}>{t.addCandidateBlock3WorkExp || 'Kinh nghiệm làm việc (職歴)'}</h3>
+              <div className="space-y-3">
               {(() => {
                 const list = formData.workExperiences || [];
                 const pairs = [];
@@ -2694,6 +2821,14 @@ const AddCandidateForm = ({ isAdmin = false, jobId = null, candidateId: candidat
                       className="w-full px-2 py-1.5 border rounded text-xs"
                       style={{ borderColor: '#d1d5db' }}
                     />
+                    <textarea
+                      value={row0.reason_for_leaving || ''}
+                      onChange={(e) => updateEmploymentPair(blockIndex, 'reason_for_leaving', e.target.value)}
+                      placeholder={t.addCandidatePlaceholderLeavingReason || 'Lý do nghỉ việc (退職理由)'}
+                      rows={2}
+                      className="w-full px-2 py-1.5 border rounded text-xs"
+                      style={{ borderColor: '#d1d5db' }}
+                    />
                   </div>
                 </div>
                   );
@@ -2714,40 +2849,12 @@ const AddCandidateForm = ({ isAdmin = false, jobId = null, candidateId: candidat
                 {t.addCandidateAddWorkExp || 'Thêm kinh nghiệm'}
               </button>
             </div>
+            </div>
           </div>
         </div>
 
         {/* Right Column */}
         <div className="space-y-3">
-          {/* Ảnh chân dung (証明写真) - thuộc Block 2 trong layout mới, nhưng hiển thị cột phải để dễ xem */}
-          <div className="rounded-lg p-4 border" style={{ backgroundColor: 'white', borderColor: '#e5e7eb' }}>
-            <h2 className="text-sm font-bold mb-4 flex items-center gap-2 pb-3 border-b" style={{ color: '#111827', borderColor: '#e5e7eb' }}>
-              <UserCircle className="w-4 h-4" style={{ color: '#2563eb' }} />
-              {t.addCandidatePortrait || 'Ảnh chân dung (証明写真)'}
-            </h2>
-            <p className="text-[10px] mb-3" style={{ color: '#6b7280' }}>{t.addCandidatePortraitHint || 'Ảnh sẽ hiển thị đúng vị trí trong template CV và được xuất kèm khi tải PDF.'}</p>
-            {!avatarPreview ? (
-              <label className="block border-2 border-dashed rounded-lg p-4 text-center cursor-pointer transition-colors hover:border-blue-400" style={{ borderColor: '#e5e7eb' }}>
-                <input type="file" accept="image/*" onChange={handleAvatarChange} className="hidden" />
-                <Upload className="w-8 h-8 mx-auto mb-2" style={{ color: '#9ca3af' }} />
-                <span className="text-xs font-medium" style={{ color: '#374151' }}>{t.addCandidateSelectImage || 'Chọn ảnh (JPG, PNG)'}</span>
-              </label>
-            ) : (
-              <div className="flex items-start gap-3">
-                {/* Khung ảnh cố định 3:4 (96×128px) */}
-                <div className="rounded border flex-shrink-0 overflow-hidden bg-gray-100" style={{ borderColor: '#e5e7eb', width: 96, height: 128 }}>
-                  <img src={avatarPreview} alt="Chân dung" className="w-full h-full object-cover" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-medium mb-2" style={{ color: '#111827' }}>{t.addCandidatePortraitSelected || 'Đã chọn ảnh chân dung'}</p>
-                  <button type="button" onClick={handleRemoveAvatar} className="text-xs px-3 py-1.5 rounded border transition-colors" style={{ borderColor: '#e5e7eb', color: '#dc2626' }}>
-                    {t.addCandidateRemoveImage || 'Xóa ảnh'}
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-
           {/* Kỹ năng & Chứng chỉ */}
           <div className="rounded-lg p-4 border" style={{ backgroundColor: 'white', borderColor: '#e5e7eb' }}>
             <h2 className="text-sm font-bold mb-4 flex items-center gap-2 pb-3 border-b" style={{ color: '#111827', borderColor: '#e5e7eb' }}>
@@ -2755,38 +2862,185 @@ const AddCandidateForm = ({ isAdmin = false, jobId = null, candidateId: candidat
               {t.addCandidateBlock4SkillsCerts || 'Thông tin Kỹ năng & Chứng chỉ (資格)'}
             </h2>
             <div className="space-y-3">
-              <div className="grid grid-cols-1 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold mb-2" style={{ color: '#111827' }}>
-                    {t.addCandidateJlptLabel || 'JLPT Level - 日本語能力試験'}
-                  </label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-xs font-semibold pointer-events-none" style={{ color: '#4b5563' }}>N</span>
+              {/* 20. JLPT Level */}
+              <div className="pb-3 border-b" style={{ borderColor: '#e5e7eb' }}>
+                <h3 className="text-xs font-bold mb-2" style={{ color: '#374151' }}>{t.addCandidateJlptLabel || 'JLPT Level - 日本語能力試験'}</h3>
+                <div className="space-y-2">
+                  <div>
+                    <label className="block text-xs font-semibold mb-2" style={{ color: '#111827' }}>
+                      {t.addCandidateJlptLevelShort || 'Cấp độ (N1-N5)'}
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-xs font-semibold pointer-events-none" style={{ color: '#4b5563' }}>N</span>
+                      <input
+                        type="number"
+                        name="jlptLevel"
+                        value={formData.jlptLevel}
+                        onChange={handleInputChange}
+                        min="1"
+                        max="5"
+                        placeholder="1-5"
+                        className="w-full pl-6 pr-3 py-2 border rounded-lg text-xs"
+                        style={{
+                          borderColor: '#d1d5db',
+                          outline: 'none'
+                        }}
+                        onFocus={(e) => {
+                          e.target.style.borderColor = '#2563eb';
+                          e.target.style.boxShadow = '0 0 0 2px rgba(37, 99, 235, 0.5)';
+                        }}
+                        onBlur={(e) => {
+                          e.target.style.borderColor = '#d1d5db';
+                          e.target.style.boxShadow = 'none';
+                        }}
+                      />
+                    </div>
+                    <p className="text-[10px] mt-1" style={{ color: '#6b7280' }}>{t.addCandidateJlptHint || 'Nhập số từ 1 (N1) đến 5 (N5)'}</p>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold mb-1" style={{ color: '#111827' }}>
+                      {t.addCandidateAcquiredYearLabel || 'Năm đạt'}
+                    </label>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        name="jlptAcquiredYear"
+                        value={formData.jlptAcquiredYear}
+                        onChange={handleInputChange}
+                        placeholder={t.addCandidatePlaceholderYear || 'Năm (年)'}
+                        className="w-16 px-2 py-1.5 border rounded text-xs"
+                        style={{ borderColor: '#d1d5db' }}
+                      />
+                      <input
+                        type="text"
+                        name="jlptAcquiredMonth"
+                        value={formData.jlptAcquiredMonth}
+                        onChange={handleInputChange}
+                        placeholder={t.addCandidatePlaceholderMonth || 'Tháng (月)'}
+                        className="w-16 px-2 py-1.5 border rounded text-xs"
+                        style={{ borderColor: '#d1d5db' }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+              {/* 21. Trình độ tiếng Anh - 英語 */}
+              <div className="pb-3 border-b" style={{ borderColor: '#e5e7eb' }}>
+                <h3 className="text-xs font-bold mb-2" style={{ color: '#374151' }}>{t.addCandidateEnglishLevel || 'Trình độ tiếng Anh - 英語'}</h3>
+                <div className="space-y-4">
+                  {/* TOEIC */}
+                  <div className="space-y-2">
+                    <label className="block text-xs font-semibold mb-2" style={{ color: '#111827' }}>
+                      {t.addCandidateToeicScore || 'TOEIC - Điểm'}
+                    </label>
                     <input
                       type="number"
-                      name="jlptLevel"
-                      value={formData.jlptLevel}
+                      name="toeicScore"
+                      value={formData.toeicScore}
                       onChange={handleInputChange}
-                      min="1"
-                      max="5"
-                      placeholder="1-5"
-                      className="w-full pl-6 pr-3 py-2 border rounded-lg text-xs"
-                      style={{
-                        borderColor: '#d1d5db',
-                        outline: 'none'
-                      }}
-                      onFocus={(e) => {
-                        e.target.style.borderColor = '#2563eb';
-                        e.target.style.boxShadow = '0 0 0 2px rgba(37, 99, 235, 0.5)';
-                      }}
-                      onBlur={(e) => {
-                        e.target.style.borderColor = '#d1d5db';
-                        e.target.style.boxShadow = 'none';
-                      }}
+                      placeholder="VD: 800"
+                      min="0"
+                      className="w-full px-3 py-2 border rounded-lg text-xs"
+                      style={{ borderColor: '#d1d5db', outline: 'none' }}
+                    />
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        name="toeicYear"
+                        value={formData.toeicYear}
+                        onChange={handleInputChange}
+                        placeholder={t.addCandidatePlaceholderYear || 'Năm (年)'}
+                        className="w-16 px-2 py-1.5 border rounded text-xs"
+                        style={{ borderColor: '#d1d5db' }}
+                      />
+                      <input
+                        type="text"
+                        name="toeicMonth"
+                        value={formData.toeicMonth}
+                        onChange={handleInputChange}
+                        placeholder={t.addCandidatePlaceholderMonth || 'Tháng (月)'}
+                        className="w-16 px-2 py-1.5 border rounded text-xs"
+                        style={{ borderColor: '#d1d5db' }}
+                      />
+                    </div>
+                  </div>
+                  {/* IELTS */}
+                  <div className="space-y-2">
+                    <label className="block text-xs font-semibold mb-2" style={{ color: '#111827' }}>
+                      {t.addCandidateIeltsScore || 'IELTS - Điểm'}
+                    </label>
+                    <input
+                      type="number"
+                      name="ieltsScore"
+                      value={formData.ieltsScore}
+                      onChange={handleInputChange}
+                      placeholder="VD: 6.5"
+                      min="0"
+                      step="0.5"
+                      className="w-full px-3 py-2 border rounded-lg text-xs"
+                      style={{ borderColor: '#d1d5db', outline: 'none' }}
+                    />
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        name="ieltsYear"
+                        value={formData.ieltsYear}
+                        onChange={handleInputChange}
+                        placeholder={t.addCandidatePlaceholderYear || 'Năm (年)'}
+                        className="w-16 px-2 py-1.5 border rounded text-xs"
+                        style={{ borderColor: '#d1d5db' }}
+                      />
+                      <input
+                        type="text"
+                        name="ieltsMonth"
+                        value={formData.ieltsMonth}
+                        onChange={handleInputChange}
+                        placeholder={t.addCandidatePlaceholderMonth || 'Tháng (月)'}
+                        className="w-16 px-2 py-1.5 border rounded text-xs"
+                        style={{ borderColor: '#d1d5db' }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+              {/* 22. Bằng lái xe - 自動車免許 */}
+              <div className="pb-3 border-b" style={{ borderColor: '#e5e7eb' }}>
+                <h3 className="text-xs font-bold mb-2" style={{ color: '#374151' }}>{t.addCandidateDrivingLicense || 'Bằng lái xe - 自動車免許'}</h3>
+                <div className="space-y-2">
+                  <select
+                    name="hasDrivingLicense"
+                    value={formData.hasDrivingLicense}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 border rounded-lg text-xs"
+                    style={{ borderColor: '#d1d5db', outline: 'none' }}
+                  >
+                    <option value="">{t.addCandidateSelect || 'Chọn'}</option>
+                    <option value="1">{t.addCandidateYes || 'Có'}</option>
+                    <option value="0">{t.addCandidateNo || 'Không'}</option>
+                  </select>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      name="drivingLicenseYear"
+                      value={formData.drivingLicenseYear}
+                      onChange={handleInputChange}
+                      placeholder={t.addCandidatePlaceholderYear || 'Năm (年)'}
+                      className="w-16 px-2 py-1.5 border rounded text-xs"
+                      style={{ borderColor: '#d1d5db' }}
+                    />
+                    <input
+                      type="text"
+                      name="drivingLicenseMonth"
+                      value={formData.drivingLicenseMonth}
+                      onChange={handleInputChange}
+                      placeholder={t.addCandidatePlaceholderMonth || 'Tháng (月)'}
+                      className="w-16 px-2 py-1.5 border rounded text-xs"
+                      style={{ borderColor: '#d1d5db' }}
                     />
                   </div>
-                  <p className="text-[10px] mt-1" style={{ color: '#6b7280' }}>{t.addCandidateJlptHint || 'Nhập số từ 1 (N1) đến 5 (N5)'}</p>
                 </div>
+              </div>
+              <div className="grid grid-cols-1 gap-3">
                 <div>
                   <label className="block text-xs font-semibold mb-2" style={{ color: '#111827' }}>
                     {t.addCandidateExpYears || 'Số năm kinh nghiệm - 経験年数'}
@@ -2797,60 +3051,6 @@ const AddCandidateForm = ({ isAdmin = false, jobId = null, candidateId: candidat
                     value={formData.experienceYears}
                     onChange={handleInputChange}
                     placeholder={t.addCandidatePlaceholderExpYears || 'VD: 3'}
-                    min="0"
-                    className="w-full px-3 py-2 border rounded-lg text-xs"
-                    style={{
-                      borderColor: '#d1d5db',
-                      outline: 'none'
-                    }}
-                    onFocus={(e) => {
-                      e.target.style.borderColor = '#2563eb';
-                      e.target.style.boxShadow = '0 0 0 2px rgba(37, 99, 235, 0.5)';
-                    }}
-                    onBlur={(e) => {
-                      e.target.style.borderColor = '#d1d5db';
-                      e.target.style.boxShadow = 'none';
-                    }}
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-1 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold mb-2" style={{ color: '#111827' }}>
-                    {t.addCandidateSpecialization || 'Chuyên ngành - 専門分野'}
-                  </label>
-                  <input
-                    type="number"
-                    name="specialization"
-                    value={formData.specialization}
-                    onChange={handleInputChange}
-                    placeholder={t.addCandidatePlaceholderSpecialization || 'ID chuyên ngành'}
-                    min="0"
-                    className="w-full px-3 py-2 border rounded-lg text-xs"
-                    style={{
-                      borderColor: '#d1d5db',
-                      outline: 'none'
-                    }}
-                    onFocus={(e) => {
-                      e.target.style.borderColor = '#2563eb';
-                      e.target.style.boxShadow = '0 0 0 2px rgba(37, 99, 235, 0.5)';
-                    }}
-                    onBlur={(e) => {
-                      e.target.style.borderColor = '#d1d5db';
-                      e.target.style.boxShadow = 'none';
-                    }}
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold mb-2" style={{ color: '#111827' }}>
-                    {t.addCandidateQualification || 'Bằng cấp - 資格'}
-                  </label>
-                  <input
-                    type="number"
-                    name="qualification"
-                    value={formData.qualification}
-                    onChange={handleInputChange}
-                    placeholder={t.addCandidatePlaceholderQualification || 'ID bằng cấp'}
                     min="0"
                     className="w-full px-3 py-2 border rounded-lg text-xs"
                     style={{
@@ -2893,10 +3093,9 @@ const AddCandidateForm = ({ isAdmin = false, jobId = null, candidateId: candidat
                   }}
                 />
               </div>
-              <div>
-                <label className="block text-xs font-semibold mb-2" style={{ color: '#111827' }}>
-                  {t.addCandidateCertificatesLabel || 'Chứng chỉ (免許・資格)'}
-                </label>
+              {/* 23. Chứng chỉ (免許・資格) khác */}
+              <div className="pt-3 border-t" style={{ borderColor: '#e5e7eb' }}>
+                <h3 className="text-xs font-bold mb-2" style={{ color: '#374151' }}>{t.addCandidateCertificatesLabel || 'Chứng chỉ (免許・資格) khác'}</h3>
                 <div className="space-y-2">
                   {formData.certificates.map((cert, index) => (
                     <div key={index} className="flex gap-2">
@@ -2952,124 +3151,205 @@ const AddCandidateForm = ({ isAdmin = false, jobId = null, candidateId: candidat
                   </button>
                 </div>
               </div>
-              <div>
-                <label className="block text-xs font-semibold mb-2" style={{ color: '#111827' }}>
-                  {t.addCandidateLearnedToolsLabel || 'Công cụ đã học - 学習したツール'}
-                </label>
-                <div className="space-y-2">
-                  {formData.learnedTools.map((tool, index) => (
-                    <div key={index} className="flex gap-2 items-center">
-                      <input
-                        type="text"
-                        value={tool}
-                        onChange={(e) => updateLearnedTool(index, e.target.value)}
-                        placeholder={t.addCandidatePlaceholderLearned || 'VD: React, Python, Docker...'}
-                        className="flex-1 px-2 py-1.5 border rounded text-xs"
-                        style={{ borderColor: '#d1d5db' }}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => handleInsertLearnedToolAt(index)}
-                        className="text-xs px-1.5 py-1 rounded border transition-colors"
-                        style={{ borderColor: '#d1d5db', color: '#2563eb' }}
-                        title={t.addCandidateInsertRow || 'Chèn dòng tại đây'}
-                      >
-                        {t.addCandidateInsertRow || 'Chèn'}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => removeLearnedTool(index)}
-                        onMouseEnter={() => setHoveredRemoveLearnedToolButtonIndex(index)}
-                        onMouseLeave={() => setHoveredRemoveLearnedToolButtonIndex(null)}
-                        style={{
-                          color: hoveredRemoveLearnedToolButtonIndex === index ? '#b91c1c' : '#ef4444'
-                        }}
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  ))}
-                  <button
-                    type="button"
-                    onClick={handleAddLearnedTool}
-                    onMouseEnter={() => setHoveredAddLearnedToolButton(true)}
-                    onMouseLeave={() => setHoveredAddLearnedToolButton(false)}
-                    className="text-xs flex items-center gap-1"
-                    style={{
-                      color: hoveredAddLearnedToolButton ? '#1d4ed8' : '#2563eb'
-                    }}
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    {t.addCandidateAddLearnedTool || 'Thêm công cụ đã học'}
-                  </button>
+              {/* 24. Công cụ đã học - 学習したツール */}
+              <div className="pt-3 border-t" style={{ borderColor: '#e5e7eb' }}>
+                <h3 className="text-xs font-bold mb-2" style={{ color: '#374151' }}>{t.addCandidateLearnedToolsLabel || 'Công cụ đã học - 学習したツール'}</h3>
+                <div className="space-y-3">
+                  {/* Ô chọn công cụ: chọn 1 cái sẽ tạo 1 dòng */}
+                  <div className="flex items-center gap-2">
+                    <label className="text-xs font-semibold" style={{ color: '#111827' }}>
+                      {t.addCandidateSelectToolLabel || 'Chọn công cụ'}
+                    </label>
+                    <select
+                      className="px-2 py-1.5 border rounded text-xs"
+                      style={{ borderColor: '#d1d5db', outline: 'none' }}
+                      defaultValue=""
+                      onChange={handleAddLearnedToolFromSelect}
+                    >
+                      <option value="">{t.addCandidateSelect || 'Chọn'}</option>
+                      {TECHNICAL_TOOLS.map(tool => (
+                        <option key={tool} value={tool}>{tool}</option>
+                      ))}
+                      <option value="__OTHER__">{t.addCandidateOtherToolsLabel || 'Khác'}</option>
+                    </select>
+                  </div>
+                  {/* Các dòng đã chọn */}
+                  <div className="space-y-2">
+                    {formData.learnedTools.map((tool, index) => {
+                      const isFixed = TECHNICAL_TOOLS.includes(tool);
+                      const displayName = isFixed ? tool : (tool || (t.addCandidateOtherToolsLabel || 'Khác'));
+                      return (
+                        <div key={index} className="flex flex-wrap gap-2 items-center">
+                          {isFixed ? (
+                            <span className="text-xs font-semibold" style={{ color: '#111827' }}>{displayName}</span>
+                          ) : (
+                            <input
+                              type="text"
+                              value={tool}
+                              onChange={(e) => updateLearnedTool(index, e.target.value)}
+                              placeholder={t.addCandidatePlaceholderLearned || 'Tên công cụ khác'}
+                              className="flex-1 min-w-[120px] px-2 py-1.5 border rounded text-xs"
+                              style={{ borderColor: '#d1d5db' }}
+                            />
+                          )}
+                          <div className="flex items-center gap-1 text-xs ml-auto">
+                            <span>{t.addCandidateYearsStudiedLabel || 'Số năm học'}</span>
+                            <input
+                              type="number"
+                              min="0"
+                              value={(formData.toolsSoftwareNotes?.learned || {})[displayName] || ''}
+                              onChange={(e) => {
+                                const v = e.target.value;
+                                const key = displayName;
+                                setFormData(prev => ({
+                                  ...prev,
+                                  toolsSoftwareNotes: {
+                                    ...(prev.toolsSoftwareNotes || {}),
+                                    learned: {
+                                      ...(prev.toolsSoftwareNotes?.learned || {}),
+                                      [key]: v
+                                    },
+                                    experienced: prev.toolsSoftwareNotes?.experienced || {},
+                                    experiencedOther: prev.toolsSoftwareNotes?.experiencedOther ?? '',
+                                  },
+                                }));
+                              }}
+                              className="w-16 px-2 py-1.5 border rounded text-xs"
+                              style={{ borderColor: '#d1d5db' }}
+                            />
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => removeLearnedTool(index)}
+                            onMouseEnter={() => setHoveredRemoveLearnedToolButtonIndex(index)}
+                            onMouseLeave={() => setHoveredRemoveLearnedToolButtonIndex(null)}
+                            style={{
+                              color: hoveredRemoveLearnedToolButtonIndex === index ? '#b91c1c' : '#ef4444'
+                            }}
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      );
+                    })}
+                    <button
+                      type="button"
+                      onClick={() => setFormData(prev => ({ ...prev, learnedTools: [...(prev.learnedTools || []), ''] }))}
+                      className="text-xs flex items-center gap-1"
+                      style={{ color: '#2563eb' }}
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      {t.addCandidateAddLearnedTool || 'Thêm công cụ khác'}
+                    </button>
+                  </div>
                 </div>
               </div>
-              <div>
-                <label className="block text-xs font-semibold mb-2" style={{ color: '#111827' }}>
-                  {t.addCandidateExpToolsLabel || 'Công cụ có kinh nghiệm - 経験のあるツール'}
-                </label>
-                <div className="space-y-2">
-                  {formData.experienceTools.map((tool, index) => (
-                    <div key={index} className="flex gap-2 items-center">
-                      <input
-                        type="text"
-                        value={tool}
-                        onChange={(e) => updateExperienceTool(index, e.target.value)}
-                        placeholder={t.addCandidatePlaceholderExp || 'VD: AWS, Kubernetes, TypeScript...'}
-                        className="flex-1 px-2 py-1.5 border rounded text-xs"
-                        style={{ borderColor: '#d1d5db' }}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => handleInsertExperienceToolAt(index)}
-                        className="text-xs px-1.5 py-1 rounded border transition-colors"
-                        style={{ borderColor: '#d1d5db', color: '#2563eb' }}
-                        title={t.addCandidateInsertRow || 'Chèn dòng tại đây'}
-                      >
-                        {t.addCandidateInsertRow || 'Chèn'}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => removeExperienceTool(index)}
-                        onMouseEnter={() => setHoveredRemoveExperienceToolButtonIndex(index)}
-                        onMouseLeave={() => setHoveredRemoveExperienceToolButtonIndex(null)}
-                        style={{
-                          color: hoveredRemoveExperienceToolButtonIndex === index ? '#b91c1c' : '#ef4444'
-                        }}
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  ))}
-                  <button
-                    type="button"
-                    onClick={handleAddExperienceTool}
-                    onMouseEnter={() => setHoveredAddExperienceToolButton(true)}
-                    onMouseLeave={() => setHoveredAddExperienceToolButton(false)}
-                    className="text-xs flex items-center gap-1"
-                    style={{
-                      color: hoveredAddExperienceToolButton ? '#1d4ed8' : '#2563eb'
-                    }}
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    {t.addCandidateAddExpTool || 'Thêm công cụ có kinh nghiệm'}
-                  </button>
+              {/* 25. Công cụ có kinh nghiệm - 経験のあるツール */}
+              <div className="pt-3 border-t" style={{ borderColor: '#e5e7eb' }}>
+                <h3 className="text-xs font-bold mb-2" style={{ color: '#374151' }}>{t.addCandidateExpToolsLabel || 'Công cụ có kinh nghiệm - 経験のあるツール'}</h3>
+                <div className="space-y-3">
+                  {/* Ô chọn công cụ: chọn 1 cái sẽ tạo 1 dòng */}
+                  <div className="flex items-center gap-2">
+                    <label className="text-xs font-semibold" style={{ color: '#111827' }}>
+                      {t.addCandidateSelectToolLabel || 'Chọn công cụ'}
+                    </label>
+                    <select
+                      className="px-2 py-1.5 border rounded text-xs"
+                      style={{ borderColor: '#d1d5db', outline: 'none' }}
+                      defaultValue=""
+                      onChange={handleAddExperienceToolFromSelect}
+                    >
+                      <option value="">{t.addCandidateSelect || 'Chọn'}</option>
+                      {TECHNICAL_TOOLS.map(tool => (
+                        <option key={tool} value={tool}>{tool}</option>
+                      ))}
+                      <option value="__OTHER__">{t.addCandidateOtherToolsLabel || 'Khác'}</option>
+                    </select>
+                  </div>
+                  {/* Các dòng đã chọn */}
+                  <div className="space-y-2">
+                    {formData.experienceTools.map((tool, index) => {
+                      const isFixed = TECHNICAL_TOOLS.includes(tool);
+                      const displayName = isFixed ? tool : (tool || (t.addCandidateOtherToolsLabel || 'Khác'));
+                      return (
+                        <div key={index} className="flex flex-wrap gap-2 items-center">
+                          {isFixed ? (
+                            <span className="text-xs font-semibold" style={{ color: '#111827' }}>{displayName}</span>
+                          ) : (
+                            <input
+                              type="text"
+                              value={tool}
+                              onChange={(e) => updateExperienceTool(index, e.target.value)}
+                              placeholder={t.addCandidatePlaceholderExp || 'Tên công cụ khác'}
+                              className="flex-1 min-w-[120px] px-2 py-1.5 border rounded text-xs"
+                              style={{ borderColor: '#d1d5db' }}
+                            />
+                          )}
+                          <div className="flex items-center gap-1 text-xs ml-auto">
+                            <span>{t.addCandidateYearsExpLabel || 'Số năm kinh nghiệm'}</span>
+                            <input
+                              type="number"
+                              min="0"
+                              value={(formData.toolsSoftwareNotes?.experienced || {})[displayName] || ''}
+                              onChange={(e) => {
+                                const v = e.target.value;
+                                const key = displayName;
+                                setFormData(prev => ({
+                                  ...prev,
+                                  toolsSoftwareNotes: {
+                                    ...(prev.toolsSoftwareNotes || {}),
+                                    learned: prev.toolsSoftwareNotes?.learned || {},
+                                    experienced: {
+                                      ...(prev.toolsSoftwareNotes?.experienced || {}),
+                                      [key]: v
+                                    },
+                                    experiencedOther: prev.toolsSoftwareNotes?.experiencedOther ?? '',
+                                  },
+                                }));
+                              }}
+                              className="w-16 px-2 py-1.5 border rounded text-xs"
+                              style={{ borderColor: '#d1d5db' }}
+                            />
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => removeExperienceTool(index)}
+                            onMouseEnter={() => setHoveredRemoveExperienceToolButtonIndex(index)}
+                            onMouseLeave={() => setHoveredRemoveExperienceToolButtonIndex(null)}
+                            style={{
+                              color: hoveredRemoveExperienceToolButtonIndex === index ? '#b91c1c' : '#ef4444'
+                            }}
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      );
+                    })}
+                    <button
+                      type="button"
+                      onClick={() => setFormData(prev => ({ ...prev, experienceTools: [...(prev.experienceTools || []), ''] }))}
+                      className="text-xs flex items-center gap-1"
+                      style={{ color: '#2563eb' }}
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      {t.addCandidateAddExpTool || 'Thêm công cụ có kinh nghiệm khác'}
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Giới thiệu bản thân */}
+          {/* Block 5: Giới thiệu bản thân (自己PR) */}
           <div className="rounded-lg p-4 border" style={{ backgroundColor: 'white', borderColor: '#e5e7eb' }}>
             <h2 className="text-sm font-bold mb-4 flex items-center gap-2 pb-3 border-b" style={{ color: '#111827', borderColor: '#e5e7eb' }}>
               <UserCircle className="w-4 h-4" style={{ color: '#2563eb' }} />
               {t.addCandidateBlock5SelfIntro || 'Giới thiệu bản thân (自己PR)'}
             </h2>
             <div className="space-y-3">
+              {/* 26. Tóm tắt nghề nghiệp */}
               <div>
-                <label className="block text-xs font-semibold mb-2" style={{ color: '#111827' }}>
-                  {t.addCandidateCareerSummary || 'Tóm tắt nghề nghiệp (職務要約)'}
-                </label>
+                <h3 className="text-xs font-bold mb-2" style={{ color: '#374151' }}>{t.addCandidateCareerSummary || 'Tóm tắt nghề nghiệp (職務要約)'}</h3>
                 <textarea
                   name="careerSummary"
                   value={formData.careerSummary}
@@ -3091,10 +3371,9 @@ const AddCandidateForm = ({ isAdmin = false, jobId = null, candidateId: candidat
                   }}
                 />
               </div>
+              {/* 27. Điểm mạnh */}
               <div>
-                <label className="block text-xs font-semibold mb-2" style={{ color: '#111827' }}>
-                  {t.addCandidateStrengths || 'Điểm mạnh (自己PR)'}
-                </label>
+                <h3 className="text-xs font-bold mb-2" style={{ color: '#374151' }}>{t.addCandidateStrengths || 'Điểm mạnh (自己PR)'}</h3>
                 <textarea
                   name="strengths"
                   value={formData.strengths}
@@ -3116,10 +3395,9 @@ const AddCandidateForm = ({ isAdmin = false, jobId = null, candidateId: candidat
                   }}
                 />
               </div>
+              {/* 28. Sở thích / Kỹ năng đặc biệt */}
               <div>
-                <label className="block text-xs font-semibold mb-2" style={{ color: '#111827' }}>
-                  {t.addCandidateHobbies || '趣味・特技 (Sở thích / Kỹ năng đặc biệt)'}
-                </label>
+                <h3 className="text-xs font-bold mb-2" style={{ color: '#374151' }}>{t.addCandidateHobbies || 'Sở thích / Kỹ năng đặc biệt (趣味・特技)'}</h3>
                 <textarea
                   name="hobbiesSpecialSkills"
                   value={formData.hobbiesSpecialSkills}
@@ -3141,10 +3419,9 @@ const AddCandidateForm = ({ isAdmin = false, jobId = null, candidateId: candidat
                   }}
                 />
               </div>
+              {/* 29. Động lực ứng tuyển */}
               <div>
-                <label className="block text-xs font-semibold mb-2" style={{ color: '#111827' }}>
-                  {t.addCandidateMotivationLabel || 'Động lực ứng tuyển (志望動機)'}
-                </label>
+                <h3 className="text-xs font-bold mb-2" style={{ color: '#374151' }}>{t.addCandidateMotivationLabel || 'Động lực ứng tuyển (志望動機)'}</h3>
                 <textarea
                   name="motivation"
                   value={formData.motivation}
@@ -3169,12 +3446,14 @@ const AddCandidateForm = ({ isAdmin = false, jobId = null, candidateId: candidat
             </div>
           </div>
 
-          {/* Mong muốn */}
+          {/* Block 6: Mong muốn (希望) */}
           <div className="rounded-lg p-4 border" style={{ backgroundColor: 'white', borderColor: '#e5e7eb' }}>
-            <h2 className="text-sm font-bold mb-4 pb-3 border-b" style={{ color: '#111827', borderColor: '#e5e7eb' }}>
+            <h2 className="text-sm font-bold mb-4 flex items-center gap-2 pb-3 border-b" style={{ color: '#111827', borderColor: '#e5e7eb' }}>
+              <Briefcase className="w-4 h-4" style={{ color: '#2563eb' }} />
               {t.addCandidateBlock6Preferences || 'Mong muốn (希望)'}
             </h2>
             <div className="space-y-3">
+              {/* 30. Lương hiện tại */}
               <div className="grid grid-cols-1 gap-3">
                 <div>
                   <label className="block text-xs font-semibold mb-2" style={{ color: '#111827' }}>
@@ -3201,6 +3480,7 @@ const AddCandidateForm = ({ isAdmin = false, jobId = null, candidateId: candidat
                     }}
                   />
                 </div>
+                {/* 31. Lương mong muốn */}
                 <div>
                   <label className="block text-xs font-semibold mb-2" style={{ color: '#111827' }}>
                     {t.addCandidateDesiredSalaryLabel || 'Lương mong muốn (希望年収)'}
@@ -3227,6 +3507,7 @@ const AddCandidateForm = ({ isAdmin = false, jobId = null, candidateId: candidat
                   />
                 </div>
               </div>
+              {/* 32. Vị trí công việc mong muốn */}
               <div>
                 <label className="block text-xs font-semibold mb-2" style={{ color: '#111827' }}>
                   {t.addCandidateDesiredPosition || 'Vị trí mong muốn (希望職種)'}
@@ -3253,9 +3534,10 @@ const AddCandidateForm = ({ isAdmin = false, jobId = null, candidateId: candidat
                 />
               </div>
               <div className="grid grid-cols-1 gap-3">
+                {/* 33. Địa điểm làm việc mong muốn */}
                 <div>
                   <label className="block text-xs font-semibold mb-2" style={{ color: '#111827' }}>
-                    {t.addCandidateDesiredLocation || 'Địa điểm (希望勤務地)'}
+                    {t.addCandidateDesiredLocation || 'Địa điểm làm việc mong muốn (希望勤務地)'}
                   </label>
                   <input
                     type="text"
@@ -3278,9 +3560,10 @@ const AddCandidateForm = ({ isAdmin = false, jobId = null, candidateId: candidat
                     }}
                   />
                 </div>
+                {/* 34. Ngày vào công ty dự kiến */}
                 <div>
                   <label className="block text-xs font-semibold mb-2" style={{ color: '#111827' }}>
-                    {t.addCandidateDesiredStartDate || 'Ngày bắt đầu (希望入社日)'}
+                    {t.addCandidateDesiredStartDate || 'Ngày dự kiến vào công ty (希望入社日)'}
                   </label>
                   <input
                     type="text"
@@ -3307,6 +3590,43 @@ const AddCandidateForm = ({ isAdmin = false, jobId = null, candidateId: candidat
             </div>
           </div>
         </div>
+
+        {/* Footer buttons: Hủy + Lưu/Cập nhật đặt ở cuối form (trừ màn tiến cử ứng viên có block riêng) */}
+        {(!jobId || isAdmin) && (
+          <div className="mt-3 flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={handleCancel}
+              onMouseEnter={() => setHoveredCancelButton(true)}
+              onMouseLeave={() => setHoveredCancelButton(false)}
+              className="px-4 py-2 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5"
+              style={{
+                backgroundColor: hoveredCancelButton ? '#e5e7eb' : '#f3f4f6',
+                color: '#374151'
+              }}
+            >
+              <X className="w-3.5 h-3.5" />
+              {t.cancelButton || 'Hủy'}
+            </button>
+            <button
+              type="submit"
+              onMouseEnter={() => setHoveredSaveButton(true)}
+              onMouseLeave={() => setHoveredSaveButton(false)}
+              disabled={isBusy}
+              className="px-4 py-2 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5"
+              style={{
+                backgroundColor: hoveredSaveButton ? '#1d4ed8' : '#2563eb',
+                color: 'white',
+                opacity: isBusy ? 0.8 : 1
+              }}
+            >
+              <Save className="w-3.5 h-3.5" />
+              {saving
+                ? (candidateId ? (t.addCandidateUpdating || 'Đang cập nhật...') : (t.addCandidateSaving || 'Đang lưu...'))
+                : (candidateId ? (t.addCandidateUpdate || 'Cập nhật ứng viên') : (t.addCandidateSave || 'Lưu ứng viên'))}
+            </button>
+          </div>
+        )}
       </form>
         </div>
 
@@ -3429,8 +3749,6 @@ const AddCandidateForm = ({ isAdmin = false, jobId = null, candidateId: candidat
                     cvEditableArray={cvEditableArray}
                     cvEditableWithDefault={cvEditableWithDefault}
                     getDefaultCvDate={getDefaultCvDate}
-                    isToolChecked={isToolChecked}
-                    toggleToolCheckbox={toggleToolCheckbox}
                     updateEmployment={updateEmployment}
                     updateEmploymentPair={updateEmploymentPair}
                     toggleShokumuCheckbox={toggleShokumuCheckbox}
@@ -3465,15 +3783,15 @@ const AddCandidateForm = ({ isAdmin = false, jobId = null, candidateId: candidat
         <button
             type="button"
           onClick={handleSubmit}
-          disabled={loading}
+          disabled={isBusy}
             className="px-6 py-2 rounded-lg font-semibold transition-colors"
-          style={{
-              backgroundColor: loading ? '#93c5fd' : '#facc15',
+            style={{
+              backgroundColor: isBusy ? '#93c5fd' : '#facc15',
               color: '#1e3a8a',
-              opacity: loading ? 0.7 : 1
+              opacity: isBusy ? 0.7 : 1
             }}
           >
-            {t.addCandidateNominate || 'Tiến cử ứng viên'}
+            {saving ? (t.addCandidateSaving || 'Đang lưu...') : (t.addCandidateNominate || 'Tiến cử ứng viên')}
         </button>
       </div>
       )}

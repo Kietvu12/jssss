@@ -24,6 +24,7 @@ import { useLanguage } from '../../context/LanguageContext';
 import { translations } from '../../translations/translations';
 import apiService from '../../services/api';
 import { BUSINESS_SECTOR_OPTIONS } from '../../utils/businessSectorOptions';
+import { JAPAN_REGIONS, JAPAN_PREFECTURES, fetchJapanCitiesByPrefecture, kanaToRomaji } from '../../utils/japanLocationData';
 
 
 // Mock data for static options
@@ -32,27 +33,25 @@ const mockLocations = [
   'Hiroshima', 'Kobe', 'Chiba', 'Saitama', 'Kanagawa', 'Aichi', 'Hyogo'
 ];
 
-// Dữ liệu quốc gia và tỉnh/thành phố
-const countryProvincesData = {
-  'Vietnam': [
-    'Hà Nội', 'Hồ Chí Minh', 'Đà Nẵng', 'Hải Phòng', 'Cần Thơ', 'An Giang', 'Bà Rịa - Vũng Tàu',
-    'Bắc Giang', 'Bắc Kạn', 'Bạc Liêu', 'Bắc Ninh', 'Bến Tre', 'Bình Định', 'Bình Dương',
-    'Bình Phước', 'Bình Thuận', 'Cà Mau', 'Cao Bằng', 'Đắk Lắk', 'Đắk Nông', 'Điện Biên',
-    'Đồng Nai', 'Đồng Tháp', 'Gia Lai', 'Hà Giang', 'Hà Nam', 'Hà Tĩnh', 'Hải Dương',
-    'Hậu Giang', 'Hòa Bình', 'Hưng Yên', 'Khánh Hòa', 'Kiên Giang', 'Kon Tum', 'Lai Châu',
-    'Lâm Đồng', 'Lạng Sơn', 'Lào Cai', 'Long An', 'Nam Định', 'Nghệ An', 'Ninh Bình',
-    'Ninh Thuận', 'Phú Thọ', 'Phú Yên', 'Quảng Bình', 'Quảng Nam', 'Quảng Ngãi', 'Quảng Ninh',
-    'Quảng Trị', 'Sóc Trăng', 'Sơn La', 'Tây Ninh', 'Thái Bình', 'Thái Nguyên', 'Thanh Hóa',
-    'Thừa Thiên Huế', 'Tiền Giang', 'Trà Vinh', 'Tuyên Quang', 'Vĩnh Long', 'Vĩnh Phúc', 'Yên Bái'
-  ],
-  'Japan': [
-    'Tokyo', 'Osaka', 'Kyoto', 'Yokohama', 'Nagoya', 'Sapporo', 'Fukuoka', 'Kobe', 'Kawasaki',
-    'Saitama', 'Hiroshima', 'Sendai', 'Chiba', 'Kitakyushu', 'Sakai', 'Niigata', 'Hamamatsu',
-    'Shizuoka', 'Sagamihara', 'Okayama', 'Kumamoto', 'Kagoshima', 'Utsunomiya', 'Hachioji',
-    'Matsuyama', 'Kanazawa', 'Nagano', 'Toyama', 'Gifu', 'Fukushima', 'Mito', 'Akita', 'Aomori',
-    'Morioka', 'Yamagata', 'Fukui', 'Tottori', 'Matsue', 'Kofu', 'Maebashi', 'Takamatsu',
-    'Tokushima', 'Kochi', 'Miyazaki', 'Naha', 'Okinawa'
-  ]
+/** Tỉnh/thành Việt Nam — chọn phẳng giống AddJob */
+const VIETNAM_PROVINCES = [
+  'Hà Nội', 'Hồ Chí Minh', 'Đà Nẵng', 'Hải Phòng', 'Cần Thơ', 'An Giang', 'Bà Rịa - Vũng Tàu',
+  'Bắc Giang', 'Bắc Kạn', 'Bạc Liêu', 'Bắc Ninh', 'Bến Tre', 'Bình Định', 'Bình Dương',
+  'Bình Phước', 'Bình Thuận', 'Cà Mau', 'Cao Bằng', 'Đắk Lắk', 'Đắk Nông', 'Điện Biên',
+  'Đồng Nai', 'Đồng Tháp', 'Gia Lai', 'Hà Giang', 'Hà Nam', 'Hà Tĩnh', 'Hải Dương',
+  'Hậu Giang', 'Hòa Bình', 'Hưng Yên', 'Khánh Hòa', 'Kiên Giang', 'Kon Tum', 'Lai Châu',
+  'Lâm Đồng', 'Lạng Sơn', 'Lào Cai', 'Long An', 'Nam Định', 'Nghệ An', 'Ninh Bình',
+  'Ninh Thuận', 'Phú Thọ', 'Phú Yên', 'Quảng Bình', 'Quảng Nam', 'Quảng Ngãi', 'Quảng Ninh',
+  'Quảng Trị', 'Sóc Trăng', 'Sơn La', 'Tây Ninh', 'Thái Bình', 'Thái Nguyên', 'Thanh Hóa',
+  'Thừa Thiên Huế', 'Tiền Giang', 'Trà Vinh', 'Tuyên Quang', 'Vĩnh Long', 'Vĩnh Phúc', 'Yên Bái',
+];
+
+const LOCATION_FILTER_COUNTRY_KEYS = ['Vietnam', 'Japan'];
+
+const countryFilterLabel = (key, lang) => {
+  if (key === 'Vietnam') return lang === 'en' ? 'Vietnam' : lang === 'ja' ? 'ベトナム' : 'Việt Nam';
+  if (key === 'Japan') return lang === 'en' ? 'Japan' : lang === 'ja' ? '日本' : 'Nhật Bản';
+  return key;
 };
 
 const mockEmploymentTypes = [
@@ -87,44 +86,44 @@ const HeaderNavigationButtons = ({
 }) => {
   if (compact) {
     return (
-      <div className="mb-2">
+      <div className="mb-1">
         <div className="flex items-center gap-0">
           <button
             onClick={onSearchHistoryClick}
             onMouseEnter={() => setHoveredNavButtonIndex('history-compact')}
             onMouseLeave={() => setHoveredNavButtonIndex(null)}
-            className="flex items-center gap-1.5 px-2 py-1.5 transition-colors justify-center text-xs"
+            className="flex items-center gap-1 px-1.5 py-0.5 transition-colors justify-center text-[9px]"
             style={{
               backgroundColor: hoveredNavButtonIndex === 'history-compact' ? '#f9fafb' : 'transparent'
             }}
           >
-            <Clock className="w-4 h-4" style={{ color: '#f97316' }} />
+            <Clock className="w-2.5 h-2.5" style={{ color: '#f97316' }} />
             <span className="font-medium truncate" style={{ color: '#1e3a8a' }}>Lịch sử</span>
           </button>
-          <span className="text-xs" style={{ color: '#d1d5db' }}>|</span>
+          <span className="text-[9px]" style={{ color: '#d1d5db' }}>|</span>
           <button
             onClick={onSavedCriteriaClick}
             onMouseEnter={() => setHoveredNavButtonIndex('criteria-compact')}
             onMouseLeave={() => setHoveredNavButtonIndex(null)}
-            className="flex items-center gap-1.5 px-2 py-1.5 transition-colors justify-center text-xs"
+            className="flex items-center gap-1 px-1.5 py-0.5 transition-colors justify-center text-[9px]"
             style={{
               backgroundColor: hoveredNavButtonIndex === 'criteria-compact' ? '#f9fafb' : 'transparent'
             }}
           >
-            <Bookmark className="w-4 h-4" style={{ color: '#60a5fa' }} />
+            <Bookmark className="w-2.5 h-2.5" style={{ color: '#60a5fa' }} />
             <span className="font-medium truncate" style={{ color: '#1e3a8a' }}>Tiêu chí đã lưu</span>
           </button>
-          <span className="text-xs" style={{ color: '#d1d5db' }}>|</span>
+          <span className="text-[9px]" style={{ color: '#d1d5db' }}>|</span>
           <button
             onClick={onSavedListClick}
             onMouseEnter={() => setHoveredNavButtonIndex('list-compact')}
             onMouseLeave={() => setHoveredNavButtonIndex(null)}
-            className="flex items-center gap-1.5 px-2 py-1.5 transition-colors justify-center text-xs"
+            className="flex items-center gap-1 px-1.5 py-0.5 transition-colors justify-center text-[9px]"
             style={{
               backgroundColor: hoveredNavButtonIndex === 'list-compact' ? '#f9fafb' : 'transparent'
             }}
           >
-            <Heart className="w-4 h-4" style={{ color: '#ef4444' }} />
+            <Heart className="w-2.5 h-2.5" style={{ color: '#ef4444' }} />
             <span className="font-medium truncate" style={{ color: '#1e3a8a' }}>Danh sách{savedListsTotalJobs > 0 ? ` (${savedListsTotalJobs})` : ''}</span>
           </button>
         </div>
@@ -133,45 +132,45 @@ const HeaderNavigationButtons = ({
   }
   
   return (
-    <div className="mb-4">
+    <div className="mb-2">
       <div className="flex items-center gap-0">
         <button
           onClick={onSearchHistoryClick}
           onMouseEnter={() => setHoveredNavButtonIndex('history')}
           onMouseLeave={() => setHoveredNavButtonIndex(null)}
-          className="flex items-center gap-2 px-4 py-2 transition-colors justify-center"
+          className="flex items-center gap-1 px-2 py-1 transition-colors justify-center text-[9px]"
           style={{
             backgroundColor: hoveredNavButtonIndex === 'history' ? '#f9fafb' : 'transparent'
           }}
         >
-          <Clock className="w-5 h-5" style={{ color: '#f97316' }} />
-          <span className="text-xs font-medium whitespace-nowrap" style={{ color: '#1e3a8a' }}>Lịch sử tìm kiếm</span>
+          <Clock className="w-3 h-3" style={{ color: '#f97316' }} />
+          <span className="font-medium whitespace-nowrap" style={{ color: '#1e3a8a' }}>Lịch sử tìm kiếm</span>
         </button>
-        <span className="text-sm" style={{ color: '#d1d5db' }}>|</span>
+        <span className="text-[9px]" style={{ color: '#d1d5db' }}>|</span>
         <button
           onClick={onSavedCriteriaClick}
           onMouseEnter={() => setHoveredNavButtonIndex('criteria')}
           onMouseLeave={() => setHoveredNavButtonIndex(null)}
-          className="flex items-center gap-2 px-4 py-2 transition-colors justify-center"
+          className="flex items-center gap-1 px-2 py-1 transition-colors justify-center text-[9px]"
           style={{
             backgroundColor: hoveredNavButtonIndex === 'criteria' ? '#f9fafb' : 'transparent'
           }}
         >
-          <Bookmark className="w-5 h-5" style={{ color: '#60a5fa' }} />
-          <span className="text-xs font-medium whitespace-nowrap" style={{ color: '#1e3a8a' }}>Tiêu chí tìm kiếm đã lưu</span>
+          <Bookmark className="w-3 h-3" style={{ color: '#60a5fa' }} />
+          <span className="font-medium whitespace-nowrap" style={{ color: '#1e3a8a' }}>Tiêu chí tìm kiếm đã lưu</span>
         </button>
-        <span className="text-sm" style={{ color: '#d1d5db' }}>|</span>
+        <span className="text-[9px]" style={{ color: '#d1d5db' }}>|</span>
         <button
           onClick={onSavedListClick}
           onMouseEnter={() => setHoveredNavButtonIndex('list')}
           onMouseLeave={() => setHoveredNavButtonIndex(null)}
-          className="flex items-center gap-2 px-4 py-2 transition-colors justify-center"
+          className="flex items-center gap-1 px-2 py-1 transition-colors justify-center text-[9px]"
           style={{
             backgroundColor: hoveredNavButtonIndex === 'list' ? '#f9fafb' : 'transparent'
           }}
         >
-          <Heart className="w-5 h-5" style={{ color: '#ef4444' }} />
-          <span className="text-xs font-medium whitespace-nowrap" style={{ color: '#1e3a8a' }}>
+          <Heart className="w-3 h-3" style={{ color: '#ef4444' }} />
+          <span className="font-medium whitespace-nowrap" style={{ color: '#1e3a8a' }}>
             Danh sách lưu giữ{savedListsTotalJobs > 0 ? <span className="font-bold"> {savedListsTotalJobs} miếng</span> : null}
           </span>
         </button>
@@ -188,15 +187,15 @@ const FilterBlock = ({
   helperText,
   compact = false
 }) => (
-  <div className={`flex ${compact ? 'gap-1.5 sm:gap-2' : 'gap-2 sm:gap-3'} min-w-0`}>
-    <div className="flex-shrink-0 pt-0.5">
-      <Icon className={compact ? "w-4 h-4 sm:w-5 sm:h-5 text-gray-600" : "w-5 h-5 text-gray-600"} />
+  <div className="flex gap-1 min-w-0 items-start">
+    <div className="flex-shrink-0 leading-none">
+      <Icon className="w-3 h-3 text-gray-600" />
     </div>
-    <div className={`flex-1 ${compact ? 'space-y-0.5' : 'space-y-1'} min-w-0`}>
-      <label className={compact ? "text-xs sm:text-sm font-medium text-gray-700" : "text-sm font-medium text-gray-700"}>{label}</label>
+    <div className="flex-1 space-y-0.5 min-w-0">
+      <label className="text-[9px] font-medium text-gray-700 block h-3 leading-3">{label}</label>
       {children}
       {helperText && (
-        <p className={compact ? "text-xs text-gray-500" : "text-sm text-gray-500"}>{helperText}</p>
+        <p className="text-[9px] text-gray-500">{helperText}</p>
       )}
     </div>
   </div>
@@ -220,16 +219,21 @@ const AgentJobsPageSession1 = ({ onSearch, onFiltersChange, compact = false, use
     employmentType: null,
     highlights: [],
     booleans: {
-      positionNoExpOk: false,
-      industryNoExpOk: false,
-      weekendOff: false,
-      noExpOk: false,
+      noExperienceOk: false,
+      underOneYearOk: false,
+      graduatingSoonOk: false,
+      remoteOk: false,
     },
   });
 
   // const [showKeywordMode, setShowKeywordMode] = useState(false); // Đã bỏ OR/AND cho keyword
   const [showLocationModal, setShowLocationModal] = useState(false); // Show both modals together
   const [selectedCountries, setSelectedCountries] = useState([]); // Array of selected countries
+  /** Nhật Bản: vùng → tỉnh → phường/thành (giống AddJob) */
+  const [japanFilterRegion, setJapanFilterRegion] = useState(null);
+  const [japanFilterPrefecture, setJapanFilterPrefecture] = useState(null);
+  const [japanFilterData, setJapanFilterData] = useState({ flat: [], tree: [] });
+  const [japanFilterLoading, setJapanFilterLoading] = useState(false);
 
   // Sync selectedCountries with filters.locations when modal opens
   useEffect(() => {
@@ -241,6 +245,36 @@ const AgentJobsPageSession1 = ({ onSearch, onFiltersChange, compact = false, use
       setSelectedCountries(Array.from(countries));
     }
   }, [showLocationModal]);
+
+  useEffect(() => {
+    if (!selectedCountries.includes('Japan')) {
+      setJapanFilterRegion(null);
+      setJapanFilterPrefecture(null);
+      setJapanFilterData({ flat: [], tree: [] });
+    }
+  }, [selectedCountries]);
+
+  useEffect(() => {
+    if (!japanFilterPrefecture) {
+      setJapanFilterData({ flat: [], tree: [] });
+      return;
+    }
+    let cancelled = false;
+    setJapanFilterLoading(true);
+    fetchJapanCitiesByPrefecture(japanFilterPrefecture)
+      .then((r) => {
+        if (!cancelled) setJapanFilterData(r || { flat: [], tree: [] });
+      })
+      .catch(() => {
+        if (!cancelled) setJapanFilterData({ flat: [], tree: [] });
+      })
+      .finally(() => {
+        if (!cancelled) setJapanFilterLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [japanFilterPrefecture]);
   const [showFieldJobTypeModal, setShowFieldJobTypeModal] = useState(false); // Dual modal for field and job type
   const [showSectorModal, setShowSectorModal] = useState(false); // Modal chọn lĩnh vực kinh doanh
   const [showHighlightModal, setShowHighlightModal] = useState(false);
@@ -720,14 +754,12 @@ const AgentJobsPageSession1 = ({ onSearch, onFiltersChange, compact = false, use
           salaryMax: payload.filters.salaryMax ?? '',
           employmentType: payload.filters.employmentType ?? null,
           highlights: Array.isArray(payload.filters.highlights) ? payload.filters.highlights : [],
-          booleans: payload.filters.booleans && typeof payload.filters.booleans === 'object'
-            ? { ...payload.filters.booleans }
-            : {
-                positionNoExpOk: false,
-                industryNoExpOk: false,
-                weekendOff: false,
-                noExpOk: false,
-              },
+          booleans: {
+            noExperienceOk: !!(payload.filters.booleans && payload.filters.booleans.noExperienceOk),
+            underOneYearOk: !!(payload.filters.booleans && payload.filters.booleans.underOneYearOk),
+            graduatingSoonOk: !!(payload.filters.booleans && payload.filters.booleans.graduatingSoonOk),
+            remoteOk: !!(payload.filters.booleans && payload.filters.booleans.remoteOk),
+          },
         }
       : filters;
     const keyword = payload.keyword ?? payload.filters?.keyword ?? '';
@@ -759,10 +791,10 @@ const AgentJobsPageSession1 = ({ onSearch, onFiltersChange, compact = false, use
       employmentType: null,
       highlights: [],
       booleans: {
-        positionNoExpOk: false,
-        industryNoExpOk: false,
-        weekendOff: false,
-        noExpOk: false,
+        noExperienceOk: false,
+        underOneYearOk: false,
+        graduatingSoonOk: false,
+        remoteOk: false,
       },
     });
   };
@@ -806,17 +838,52 @@ const AgentJobsPageSession1 = ({ onSearch, onFiltersChange, compact = false, use
     });
   };
 
-  // Get all provinces from selected countries
   const getAvailableProvinces = () => {
     const allProvinces = [];
-    selectedCountries.forEach(country => {
-      if (countryProvincesData[country]) {
-        countryProvincesData[country].forEach(province => {
+    selectedCountries.forEach((country) => {
+      if (country === 'Vietnam') {
+        VIETNAM_PROVINCES.forEach((province) => {
           allProvinces.push({ country, location: province });
         });
       }
     });
     return allProvinces;
+  };
+
+  const toggleJapanLocationEntry = ({ location, locationJp, jpId }) => {
+    setFilters((prev) => {
+      const idx = prev.locations.findIndex(
+        (l) =>
+          l.country === 'Japan' &&
+          (jpId ? l.jpId === jpId : l.location === location)
+      );
+      if (idx >= 0) {
+        return { ...prev, locations: prev.locations.filter((_, i) => i !== idx) };
+      }
+      return {
+        ...prev,
+        locations: [...prev.locations, { country: 'Japan', location, locationJp, jpId }],
+      };
+    });
+  };
+
+  const applyJapanLocationBulk = (add, locObjs) => {
+    setFilters((prev) => {
+      const ids = new Set(locObjs.map((l) => l.id));
+      let next = [...prev.locations];
+      if (add) {
+        const have = new Set(next.filter((l) => l.country === 'Japan').map((l) => l.jpId));
+        locObjs.forEach((loc) => {
+          if (!have.has(loc.id)) {
+            next.push({ country: 'Japan', location: loc.alpha, locationJp: loc.ja, jpId: loc.id });
+            have.add(loc.id);
+          }
+        });
+      } else {
+        next = next.filter((l) => l.country !== 'Japan' || !ids.has(l.jpId));
+      }
+      return { ...prev, locations: next };
+    });
   };
 
   const getSelectedLocationsDisplay = () => {
@@ -828,7 +895,11 @@ const AgentJobsPageSession1 = ({ onSearch, onFiltersChange, compact = false, use
       if (!byCountry[loc.country]) {
         byCountry[loc.country] = [];
       }
-      byCountry[loc.country].push(loc.location);
+      const disp =
+        loc.country === 'Japan' && language === 'ja' && loc.locationJp
+          ? loc.locationJp
+          : loc.location;
+      byCountry[loc.country].push(disp);
     });
     
     // Format: "Vietnam: Hà Nội, Hồ Chí Minh; Japan: Tokyo, Osaka"
@@ -1106,7 +1177,7 @@ const AgentJobsPageSession1 = ({ onSearch, onFiltersChange, compact = false, use
 
       <div className={`flex-1 flex flex-col bg-white ${compact ? 'rounded-lg' : 'rounded-2xl'} border border-gray-200 overflow-hidden min-h-0`}>
         {/* Scrollable Form Content */}
-        <div className={`flex-1 overflow-y-auto ${compact ? 'p-2 sm:p-3' : 'p-3 sm:p-4 md:p-5'} ${compact ? 'space-y-2 sm:space-y-2.5' : 'space-y-3 sm:space-y-4'} custom-scrollbar min-h-0`}>
+        <div className={`flex-1 overflow-y-auto ${compact ? 'p-1.5' : 'p-2'} ${compact ? 'space-y-1.5' : 'space-y-2'} custom-scrollbar min-h-0`}>
           {/* A. Freeword / Keyword - controlled để tránh bị xóa khi re-render */}
         <FilterBlock icon={Search} label={language === 'vi' ? 'Từ khóa' : language === 'en' ? 'Keyword' : 'フリーワード'} compact={compact}>
           <div className="relative">
@@ -1116,33 +1187,33 @@ const AgentJobsPageSession1 = ({ onSearch, onFiltersChange, compact = false, use
               value={filters.keyword ?? ''}
               onChange={(e) => setFilters(prev => ({ ...prev, keyword: e.target.value }))}
               placeholder={language === 'vi' ? 'ID, tên job, nội dung công việc…' : language === 'en' ? 'ID, job name, job description…' : 'ID、求人名、業務内容…'}
-              className={`w-full ${compact ? 'px-3 sm:px-3.5 py-2 sm:py-2.5 text-xs sm:text-sm' : 'px-4 py-3 text-sm'} border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
+              className="w-full px-2 py-1 text-[9px] border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
           </div>
         </FilterBlock>
 
         {/* B. Địa điểm làm việc */}
         <FilterBlock icon={MapPin} label={language === 'vi' ? 'Địa điểm làm việc' : language === 'en' ? 'Work Location' : '勤務地'} compact={compact}>
-          <div className={`flex ${compact ? 'gap-1 sm:gap-1.5' : 'gap-2'} items-center`}>
+          <div className="flex gap-1 items-center">
             <input
               type="text"
               readOnly
               value={getSelectedLocationsDisplay()}
               placeholder={language === 'vi' ? 'Chọn địa điểm làm việc' : language === 'en' ? 'Select work location' : '勤務地を選択'}
-              className={`flex-1 ${compact ? 'px-3 sm:px-3.5 py-2 sm:py-2.5 text-xs sm:text-sm' : 'px-5 py-3 text-sm'} border border-gray-300 rounded-lg bg-gray-50 cursor-pointer`}
+              className="flex-1 px-2 py-1 text-[9px] border border-gray-300 rounded bg-gray-50 cursor-pointer"
               onClick={() => setShowLocationModal(true)}
             />
             <button
               onClick={() => setShowLocationModal(true)}
               onMouseEnter={() => setHoveredLocationButton(true)}
               onMouseLeave={() => setHoveredLocationButton(false)}
-              className={`${compact ? 'px-2 sm:px-2.5 py-2 sm:py-2.5' : 'px-4 py-3'} border rounded-lg transition-colors flex-shrink-0`}
+              className="px-1.5 py-1 border rounded transition-colors flex-shrink-0"
               style={{
                 borderColor: '#d1d5db',
                 backgroundColor: hoveredLocationButton ? '#f9fafb' : 'transparent'
               }}
             >
-              <Plus className={compact ? "w-4 h-4 sm:w-5 sm:h-5" : "w-5 h-5"} style={{ color: '#4b5563' }} />
+              <Plus className="w-3 h-3" style={{ color: '#4b5563' }} />
             </button>
           </div>
         </FilterBlock>
@@ -1153,20 +1224,20 @@ const AgentJobsPageSession1 = ({ onSearch, onFiltersChange, compact = false, use
           label={t.agentJobsJobType}
           compact={compact}
         >
-          <div className={`flex ${compact ? 'gap-1 sm:gap-1.5' : 'gap-2'} items-center`}>
+          <div className="flex gap-1 items-center">
             <input
               type="text"
               readOnly
               value={getSelectedCategoryDisplay() || ''}
               placeholder={t.agentJobsSelectJobTypePlaceholder}
-              className={`flex-1 ${compact ? 'px-3 sm:px-3.5 py-2 sm:py-2.5 text-xs sm:text-sm' : 'px-5 py-3 text-sm'} border border-gray-300 rounded-lg bg-gray-50 cursor-pointer`}
+              className="flex-1 px-2 py-1 text-[9px] border border-gray-300 rounded bg-gray-50 cursor-pointer"
               onClick={() => setShowFieldJobTypeModal(true)}
             />
             <button
               onClick={() => setShowFieldJobTypeModal(true)}
-              className={`${compact ? 'px-2 sm:px-2.5 py-2 sm:py-2.5' : 'px-4 py-3'} border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex-shrink-0`}
+              className="px-1.5 py-1 border border-gray-300 rounded hover:bg-gray-50 transition-colors flex-shrink-0"
             >
-              <Plus className={compact ? "w-4 h-4 sm:w-5 sm:h-5 text-gray-600" : "w-5 h-5 text-gray-600"} />
+              <Plus className="w-3 h-3 text-gray-600" />
             </button>
           </div>
         </FilterBlock>
@@ -1177,31 +1248,31 @@ const AgentJobsPageSession1 = ({ onSearch, onFiltersChange, compact = false, use
           label={language === 'vi' ? 'Lĩnh vực' : language === 'en' ? 'Business Sector' : '業種'}
           compact={compact}
         >
-          <div className={`flex ${compact ? 'gap-1 sm:gap-1.5' : 'gap-2'} items-center`}>
+          <div className="flex gap-1 items-center">
             <input
               type="text"
               readOnly
               value={getSelectedSectorNames() || ''}
               placeholder={language === 'vi' ? 'Chọn lĩnh vực kinh doanh' : language === 'en' ? 'Select business sector' : '業種を選択'}
-              className={`flex-1 ${compact ? 'px-3 sm:px-3.5 py-2 sm:py-2.5 text-xs sm:text-sm' : 'px-5 py-3 text-sm'} border border-gray-300 rounded-lg bg-gray-50 cursor-pointer`}
+              className="flex-1 px-2 py-1 text-[9px] border border-gray-300 rounded bg-gray-50 cursor-pointer"
               onClick={() => setShowSectorModal(true)}
             />
             <button
               onClick={() => setShowSectorModal(true)}
-              className={`${compact ? 'px-2 sm:px-2.5 py-2 sm:py-2.5' : 'px-4 py-3'} border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex-shrink-0`}
+              className="px-1.5 py-1 border border-gray-300 rounded hover:bg-gray-50 transition-colors flex-shrink-0"
             >
-              <Plus className={compact ? "w-4 h-4 sm:w-5 sm:h-5 text-gray-600" : "w-5 h-5 text-gray-600"} />
+              <Plus className="w-3 h-3 text-gray-600" />
             </button>
           </div>
         </FilterBlock>
 
         {/* E. Tuổi */}
         <FilterBlock icon={Calendar} label={language === 'vi' ? 'Tuổi' : language === 'en' ? 'Age' : '年齢'} compact={compact}>
-          <div className={`flex items-center ${compact ? 'gap-1 sm:gap-1.5' : 'gap-2'} flex-wrap`}>
+          <div className="flex items-center gap-1 flex-wrap">
             <select
               value={filters.age || ''}
               onChange={(e) => setFilters(prev => ({ ...prev, age: e.target.value || null }))}
-              className={`flex-1 min-w-0 ${compact ? 'px-3 sm:px-3.5 py-2 sm:py-2.5 text-xs sm:text-sm' : 'px-5 py-3 text-sm'} border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
+              className="flex-1 min-w-0 px-2 py-1 text-[9px] border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             >
               <option value="">{language === 'vi' ? 'Chọn tuổi' : language === 'en' ? 'Select age' : '選択'}</option>
               <option value="18">18</option>
@@ -1211,7 +1282,7 @@ const AgentJobsPageSession1 = ({ onSearch, onFiltersChange, compact = false, use
               <option value="35">35</option>
               <option value="40">40</option>
             </select>
-            <span className={compact ? "text-xs sm:text-sm text-gray-500 whitespace-nowrap flex-shrink-0" : "text-sm text-gray-500 whitespace-nowrap flex-shrink-0"}>
+            <span className="text-[9px] text-gray-500 whitespace-nowrap flex-shrink-0">
               {language === 'vi' ? 'tuổi có thể ứng tuyển' : language === 'en' ? 'years old' : '歳で応募可能'}
             </span>
           </div>
@@ -1219,23 +1290,23 @@ const AgentJobsPageSession1 = ({ onSearch, onFiltersChange, compact = false, use
 
         {/* F. Range lương */}
         <FilterBlock icon={DollarSign} label={language === 'vi' ? 'Range lương' : language === 'en' ? 'Salary Range' : '給与範囲'} compact={compact}>
-          <div className={`flex items-center ${compact ? 'gap-1 sm:gap-1.5' : 'gap-2'} min-w-0 flex-wrap`}>
+          <div className="flex items-center gap-1 min-w-0 flex-wrap">
             <input
               type="number"
               value={filters.salaryMin}
               onChange={(e) => setFilters(prev => ({ ...prev, salaryMin: e.target.value ? Number(e.target.value) : '' }))}
               placeholder={language === 'vi' ? 'Từ' : language === 'en' ? 'From' : 'から'}
-              className={`flex-1 min-w-[60px] ${compact ? 'px-2 sm:px-3 py-2 sm:py-2.5 text-xs sm:text-sm' : 'px-5 py-3 text-sm'} border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
+              className="flex-1 min-w-[60px] px-2 py-1 text-[9px] border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
-            <span className="text-gray-500 flex-shrink-0 text-sm">{compact ? '~' : '~'}</span>
+            <span className="text-gray-500 flex-shrink-0 text-[9px]">~</span>
             <input
               type="number"
               value={filters.salaryMax}
               onChange={(e) => setFilters(prev => ({ ...prev, salaryMax: e.target.value ? Number(e.target.value) : '' }))}
               placeholder={language === 'vi' ? 'Đến' : language === 'en' ? 'To' : 'まで'}
-              className={`flex-1 min-w-[60px] ${compact ? 'px-2 sm:px-3 py-2 sm:py-2.5 text-xs sm:text-sm' : 'px-5 py-3 text-sm'} border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
+              className="flex-1 min-w-[60px] px-2 py-1 text-[9px] border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
-            <span className={compact ? "text-xs sm:text-sm text-gray-500 whitespace-nowrap flex-shrink-0" : "text-sm text-gray-500 whitespace-nowrap flex-shrink-0"}>
+            <span className="text-[9px] text-gray-500 whitespace-nowrap flex-shrink-0">
               {language === 'vi' ? 'triệu' : language === 'en' ? 'million' : '万円'}
             </span>
           </div>
@@ -1246,7 +1317,7 @@ const AgentJobsPageSession1 = ({ onSearch, onFiltersChange, compact = false, use
           <select
             value={filters.employmentType || ''}
             onChange={(e) => setFilters(prev => ({ ...prev, employmentType: e.target.value || null }))}
-            className={`w-full ${compact ? 'px-3 sm:px-3.5 py-2 sm:py-2.5 text-xs sm:text-sm' : 'px-5 py-3 text-sm'} border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
+            className="w-full px-2 py-1 text-[9px] border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           >
             <option value="">{language === 'vi' ? 'Chọn hình thức' : language === 'en' ? 'Select type' : '選択'}</option>
             {mockEmploymentTypes.map((type) => (
@@ -1257,81 +1328,81 @@ const AgentJobsPageSession1 = ({ onSearch, onFiltersChange, compact = false, use
 
         {/* I. Điểm nổi bật */}
         <FilterBlock icon={Star} label={language === 'vi' ? 'Điểm nổi bật của job' : language === 'en' ? 'Job Highlights' : '求人の特徴'} compact={compact}>
-          <div className={`flex ${compact ? 'gap-1 sm:gap-1.5' : 'gap-2'} items-center`}>
+          <div className="flex gap-1 items-center">
             <input
               type="text"
               readOnly
               value={getSelectedHighlightsNames() || ''}
               placeholder={language === 'vi' ? 'Chọn điểm nổi bật' : language === 'en' ? 'Select highlights' : '特徴を選択'}
-              className={`flex-1 ${compact ? 'px-3 sm:px-3.5 py-2 sm:py-2.5 text-xs sm:text-sm' : 'px-5 py-3 text-sm'} border border-gray-300 rounded-lg bg-gray-50 cursor-pointer`}
+              className="flex-1 px-2 py-1 text-[9px] border border-gray-300 rounded bg-gray-50 cursor-pointer"
               onClick={() => setShowHighlightModal(true)}
             />
             <button
               onClick={() => setShowHighlightModal(true)}
-              className={`${compact ? 'px-2 sm:px-2.5 py-2 sm:py-2.5' : 'px-4 py-3'} border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex-shrink-0`}
+              className="px-1.5 py-1 border border-gray-300 rounded hover:bg-gray-50 transition-colors flex-shrink-0"
             >
-              <Plus className={compact ? "w-4 h-4 sm:w-5 sm:h-5 text-gray-600" : "w-5 h-5 text-gray-600"} />
+              <Plus className="w-3 h-3 text-gray-600" />
             </button>
           </div>
         </FilterBlock>
 
         {/* J. Nhóm checkbox Yes/No */}
         <FilterBlock icon={CheckSquare} label={language === 'vi' ? 'Điều kiện' : language === 'en' ? 'Conditions' : '条件'} compact={compact}>
-          <div className={`grid grid-cols-1 sm:grid-cols-2 ${compact ? 'gap-1.5 sm:gap-2' : 'gap-2 sm:gap-3'}`}>
-            <label className={`flex items-start ${compact ? 'gap-1.5 sm:gap-2 p-1.5 sm:p-2' : 'gap-2 p-2'} rounded-lg hover:bg-gray-50 cursor-pointer`}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-1">
+            <label className="flex items-start gap-1 p-1 rounded hover:bg-gray-50 cursor-pointer">
               <input
                 type="checkbox"
-                checked={filters.booleans.positionNoExpOk}
+                checked={filters.booleans.noExperienceOk}
                 onChange={(e) => setFilters(prev => ({
                   ...prev,
-                  booleans: { ...prev.booleans, positionNoExpOk: e.target.checked }
+                  booleans: { ...prev.booleans, noExperienceOk: e.target.checked }
                 }))}
-                className={`mt-0.5 ${compact ? "w-4 h-4 sm:w-5 sm:h-5 text-blue-600 rounded border-gray-300 focus:ring-blue-500 flex-shrink-0" : "w-5 h-5 text-blue-600 rounded border-gray-300 focus:ring-blue-500 flex-shrink-0"}`}
+                className="mt-0.5 w-3 h-3 text-blue-600 rounded border-gray-300 focus:ring-blue-500 flex-shrink-0"
               />
-              <span className={compact ? "text-xs sm:text-sm text-gray-700 leading-tight" : "text-sm text-gray-700 leading-tight"}>
-                {language === 'vi' ? 'Chưa kinh nghiệm vị trí OK' : language === 'en' ? 'No position exp OK' : '未経験職種OK'}
+              <span className="text-[9px] text-gray-700 leading-tight">
+                {language === 'vi' ? 'Chưa có kinh nghiệm OK' : language === 'en' ? 'No experience OK' : '未経験OK'}
               </span>
             </label>
-            <label className={`flex items-start ${compact ? 'gap-1.5 sm:gap-2 p-1.5 sm:p-2' : 'gap-2 p-2'} rounded-lg hover:bg-gray-50 cursor-pointer`}>
+            <label className="flex items-start gap-1 p-1 rounded hover:bg-gray-50 cursor-pointer">
               <input
                 type="checkbox"
-                checked={filters.booleans.industryNoExpOk}
+                checked={filters.booleans.underOneYearOk}
                 onChange={(e) => setFilters(prev => ({
                   ...prev,
-                  booleans: { ...prev.booleans, industryNoExpOk: e.target.checked }
+                  booleans: { ...prev.booleans, underOneYearOk: e.target.checked }
                 }))}
-                className={`mt-0.5 ${compact ? "w-4 h-4 sm:w-5 sm:h-5 text-blue-600 rounded border-gray-300 focus:ring-blue-500 flex-shrink-0" : "w-5 h-5 text-blue-600 rounded border-gray-300 focus:ring-blue-500 flex-shrink-0"}`}
+                className="mt-0.5 w-3 h-3 text-blue-600 rounded border-gray-300 focus:ring-blue-500 flex-shrink-0"
               />
-              <span className={compact ? "text-xs sm:text-sm text-gray-700 leading-tight" : "text-sm text-gray-700 leading-tight"}>
-                {language === 'vi' ? 'Chưa kinh nghiệm ngành OK' : language === 'en' ? 'No industry exp OK' : '未経験業種OK'}
+              <span className="text-[9px] text-gray-700 leading-tight">
+                {language === 'vi' ? 'Kinh nghiệm dưới 1 năm OK' : language === 'en' ? 'Under 1 year exp OK' : '経験1年未満OK'}
               </span>
             </label>
-            <label className={`flex items-start ${compact ? 'gap-1.5 sm:gap-2 p-1.5 sm:p-2' : 'gap-2 p-2'} rounded-lg hover:bg-gray-50 cursor-pointer`}>
+            <label className="flex items-start gap-1 p-1 rounded hover:bg-gray-50 cursor-pointer">
               <input
                 type="checkbox"
-                checked={filters.booleans.weekendOff}
+                checked={filters.booleans.graduatingSoonOk}
                 onChange={(e) => setFilters(prev => ({
                   ...prev,
-                  booleans: { ...prev.booleans, weekendOff: e.target.checked }
+                  booleans: { ...prev.booleans, graduatingSoonOk: e.target.checked }
                 }))}
-                className={`mt-0.5 ${compact ? "w-4 h-4 sm:w-5 sm:h-5 text-blue-600 rounded border-gray-300 focus:ring-blue-500 flex-shrink-0" : "w-5 h-5 text-blue-600 rounded border-gray-300 focus:ring-blue-500 flex-shrink-0"}`}
+                className="mt-0.5 w-3 h-3 text-blue-600 rounded border-gray-300 focus:ring-blue-500 flex-shrink-0"
               />
-              <span className={compact ? "text-xs sm:text-sm text-gray-700 leading-tight" : "text-sm text-gray-700 leading-tight"}>
-                {language === 'vi' ? 'Nghỉ T7-CN' : language === 'en' ? 'Weekend off' : '土日祝休み'}
+              <span className="text-[9px] text-gray-700 leading-tight">
+                {language === 'vi' ? 'Ứng viên sắp tốt nghiệp OK' : language === 'en' ? 'Graduating soon OK' : '卒業予定者OK'}
               </span>
             </label>
-            <label className={`flex items-start ${compact ? 'gap-1.5 sm:gap-2 p-1.5 sm:p-2' : 'gap-2 p-2'} rounded-lg hover:bg-gray-50 cursor-pointer`}>
+            <label className="flex items-start gap-1 p-1 rounded hover:bg-gray-50 cursor-pointer">
               <input
                 type="checkbox"
-                checked={filters.booleans.noExpOk}
+                checked={filters.booleans.remoteOk}
                 onChange={(e) => setFilters(prev => ({
                   ...prev,
-                  booleans: { ...prev.booleans, noExpOk: e.target.checked }
+                  booleans: { ...prev.booleans, remoteOk: e.target.checked }
                 }))}
-                className={`mt-0.5 ${compact ? "w-4 h-4 sm:w-5 sm:h-5 text-blue-600 rounded border-gray-300 focus:ring-blue-500 flex-shrink-0" : "w-5 h-5 text-blue-600 rounded border-gray-300 focus:ring-blue-500 flex-shrink-0"}`}
+                className="mt-0.5 w-3 h-3 text-blue-600 rounded border-gray-300 focus:ring-blue-500 flex-shrink-0"
               />
-              <span className={compact ? "text-xs sm:text-sm text-gray-700 leading-tight" : "text-sm text-gray-700 leading-tight"}>
-                {language === 'vi' ? 'Hoàn toàn chưa kinh nghiệm OK' : language === 'en' ? 'No experience OK' : '完全未経験OK'}
+              <span className="text-[9px] text-gray-700 leading-tight">
+                {language === 'vi' ? 'Remote / Full remote Ok' : language === 'en' ? 'Remote / Full remote OK' : 'リモート・在宅OK'}
               </span>
             </label>
           </div>
@@ -1339,14 +1410,14 @@ const AgentJobsPageSession1 = ({ onSearch, onFiltersChange, compact = false, use
         </div>
 
         {/* Fixed Buttons Row */}
-        <div className={`flex-shrink-0 border-t border-gray-200 bg-white ${compact ? 'p-2 sm:p-3' : 'p-4 sm:p-5'} ${compact ? 'rounded-b-lg' : 'rounded-b-2xl'}`}>
-          <div className={`${compact ? "space-y-1.5 sm:space-y-2" : "space-y-2"}`}>
-            <div className={`flex ${compact ? 'gap-1.5 sm:gap-2' : 'gap-2'} flex-col sm:flex-row`}>
+        <div className={`flex-shrink-0 border-t border-gray-200 bg-white ${compact ? 'p-1.5' : 'p-2'} ${compact ? 'rounded-b-lg' : 'rounded-b-2xl'}`}>
+          <div className="space-y-1">
+            <div className={`flex ${compact ? 'gap-1' : 'gap-1'} flex-col sm:flex-row`}>
               <button
                 onClick={handleClearAll}
                 onMouseEnter={() => setHoveredClearButton(true)}
                 onMouseLeave={() => setHoveredClearButton(false)}
-                className={`flex-1 ${compact ? 'py-2 sm:py-2.5 px-3 sm:px-4 text-xs sm:text-sm' : 'py-3 px-5 text-sm'} font-medium rounded-lg transition-colors`}
+                className={`flex-1 ${compact ? 'py-1 px-2 text-[9px]' : 'py-1.5 px-2 text-[9px]'} font-medium rounded transition-colors`}
                 style={{
                   color: '#374151',
                   backgroundColor: hoveredClearButton ? '#e5e7eb' : '#f3f4f6'
@@ -1359,7 +1430,7 @@ const AgentJobsPageSession1 = ({ onSearch, onFiltersChange, compact = false, use
                 disabled={loading}
                 onMouseEnter={() => setHoveredSearchButton(true)}
                 onMouseLeave={() => setHoveredSearchButton(false)}
-                className={`flex-1 ${compact ? 'h-10 sm:h-11' : 'h-12'} rounded-lg flex items-center justify-center ${compact ? 'gap-1.5 sm:gap-2' : 'gap-2'} transition-colors shadow-md`}
+                className={`flex-1 ${compact ? 'h-7' : 'h-8'} rounded flex items-center justify-center gap-1 transition-colors shadow-md`}
                 style={{
                   backgroundColor: hoveredSearchButton ? '#eab308' : '#facc15',
                   opacity: loading ? 0.5 : 1,
@@ -1368,11 +1439,11 @@ const AgentJobsPageSession1 = ({ onSearch, onFiltersChange, compact = false, use
                 }}
               >
                 {loading ? (
-                  <RotateCw className={compact ? "w-4 h-4 sm:w-5 sm:h-5 animate-spin" : "w-5 h-5 animate-spin"} style={{ color: '#1f2937' }} />
+                  <RotateCw className="w-3 h-3 animate-spin" style={{ color: '#1f2937' }} />
                 ) : (
-                  <Search className={compact ? "w-4 h-4 sm:w-5 sm:h-5" : "w-5 h-5"} style={{ color: '#1f2937' }} />
+                  <Search className="w-3 h-3" style={{ color: '#1f2937' }} />
                 )}
-                <span className={compact ? "text-xs sm:text-sm font-semibold" : "text-base font-semibold"} style={{ color: '#1f2937' }}>
+                <span className="text-[9px] font-semibold" style={{ color: '#1f2937' }}>
                   {language === 'vi'
                     ? `Tìm ${displayCount.toLocaleString('vi-VN')} job`
                     : language === 'en'
@@ -1381,7 +1452,7 @@ const AgentJobsPageSession1 = ({ onSearch, onFiltersChange, compact = false, use
                 </span>
               </button>
             </div>
-            <p className={`text-center ${compact ? 'text-xs sm:text-sm' : 'text-sm'} text-gray-600`}>
+            <p className="text-center text-[9px] text-gray-600">
               {language === 'vi' 
                 ? `Đang hiển thị ${displayCount.toLocaleString('vi-VN')} việc phù hợp với điều kiện lọc`
                 : language === 'en'
@@ -1396,7 +1467,7 @@ const AgentJobsPageSession1 = ({ onSearch, onFiltersChange, compact = false, use
                 }}
                 onMouseEnter={() => setHoveredSaveSearchButton(true)}
                 onMouseLeave={() => setHoveredSaveSearchButton(false)}
-                className={`${compact ? 'px-3 py-1.5 text-xs' : 'px-4 py-2 text-sm'} rounded-lg border font-medium transition-colors`}
+                className="px-2 py-0.5 text-[9px] rounded border font-medium transition-colors"
                 style={{
                   borderColor: '#60a5fa',
                   color: '#1d4ed8',
@@ -1419,15 +1490,17 @@ const AgentJobsPageSession1 = ({ onSearch, onFiltersChange, compact = false, use
           onClick={() => {
             setShowLocationModal(false);
             setSelectedCountries([]);
+            setJapanFilterRegion(null);
+            setJapanFilterPrefecture(null);
           }}
         >
           <div 
-            className="rounded-lg shadow-xl w-full max-w-4xl max-h-[80vh] overflow-hidden flex" 
+            className="rounded-lg shadow-xl w-full max-w-5xl max-h-[85vh] overflow-hidden flex flex-col lg:flex-row" 
             onClick={(e) => e.stopPropagation()}
             style={{ backgroundColor: 'white', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)' }}
           >
             {/* Left Panel: Country Selection */}
-            <div className="w-1/2 border-r flex flex-col" style={{ borderColor: '#e5e7eb' }}>
+            <div className="w-full lg:w-[220px] flex-shrink-0 border-b lg:border-b-0 lg:border-r flex flex-col" style={{ borderColor: '#e5e7eb' }}>
               <div className="flex items-center justify-between p-4 border-b" style={{ borderColor: '#e5e7eb' }}>
                 <h3 className="text-base font-semibold" style={{ color: '#111827' }}>
                   {language === 'vi' ? 'Chọn quốc gia' : language === 'en' ? 'Select Country' : '国を選択'}
@@ -1436,6 +1509,8 @@ const AgentJobsPageSession1 = ({ onSearch, onFiltersChange, compact = false, use
                   onClick={() => {
                     setShowLocationModal(false);
                     setSelectedCountries([]);
+                    setJapanFilterRegion(null);
+                    setJapanFilterPrefecture(null);
                   }}
                   onMouseEnter={() => setHoveredModalCloseButton('location')}
                   onMouseLeave={() => setHoveredModalCloseButton(null)}
@@ -1449,7 +1524,7 @@ const AgentJobsPageSession1 = ({ onSearch, onFiltersChange, compact = false, use
               </div>
               <div className="flex-1 overflow-y-auto p-4">
                 <div className="space-y-2">
-                  {Object.keys(countryProvincesData).map((country) => {
+                  {LOCATION_FILTER_COUNTRY_KEYS.map((country) => {
                     const isSelected = selectedCountries.includes(country);
                     return (
                       <label
@@ -1462,7 +1537,7 @@ const AgentJobsPageSession1 = ({ onSearch, onFiltersChange, compact = false, use
                           onChange={() => toggleCountry(country)}
                           className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
                         />
-                        <span className="text-xs text-gray-900">{country}</span>
+                        <span className="text-xs text-gray-900">{countryFilterLabel(country, language)}</span>
                       </label>
                     );
                   })}
@@ -1470,59 +1545,271 @@ const AgentJobsPageSession1 = ({ onSearch, onFiltersChange, compact = false, use
               </div>
             </div>
 
-            {/* Right Panel: Location Selection */}
-            <div className="w-1/2 flex flex-col">
+            {/* Right Panel: Việt Nam = tỉnh phẳng; Nhật = vùng → tỉnh → phường */}
+            <div className="flex-1 min-w-0 flex flex-col">
               <div className="flex items-center justify-between p-4 border-b border-gray-200">
                 <h3 className="text-base font-semibold text-gray-900">
-                  {language === 'vi' 
-                    ? 'Chọn địa điểm làm việc' 
-                    : language === 'en' 
-                    ? 'Select Work Location' 
+                  {language === 'vi'
+                    ? 'Chọn địa điểm làm việc'
+                    : language === 'en'
+                    ? 'Select work location'
                     : '勤務地を選択'}
                 </h3>
               </div>
               <div className="flex-1 overflow-y-auto p-4">
                 {selectedCountries.length === 0 ? (
                   <div className="text-center py-8 text-gray-500 text-sm">
-                    {language === 'vi' 
-                      ? 'Vui lòng chọn quốc gia trước' 
-                      : language === 'en' 
-                      ? 'Please select a country first' 
+                    {language === 'vi'
+                      ? 'Vui lòng chọn quốc gia trước'
+                      : language === 'en'
+                      ? 'Please select a country first'
                       : 'まず国を選択してください'}
                   </div>
                 ) : (
-                  <div className="space-y-4">
-                    {selectedCountries.map((country) => {
-                      const provinces = countryProvincesData[country] || [];
-                      const selectedProvinces = filters.locations
-                        .filter(loc => loc.country === country)
-                        .map(loc => loc.location);
-                      
-                      return (
-                        <div key={country} className="space-y-2">
-                          <h4 className="text-sm font-medium text-gray-700 mb-2">{country}</h4>
-                          <div className="space-y-1">
-                            {provinces.map((province) => {
-                              const isSelected = selectedProvinces.includes(province);
-                              return (
-                                <label
-                                  key={province}
-                                  className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 cursor-pointer"
+                  <div className="space-y-6">
+                    {selectedCountries.includes('Vietnam') && (
+                      <div>
+                        <h4 className="text-sm font-medium text-gray-800 mb-2">
+                          {countryFilterLabel('Vietnam', language)}
+                        </h4>
+                        <p className="text-[11px] text-gray-500 mb-2">
+                          {language === 'vi'
+                            ? 'Chọn một hoặc nhiều tỉnh/thành'
+                            : language === 'en'
+                            ? 'Select one or more provinces/cities'
+                            : '都道府県・都市を選択'}
+                        </p>
+                        <div className="max-h-[36vh] overflow-y-auto border border-gray-100 rounded-lg p-2 space-y-0.5">
+                          {VIETNAM_PROVINCES.map((province) => {
+                            const isSelected = filters.locations.some(
+                              (l) => l.country === 'Vietnam' && l.location === province
+                            );
+                            return (
+                              <label
+                                key={province}
+                                className="flex items-center gap-2 p-2 rounded-lg hover:bg-gray-50 cursor-pointer"
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={isSelected}
+                                  onChange={() => toggleLocation(province, 'Vietnam')}
+                                  className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                                />
+                                <span className="text-xs text-gray-900">{province}</span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {selectedCountries.includes('Japan') && (
+                      <div>
+                        <h4 className="text-sm font-medium text-gray-800 mb-1">
+                          {countryFilterLabel('Japan', language)}
+                        </h4>
+                        <p className="text-[11px] text-gray-500 mb-2">
+                          {language === 'vi'
+                            ? 'Chọn vùng → tỉnh/thành → phường/quận (có thể chọn nhiều)'
+                            : language === 'en'
+                            ? 'Region → prefecture → city/ward (multi-select)'
+                            : '地域 → 都道府県 → 市区町村'}
+                        </p>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                          <div className="border rounded-lg overflow-hidden flex flex-col max-h-[38vh]">
+                            <div className="text-[10px] font-semibold px-2 py-1 bg-gray-100 text-gray-700 shrink-0">
+                              {language === 'vi' ? 'Vùng' : language === 'en' ? 'Region' : '地域'}
+                            </div>
+                            <div className="overflow-y-auto flex-1 p-1">
+                              {JAPAN_REGIONS.map((reg) => (
+                                <button
+                                  key={reg.id}
+                                  type="button"
+                                  onClick={() => {
+                                    setJapanFilterRegion(reg.id);
+                                    setJapanFilterPrefecture(null);
+                                  }}
+                                  className={`w-full text-left px-2 py-1.5 rounded text-xs cursor-pointer ${
+                                    japanFilterRegion === reg.id
+                                      ? 'bg-blue-100 text-blue-800 font-medium'
+                                      : 'hover:bg-gray-50 text-gray-800'
+                                  }`}
                                 >
-                                  <input
-                                    type="checkbox"
-                                    checked={isSelected}
-                                    onChange={() => toggleLocation(province, country)}
-                                    className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
-                                  />
-                                  <span className="text-xs text-gray-900">{province}</span>
-                                </label>
-                              );
-                            })}
+                                  {language === 'ja' ? reg.ja : reg.en}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                          <div className="border rounded-lg overflow-hidden flex flex-col max-h-[38vh]">
+                            <div className="text-[10px] font-semibold px-2 py-1 bg-gray-100 text-gray-700 shrink-0">
+                              {language === 'vi' ? 'Tỉnh / thành' : language === 'en' ? 'Prefecture' : '都道府県'}
+                            </div>
+                            <div className="overflow-y-auto flex-1 p-1">
+                              {!japanFilterRegion && (
+                                <div className="text-xs text-gray-400 p-2">
+                                  {language === 'vi'
+                                    ? 'Chọn vùng trước'
+                                    : language === 'en'
+                                    ? 'Select a region'
+                                    : '地域を選んでください'}
+                                </div>
+                              )}
+                              {japanFilterRegion &&
+                                (JAPAN_REGIONS.find((r) => r.id === japanFilterRegion)?.prefectureCodes || []).map(
+                                  (code) => {
+                                    const pref = JAPAN_PREFECTURES[code];
+                                    if (!pref) return null;
+                                    return (
+                                      <button
+                                        key={code}
+                                        type="button"
+                                        onClick={() => setJapanFilterPrefecture(code)}
+                                        className={`w-full text-left px-2 py-1.5 rounded text-xs cursor-pointer ${
+                                          japanFilterPrefecture === code
+                                            ? 'bg-blue-100 text-blue-800 font-medium'
+                                            : 'hover:bg-gray-50 text-gray-800'
+                                        }`}
+                                      >
+                                        {language === 'ja' ? pref.ja : pref.en}
+                                      </button>
+                                    );
+                                  }
+                                )}
+                            </div>
+                          </div>
+                          <div className="border rounded-lg overflow-hidden flex flex-col max-h-[38vh] sm:max-h-[42vh]">
+                            <div className="text-[10px] font-semibold px-2 py-1 bg-gray-100 text-gray-700 shrink-0">
+                              {language === 'vi' ? 'Phường / quận' : language === 'en' ? 'City / ward' : '市区町村'}
+                            </div>
+                            <div className="overflow-y-auto flex-1 p-1">
+                              {japanFilterLoading && (
+                                <div className="text-xs text-gray-500 p-2">Loading…</div>
+                              )}
+                              {!japanFilterLoading && japanFilterPrefecture && (() => {
+                                const { tree } = japanFilterData;
+                                const pref = JAPAN_PREFECTURES[japanFilterPrefecture];
+                                const prefJa = pref?.ja || '';
+                                const prefEn = pref?.en || '';
+                                const toR = (kana, fb) => (kana ? kanaToRomaji(kana) : fb);
+                                const makeLoc = (nameJa, nameKana) => {
+                                  const ja = `${prefJa} ${nameJa}`.trim();
+                                  const alpha = `${prefEn} ${toR(nameKana, nameJa)}`.trim();
+                                  const id = `${japanFilterPrefecture}|${nameJa}`;
+                                  return { id, ja, alpha };
+                                };
+                                const selectedIds = new Set(
+                                  filters.locations
+                                    .filter((l) => l.country === 'Japan')
+                                    .map((l) => l.jpId || `${l.location}_Japan`)
+                                );
+                                const allLocs = tree.flatMap((c) =>
+                                  c.standalone
+                                    ? [makeLoc(c.name, c.nameKana)]
+                                    : (c.wards || []).map((w) => makeLoc(w.fullName, w.fullNameKana))
+                                );
+                                if (allLocs.length === 0) {
+                                  return (
+                                    <div className="text-xs text-gray-400 p-2">
+                                      {language === 'vi'
+                                        ? 'Không có dữ liệu'
+                                        : language === 'en'
+                                        ? 'No data'
+                                        : 'データがありません'}
+                                    </div>
+                                  );
+                                }
+                                const allOn = allLocs.length > 0 && allLocs.every((loc) => selectedIds.has(loc.id));
+                                return (
+                                  <>
+                                    <label className="flex items-center gap-2 p-1.5 hover:bg-gray-50 rounded cursor-pointer">
+                                      <input
+                                        type="checkbox"
+                                        checked={allOn}
+                                        onChange={(e) => applyJapanLocationBulk(e.target.checked, allLocs)}
+                                        className="w-3.5 h-3.5 text-blue-600 rounded border-gray-300"
+                                      />
+                                      <span className="text-xs font-medium">
+                                        {language === 'vi' ? 'Tất cả' : language === 'en' ? 'All' : 'すべて'}
+                                      </span>
+                                    </label>
+                                    {tree.map((city) => {
+                                      const cityLocs = city.standalone
+                                        ? [makeLoc(city.name, city.nameKana)]
+                                        : (city.wards || []).map((w) => makeLoc(w.fullName, w.fullNameKana));
+                                      const cityOn =
+                                        cityLocs.length > 0 && cityLocs.every((l) => selectedIds.has(l.id));
+                                      return (
+                                        <div key={city.name}>
+                                          <label className="flex items-center gap-2 p-1.5 hover:bg-gray-50 rounded cursor-pointer">
+                                            <input
+                                              type="checkbox"
+                                              checked={cityOn}
+                                              onChange={(e) => applyJapanLocationBulk(e.target.checked, cityLocs)}
+                                              className="w-3.5 h-3.5 text-blue-600 rounded border-gray-300"
+                                            />
+                                            <span className="text-xs font-medium text-gray-800">
+                                              {language === 'ja' ? city.name : toR(city.nameKana, city.name)}
+                                            </span>
+                                          </label>
+                                          {city.wards && city.wards.length > 0 && (
+                                            <div className="ml-3 pl-2 border-l border-gray-200">
+                                              {city.wards.map((w) => {
+                                                const loc = makeLoc(w.fullName, w.fullNameKana);
+                                                const on = selectedIds.has(loc.id);
+                                                return (
+                                                  <label
+                                                    key={w.fullName}
+                                                    className="flex items-center gap-2 p-1 hover:bg-gray-50 rounded cursor-pointer"
+                                                  >
+                                                    <input
+                                                      type="checkbox"
+                                                      checked={on}
+                                                      onChange={() =>
+                                                        toggleJapanLocationEntry({
+                                                          location: loc.alpha,
+                                                          locationJp: loc.ja,
+                                                          jpId: loc.id,
+                                                        })
+                                                      }
+                                                      className="w-3.5 h-3.5 text-blue-600 rounded border-gray-300"
+                                                    />
+                                                    <span className="text-xs text-gray-700">
+                                                      {language === 'ja' ? w.fullName : toR(w.fullNameKana, w.fullName)}
+                                                    </span>
+                                                  </label>
+                                                );
+                                              })}
+                                            </div>
+                                          )}
+                                        </div>
+                                      );
+                                    })}
+                                  </>
+                                );
+                              })()}
+                              {!japanFilterLoading && japanFilterRegion && !japanFilterPrefecture && (
+                                <div className="text-xs text-gray-400 p-2">
+                                  {language === 'vi'
+                                    ? 'Chọn tỉnh/thành'
+                                    : language === 'en'
+                                    ? 'Select prefecture'
+                                    : '都道府県を選んでください'}
+                                </div>
+                              )}
+                              {!japanFilterLoading && !japanFilterRegion && (
+                                <div className="text-xs text-gray-400 p-2">
+                                  {language === 'vi'
+                                    ? 'Chọn vùng và tỉnh'
+                                    : language === 'en'
+                                    ? 'Select region & prefecture'
+                                    : '地域と都道府県を選んでください'}
+                                </div>
+                              )}
+                            </div>
                           </div>
                         </div>
-                      );
-                    })}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -1531,6 +1818,8 @@ const AgentJobsPageSession1 = ({ onSearch, onFiltersChange, compact = false, use
                   onClick={() => {
                     setShowLocationModal(false);
                     setSelectedCountries([]);
+                    setJapanFilterRegion(null);
+                    setJapanFilterPrefecture(null);
                   }}
                   onMouseEnter={() => setHoveredModalConfirmButton('location')}
                   onMouseLeave={() => setHoveredModalConfirmButton(null)}

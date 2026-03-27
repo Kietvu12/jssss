@@ -1,511 +1,354 @@
 import { OutlookConnection, SyncedEmail } from '../../models/index.js';
-import outlookService from '../../services/outlookService.js';
-import { Op } from 'sequelize';
+import { fetchInboxMessages, fetchSentMessages, refreshAccessToken, sendMail } from '../../services/outlookOAuthService.js';
 
 /**
- * Outlook Email Controller
- * Quản lý kết nối và đồng bộ email với Outlook
+ * GET /api/admin/outlook/connection - Lấy thông tin kết nối Outlook của admin hiện tại
  */
-export const outlookEmailController = {
-  /**
-   * Lấy authorization URL để kết nối Outlook
-   * GET /api/admin/emails/outlook/authorize
-   */
-  getAuthorizationUrl: async (req, res, next) => {
-    try {
-      const authUrl = outlookService.getAuthorizationUrl();
-      res.json({
+export async function getConnection(req, res) {
+  try {
+    const adminId = req.admin?.id;
+    if (!adminId) {
+      return res.status(401).json({ success: false, message: 'Authentication required' });
+    }
+    const connection = await OutlookConnection.findOne({
+      where: { adminId },
+      attributes: ['id', 'email', 'isActive', 'syncEnabled', 'lastSyncAt']
+    });
+    if (!connection) {
+      return res.status(200).json({
         success: true,
-        data: {
-          authorizationUrl: authUrl
-        }
+        data: { connection: null, connected: false }
       });
-    } catch (error) {
-      next(error);
     }
-  },
+    const plain = connection.get({ plain: true });
+    return res.status(200).json({
+      success: true,
+      data: { connection: plain, connected: true }
+    });
+  } catch (err) {
+    console.error('getConnection error:', err);
+    return res.status(500).json({ success: false, message: err.message || 'Server error' });
+  }
+}
 
-  /**
-   * Xử lý OAuth callback và lưu tokens
-   * GET /api/admin/emails/outlook/oauth/callback
-   */
-  handleOAuthCallback: async (req, res, next) => {
-    try {
-      const { code, error } = req.query;
-
-      if (error) {
-        return res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:5173'}/admin/emails?error=${encodeURIComponent(error)}`);
-      }
-
-      if (!code) {
-        return res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:5173'}/admin/emails?error=no_code`);
-      }
-
-      // Lấy access token
-      const tokens = await outlookService.getAccessTokenFromCode(code);
-      
-      // Lấy thông tin user
-      outlookService.setAccessToken(tokens.accessToken, tokens.refreshToken, tokens.expiresAt);
-      const userProfile = await outlookService.getUserProfile();
-
-      // Lưu hoặc cập nhật connection
-      const [connection, created] = await OutlookConnection.upsert({
-        email: userProfile.mail || userProfile.userPrincipalName,
-        accessToken: tokens.accessToken,
-        refreshToken: tokens.refreshToken,
-        expiresAt: new Date(tokens.expiresAt),
-        isActive: true,
-        syncEnabled: true
-      }, {
-        returning: true
-      });
-
-      res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:5173'}/admin/emails?success=connected&email=${encodeURIComponent(connection.email)}`);
-    } catch (error) {
-      console.error('OAuth callback error:', error);
-      res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:5173'}/admin/emails?error=${encodeURIComponent(error.message)}`);
+/**
+ * POST /api/admin/outlook/disconnect - Đăng xuất / ngắt kết nối Outlook (xóa connection của admin hiện tại)
+ */
+export async function disconnect(req, res) {
+  try {
+    const adminId = req.admin?.id;
+    if (!adminId) {
+      return res.status(401).json({ success: false, message: 'Authentication required' });
     }
-  },
-
-  /**
-   * Lấy danh sách connections
-   * GET /api/admin/emails/outlook/connections
-   */
-  getConnections: async (req, res, next) => {
-    try {
-      const connections = await OutlookConnection.findAll({
-        order: [['created_at', 'DESC']]
-      });
-
-      res.json({
-        success: true,
-        data: connections.map(conn => ({
-          id: conn.id,
-          email: conn.email,
-          isActive: conn.isActive,
-          syncEnabled: conn.syncEnabled,
-          lastSyncAt: conn.lastSyncAt,
-          createdAt: conn.created_at
-        }))
-      });
-    } catch (error) {
-      next(error);
+    const connection = await OutlookConnection.findOne({ where: { adminId } });
+    if (!connection) {
+      return res.status(200).json({ success: true, message: 'Chưa kết nối Outlook.' });
     }
-  },
+    await SyncedEmail.destroy({ where: { outlookConnectionId: connection.id } });
+    await connection.destroy();
+    return res.status(200).json({ success: true, message: 'Đã đăng xuất Outlook.' });
+  } catch (err) {
+    console.error('Outlook disconnect error:', err);
+    return res.status(500).json({ success: false, message: err.message || 'Đăng xuất thất bại' });
+  }
+}
 
-  /**
-   * Đồng bộ email từ Outlook
-   * POST /api/admin/emails/outlook/sync
-   */
-  syncEmails: async (req, res, next) => {
-    try {
-      const { connectionId, folder = 'inbox', limit = 50 } = req.body;
+/**
+ * POST /api/admin/outlook/sync - Đồng bộ inbox từ Microsoft Graph vào DB
+ */
+export async function sync(req, res) {
+  try {
+    const adminId = req.admin?.id;
+    if (!adminId) {
+      return res.status(401).json({ success: false, message: 'Authentication required' });
+    }
+    const connection = await OutlookConnection.findOne({ where: { adminId } });
+    if (!connection) {
+      return res.status(400).json({ success: false, message: 'Chưa kết nối Outlook. Vui lòng kết nối trước.' });
+    }
 
-      const connection = await OutlookConnection.findByPk(connectionId);
-      if (!connection) {
-        return res.status(404).json({
-          success: false,
-          message: 'Connection not found'
-        });
-      }
-
-      if (!connection.isActive || !connection.syncEnabled) {
-        return res.status(400).json({
-          success: false,
-          message: 'Connection is not active or sync is disabled'
-        });
-      }
-
-      // Set tokens
-      outlookService.setAccessToken(
-        connection.accessToken,
-        connection.refreshToken,
-        connection.expiresAt
-      );
-
-      // Đảm bảo token còn hiệu lực
-      const newTokens = await outlookService.ensureValidToken();
-      if (newTokens) {
-        // Cập nhật tokens mới
-        await connection.update({
-          accessToken: newTokens.accessToken,
-          refreshToken: newTokens.refreshToken,
-          expiresAt: new Date(newTokens.expiresAt)
-        });
-        outlookService.setAccessToken(
-          newTokens.accessToken,
-          newTokens.refreshToken,
-          newTokens.expiresAt
-        );
-      }
-
-      // Lấy email từ Outlook
-      const messages = await outlookService.getMessages(folder, limit);
-
-      let syncedCount = 0;
-      let updatedCount = 0;
-
-      for (const message of messages.value || []) {
-        const emailData = {
-          outlookConnectionId: connection.id,
-          messageId: message.id,
-          conversationId: message.conversationId,
-          internetMessageId: message.internetMessageId,
-          subject: message.subject,
-          body: message.body?.content || '',
-          bodyPreview: message.bodyPreview || '',
-          fromEmail: message.from?.emailAddress?.address || '',
-          fromName: message.from?.emailAddress?.name || '',
-          toRecipients: message.toRecipients?.map(r => ({
-            email: r.emailAddress?.address,
-            name: r.emailAddress?.name
-          })) || [],
-          ccRecipients: message.ccRecipients?.map(r => ({
-            email: r.emailAddress?.address,
-            name: r.emailAddress?.name
-          })) || [],
-          bccRecipients: message.bccRecipients?.map(r => ({
-            email: r.emailAddress?.address,
-            name: r.emailAddress?.name
-          })) || [],
-          receivedDateTime: message.receivedDateTime ? new Date(message.receivedDateTime) : null,
-          sentDateTime: message.sentDateTime ? new Date(message.sentDateTime) : null,
-          isRead: message.isRead || false,
-          hasAttachments: message.hasAttachments || false,
-          importance: message.importance || 'normal',
-          folder: folder,
-          direction: message.from?.emailAddress?.address === connection.email ? 'outbound' : 'inbound'
-        };
-
-        const [syncedEmail, created] = await SyncedEmail.upsert(emailData, {
-          conflictFields: ['message_id'],
-          returning: true
-        });
-
-        if (created) {
-          syncedCount++;
-        } else {
-          updatedCount++;
-        }
-      }
-
-      // Cập nhật lastSyncAt
+    let accessToken = connection.accessToken;
+    const expiresAt = connection.expiresAt;
+    if (connection.refreshToken && expiresAt && new Date(expiresAt) <= new Date(Date.now() + 5 * 60 * 1000)) {
+      const refreshed = await refreshAccessToken(connection.refreshToken);
+      accessToken = refreshed.access_token;
+      const newExpires = refreshed.expires_in ? new Date(Date.now() + refreshed.expires_in * 1000) : null;
       await connection.update({
-        lastSyncAt: new Date()
+        accessToken,
+        refreshToken: refreshed.refresh_token || connection.refreshToken,
+        expiresAt: newExpires
       });
-
-      res.json({
-        success: true,
-        data: {
-          syncedCount,
-          updatedCount,
-          total: (messages.value || []).length,
-          lastSyncAt: new Date()
-        }
-      });
-    } catch (error) {
-      console.error('Sync emails error:', error);
-      next(error);
     }
-  },
 
-  /**
-   * Lấy danh sách email đã đồng bộ
-   * GET /api/admin/emails/outlook/synced
-   */
-  getSyncedEmails: async (req, res, next) => {
-    try {
-      const {
-        connectionId,
-        folder = 'inbox',
-        isRead,
-        page = 1,
-        limit = 50,
-        search
-      } = req.query;
+    const processMessages = async (messages, connectionId, folder, direction) => {
+      let created = 0;
+      let updated = 0;
+      for (const msg of messages) {
+        const from = msg.from?.emailAddress || {};
+        const fromEmail = from.address || '';
+        const fromName = from.name || '';
+        const toRecipients = (msg.toRecipients || []).map(r => ({ email: r.emailAddress?.address, name: r.emailAddress?.name }));
+        const ccRecipients = (msg.ccRecipients || []).map(r => ({ email: r.emailAddress?.address, name: r.emailAddress?.name }));
+        const bccRecipients = (msg.bccRecipients || []).map(r => ({ email: r.emailAddress?.address, name: r.emailAddress?.name }));
 
-      const where = {};
-      if (connectionId) where.outlookConnectionId = connectionId;
-      if (folder) where.folder = folder;
-      if (isRead !== undefined) where.isRead = isRead === 'true';
-
-      if (search) {
-        where[Op.or] = [
-          { subject: { [Op.like]: `%${search}%` } },
-          { fromEmail: { [Op.like]: `%${search}%` } },
-          { fromName: { [Op.like]: `%${search}%` } },
-          { bodyPreview: { [Op.like]: `%${search}%` } }
-        ];
-      }
-
-      const offset = (parseInt(page) - 1) * parseInt(limit);
-
-      const { count, rows } = await SyncedEmail.findAndCountAll({
-        where,
-        include: [{
-          model: OutlookConnection,
-          as: 'outlookConnection',
-          attributes: ['id', 'email']
-        }],
-        order: [['received_date_time', 'DESC']],
-        limit: parseInt(limit),
-        offset
-      });
-
-      res.json({
-        success: true,
-        data: {
-          emails: rows,
-          pagination: {
-            total: count,
-            page: parseInt(page),
-            limit: parseInt(limit),
-            totalPages: Math.ceil(count / parseInt(limit))
+        const [row, wasCreated] = await SyncedEmail.findOrCreate({
+          where: { messageId: msg.id },
+          defaults: {
+            outlookConnectionId: connectionId,
+            messageId: msg.id,
+            conversationId: msg.conversationId || null,
+            internetMessageId: msg.internetMessageId || null,
+            subject: msg.subject || '',
+            body: msg.body?.content || null,
+            bodyPreview: msg.bodyPreview || null,
+            fromEmail,
+            fromName,
+            toRecipients,
+            ccRecipients,
+            bccRecipients,
+            receivedDateTime: msg.receivedDateTime ? new Date(msg.receivedDateTime) : null,
+            sentDateTime: msg.sentDateTime ? new Date(msg.sentDateTime) : null,
+            isRead: !!msg.isRead,
+            hasAttachments: !!msg.hasAttachments,
+            importance: msg.importance || null,
+            folder,
+            direction
           }
+        });
+        if (wasCreated) created++;
+        else {
+          await row.update({
+            outlookConnectionId: connectionId,
+            subject: msg.subject || '',
+            body: msg.body?.content || row.body,
+            bodyPreview: msg.bodyPreview || row.bodyPreview,
+            fromEmail,
+            fromName,
+            toRecipients,
+            ccRecipients,
+            bccRecipients,
+            receivedDateTime: msg.receivedDateTime ? new Date(msg.receivedDateTime) : row.receivedDateTime,
+            sentDateTime: msg.sentDateTime ? new Date(msg.sentDateTime) : row.sentDateTime,
+            isRead: !!msg.isRead,
+            hasAttachments: !!msg.hasAttachments,
+            importance: msg.importance || null,
+            folder,
+            direction
+          });
+          updated++;
         }
-      });
-    } catch (error) {
-      next(error);
-    }
-  },
+      }
+      return { created, updated };
+    };
 
-  /**
-   * Lấy chi tiết một email
-   * GET /api/admin/emails/outlook/synced/:id
-   */
-  getEmailDetail: async (req, res, next) => {
+    const callGraphInbox = async (token) => {
+      const res = await fetchInboxMessages(token, 100);
+      return res;
+    };
+
+    let inboxRes;
     try {
-      const { id } = req.params;
-
-      const email = await SyncedEmail.findByPk(id, {
-        include: [{
-          model: OutlookConnection,
-          as: 'outlookConnection',
-          attributes: ['id', 'email']
-        }]
-      });
-
-      if (!email) {
-        return res.status(404).json({
-          success: false,
-          message: 'Email not found'
-        });
-      }
-
-      res.json({
-        success: true,
-        data: email
-      });
-    } catch (error) {
-      next(error);
-    }
-  },
-
-  /**
-   * Gửi email qua Outlook
-   * POST /api/admin/emails/outlook/send
-   */
-  sendEmail: async (req, res, next) => {
-    try {
-      const { connectionId, to, cc, bcc, subject, body, bodyType = 'HTML', attachments } = req.body;
-
-      const connection = await OutlookConnection.findByPk(connectionId);
-      if (!connection || !connection.isActive) {
-        return res.status(404).json({
-          success: false,
-          message: 'Connection not found or not active'
-        });
-      }
-
-      // Set tokens
-      outlookService.setAccessToken(
-        connection.accessToken,
-        connection.refreshToken,
-        connection.expiresAt
-      );
-
-      // Đảm bảo token còn hiệu lực
-      const newTokens = await outlookService.ensureValidToken();
-      if (newTokens) {
-        await connection.update({
-          accessToken: newTokens.accessToken,
-          refreshToken: newTokens.refreshToken,
-          expiresAt: new Date(newTokens.expiresAt)
-        });
-        outlookService.setAccessToken(
-          newTokens.accessToken,
-          newTokens.refreshToken,
-          newTokens.expiresAt
-        );
-      }
-
-      // Gửi email
-      const result = await outlookService.sendMessage({
-        to: Array.isArray(to) ? to : [to],
-        cc: cc ? (Array.isArray(cc) ? cc : [cc]) : undefined,
-        bcc: bcc ? (Array.isArray(bcc) ? bcc : [bcc]) : undefined,
-        subject,
-        body,
-        bodyType,
-        attachments,
-        saveToSentItems: true
-      });
-
-      // Đồng bộ thư mục "Đã gửi" vào DB để email vừa gửi hiển thị trong phần Đã gửi
-      try {
-        const sentMessages = await outlookService.getMessages('sentitems', 20);
-        for (const message of sentMessages.value || []) {
-          const emailData = {
-            outlookConnectionId: connection.id,
-            messageId: message.id,
-            conversationId: message.conversationId,
-            internetMessageId: message.internetMessageId,
-            subject: message.subject,
-            body: message.body?.content || '',
-            bodyPreview: message.bodyPreview || '',
-            fromEmail: message.from?.emailAddress?.address || '',
-            fromName: message.from?.emailAddress?.name || '',
-            toRecipients: message.toRecipients?.map(r => ({
-              email: r.emailAddress?.address,
-              name: r.emailAddress?.name
-            })) || [],
-            ccRecipients: message.ccRecipients?.map(r => ({
-              email: r.emailAddress?.address,
-              name: r.emailAddress?.name
-            })) || [],
-            bccRecipients: message.bccRecipients?.map(r => ({
-              email: r.emailAddress?.address,
-              name: r.emailAddress?.name
-            })) || [],
-            receivedDateTime: message.receivedDateTime ? new Date(message.receivedDateTime) : null,
-            sentDateTime: message.sentDateTime ? new Date(message.sentDateTime) : null,
-            isRead: message.isRead || false,
-            hasAttachments: message.hasAttachments || false,
-            importance: message.importance || 'normal',
-            folder: 'sentitems',
-            direction: message.from?.emailAddress?.address === connection.email ? 'outbound' : 'inbound'
-          };
-          await SyncedEmail.upsert(emailData, {
-            conflictFields: ['message_id'],
-            returning: false
+      inboxRes = await callGraphInbox(accessToken);
+    } catch (graphErr) {
+      const msg = graphErr.message || '';
+      const is401 = /401|Unauthorized|invalid_token|Token/i.test(msg);
+      const is403 = /403|Access denied|Forbidden/i.test(msg);
+      console.error('Outlook sync inbox Graph error:', msg);
+      if (is401 && connection.refreshToken) {
+        try {
+          const refreshed = await refreshAccessToken(connection.refreshToken);
+          accessToken = refreshed.access_token;
+          const newExpires = refreshed.expires_in ? new Date(Date.now() + refreshed.expires_in * 1000) : null;
+          await connection.update({
+            accessToken,
+            refreshToken: refreshed.refresh_token || connection.refreshToken,
+            ...(newExpires && { expiresAt: newExpires })
+          });
+          inboxRes = await callGraphInbox(accessToken);
+        } catch (refreshErr) {
+          console.error('Outlook sync refresh token failed:', refreshErr.message);
+          return res.status(401).json({
+            success: false,
+            message: 'Token Outlook hết hạn. Vui lòng bấm "Kết nối lại" để đăng nhập lại Microsoft.'
           });
         }
-      } catch (syncErr) {
-        console.error('Sync sent items after send:', syncErr);
-        // Không fail request gửi email vì đã gửi thành công
-      }
-
-      res.json({
-        success: true,
-        data: result
-      });
-    } catch (error) {
-      console.error('Send email error:', error);
-      next(error);
-    }
-  },
-
-  /**
-   * Đánh dấu email đã đọc
-   * PATCH /api/admin/emails/outlook/synced/:id/read
-   */
-  markAsRead: async (req, res, next) => {
-    try {
-      const { id } = req.params;
-
-      const email = await SyncedEmail.findByPk(id, {
-        include: [{
-          model: OutlookConnection,
-          as: 'outlookConnection'
-        }]
-      });
-
-      if (!email) {
-        return res.status(404).json({
+      } else if (is401) {
+        return res.status(401).json({
           success: false,
-          message: 'Email not found'
+          message: 'Token Outlook hết hạn hoặc không hợp lệ. Vui lòng bấm "Kết nối lại" để đăng nhập lại Microsoft.'
+        });
+      } else if (is403) {
+        return res.status(403).json({
+          success: false,
+          message: 'Tài khoản chưa có quyền đọc thư (Mail.Read). Vui lòng bấm "Kết nối lại" và đồng ý quyền khi Microsoft hỏi.'
+        });
+      } else {
+        return res.status(502).json({
+          success: false,
+          message: msg || 'Không thể kết nối Microsoft Graph. Thử lại sau hoặc bấm "Kết nối lại".'
         });
       }
-
-      // Đánh dấu đọc trong Outlook
-      outlookService.setAccessToken(
-        email.outlookConnection.accessToken,
-        email.outlookConnection.refreshToken,
-        email.outlookConnection.expiresAt
-      );
-
-      try {
-        await outlookService.markAsRead(email.messageId);
-      } catch (error) {
-        console.error('Failed to mark as read in Outlook:', error);
-      }
-
-      // Cập nhật trong DB
-      await email.update({ isRead: true });
-
-      res.json({
-        success: true,
-        data: email
-      });
-    } catch (error) {
-      next(error);
     }
-  },
+    const inboxMessages = inboxRes.value || [];
+    const inboxStats = await processMessages(inboxMessages, connection.id, 'inbox', 'inbound');
 
-  /**
-   * Xóa connection
-   * DELETE /api/admin/emails/outlook/connections/:id
-   */
-  deleteConnection: async (req, res, next) => {
+    let sentStats = { created: 0, updated: 0 };
+    let sentMessages = [];
     try {
-      const { id } = req.params;
-
-      const connection = await OutlookConnection.findByPk(id);
-      if (!connection) {
-        return res.status(404).json({
-          success: false,
-          message: 'Connection not found'
-        });
-      }
-
-      await connection.destroy();
-
-      res.json({
-        success: true,
-        message: 'Connection deleted successfully'
-      });
-    } catch (error) {
-      next(error);
+      const sentRes = await fetchSentMessages(accessToken, 100);
+      sentMessages = sentRes.value || [];
+      sentStats = await processMessages(sentMessages, connection.id, 'sent', 'outbound');
+    } catch (sentErr) {
+      console.error('Outlook sync sent folder error:', sentErr.message || sentErr);
+      // Không fail cả sync; inbox vẫn thành công
     }
-  },
 
-  /**
-   * Toggle sync enabled
-   * PATCH /api/admin/emails/outlook/connections/:id/toggle-sync
-   */
-  toggleSync: async (req, res, next) => {
-    try {
-      const { id } = req.params;
+    await connection.update({ lastSyncAt: new Date() });
 
-      const connection = await OutlookConnection.findByPk(id);
-      if (!connection) {
-        return res.status(404).json({
-          success: false,
-          message: 'Connection not found'
-        });
+    console.log(`Outlook sync done: inbox=${inboxMessages.length} (${inboxStats.created} new, ${inboxStats.updated} updated), sent=${sentMessages.length} (${sentStats.created} new, ${sentStats.updated} updated)`);
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        inbox: { created: inboxStats.created, updated: inboxStats.updated, total: inboxMessages.length },
+        sent: { created: sentStats.created, updated: sentStats.updated, total: sentMessages.length },
+        lastSyncAt: new Date()
       }
-
-      await connection.update({
-        syncEnabled: !connection.syncEnabled
-      });
-
-      res.json({
-        success: true,
-        data: connection
-      });
-    } catch (error) {
-      next(error);
-    }
+    });
+  } catch (err) {
+    console.error('Outlook sync error:', err);
+    const msg = err.message || '';
+    const isToken = /token|401|Unauthorized|ECONNREFUSED/i.test(msg);
+    return res.status(500).json({
+      success: false,
+      message: isToken
+        ? 'Token hoặc kết nối Microsoft lỗi. Vui lòng bấm "Kết nối lại" và thử đồng bộ lại.'
+        : msg || 'Đồng bộ thất bại'
+    });
   }
-};
+}
 
+/**
+ * GET /api/admin/outlook/emails - Danh sách email đã đồng bộ (phân trang)
+ */
+export async function listEmails(req, res) {
+  try {
+    const adminId = req.admin?.id;
+    if (!adminId) {
+      return res.status(401).json({ success: false, message: 'Authentication required' });
+    }
+    const connection = await OutlookConnection.findOne({ where: { adminId } });
+    if (!connection) {
+      return res.status(200).json({ success: true, data: { emails: [], total: 0 } });
+    }
+
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limit = Math.min(50, Math.max(1, parseInt(req.query.limit, 10) || 20));
+    const folder = (req.query.folder || 'inbox').toLowerCase();
+    const offset = (page - 1) * limit;
+
+    const orderField = folder === 'sent' ? 'sentDateTime' : 'receivedDateTime';
+    const { count, rows } = await SyncedEmail.findAndCountAll({
+      where: {
+        outlookConnectionId: connection.id,
+        folder
+      },
+      order: [[orderField, 'DESC']],
+      limit,
+      offset,
+      attributes: ['id', 'subject', 'bodyPreview', 'fromEmail', 'fromName', 'receivedDateTime', 'sentDateTime', 'isRead', 'hasAttachments']
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        emails: rows.map(r => r.get({ plain: true })),
+        total: count,
+        page,
+        limit
+      }
+    });
+  } catch (err) {
+    console.error('listEmails error:', err);
+    return res.status(500).json({ success: false, message: err.message || 'Server error' });
+  }
+}
+
+/**
+ * GET /api/admin/outlook/emails/:id - Chi tiết một email
+ */
+export async function getEmailById(req, res) {
+  try {
+    const adminId = req.admin?.id;
+    const { id } = req.params;
+    if (!adminId) {
+      return res.status(401).json({ success: false, message: 'Authentication required' });
+    }
+    const connection = await OutlookConnection.findOne({ where: { adminId } });
+    if (!connection) {
+      return res.status(404).json({ success: false, message: 'Chưa kết nối Outlook' });
+    }
+
+    const email = await SyncedEmail.findOne({
+      where: { id: parseInt(id, 10), outlookConnectionId: connection.id }
+    });
+    if (!email) {
+      return res.status(404).json({ success: false, message: 'Email không tồn tại' });
+    }
+
+    const plain = email.get({ plain: true });
+    const toRecipients = plain.toRecipients ?? plain.to_recipients ?? [];
+    const ccRecipients = plain.ccRecipients ?? plain.cc_recipients ?? [];
+    return res.status(200).json({
+      success: true,
+      data: {
+        email: {
+          ...plain,
+          toRecipients: Array.isArray(toRecipients) ? toRecipients : (typeof toRecipients === 'string' ? (() => { try { return JSON.parse(toRecipients); } catch { return []; } })() : []),
+          ccRecipients: Array.isArray(ccRecipients) ? ccRecipients : (typeof ccRecipients === 'string' ? (() => { try { return JSON.parse(ccRecipients); } catch { return []; } })() : [])
+        }
+      }
+    });
+  } catch (err) {
+    console.error('getEmailById error:', err);
+    return res.status(500).json({ success: false, message: err.message || 'Server error' });
+  }
+}
+
+/**
+ * POST /api/admin/outlook/send - Gửi email qua Outlook (Microsoft Graph sendMail)
+ * Body: { to: string | string[] | {email,name}[], cc?: same, subject: string, body: string, bodyContentType?: 'Text'|'HTML' }
+ */
+export async function sendEmail(req, res) {
+  try {
+    const adminId = req.admin?.id;
+    if (!adminId) {
+      return res.status(401).json({ success: false, message: 'Authentication required' });
+    }
+    const connection = await OutlookConnection.findOne({ where: { adminId } });
+    if (!connection) {
+      return res.status(400).json({ success: false, message: 'Chưa kết nối Outlook. Vui lòng kết nối trước.' });
+    }
+
+    let accessToken = connection.accessToken;
+    const expiresAt = connection.expiresAt;
+    if (connection.refreshToken && expiresAt && new Date(expiresAt) <= new Date(Date.now() + 5 * 60 * 1000)) {
+      const refreshed = await refreshAccessToken(connection.refreshToken);
+      accessToken = refreshed.access_token;
+      const newExpires = refreshed.expires_in ? new Date(Date.now() + refreshed.expires_in * 1000) : null;
+      await connection.update({
+        accessToken,
+        ...(refreshed.refresh_token && { refreshToken: refreshed.refresh_token }),
+        ...(newExpires && { expiresAt: newExpires })
+      });
+    }
+
+    const { to, cc, subject, body, bodyContentType, attachments } = req.body || {};
+    await sendMail(accessToken, { to, cc, subject, body, bodyContentType, attachments });
+
+    return res.status(200).json({ success: true, message: 'Đã gửi thư thành công.' });
+  } catch (err) {
+    console.error('sendEmail error:', err);
+    return res.status(500).json({ success: false, message: err.message || 'Gửi thư thất bại.' });
+  }
+}

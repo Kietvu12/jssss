@@ -4,8 +4,6 @@ import {
   ArrowLeft,
   Target,
   Calendar,
-  DollarSign,
-  FileText,
   Edit,
   Trash2,
   Briefcase,
@@ -15,7 +13,6 @@ import {
   CheckCircle,
   XCircle,
   Clock,
-  AlertCircle,
   ExternalLink,
   Building2,
 } from 'lucide-react';
@@ -138,7 +135,7 @@ const AdminCampaignDetailPage = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
+      <div className="flex items-center justify-center h-48">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2" style={{ borderColor: '#2563eb' }}></div>
       </div>
     );
@@ -146,20 +143,19 @@ const AdminCampaignDetailPage = () => {
 
   if (error || !campaign) {
     return (
-      <div className="rounded-lg border p-8 text-center" style={{ backgroundColor: 'white', borderColor: '#e5e7eb' }}>
-        <p className="text-sm" style={{ color: '#dc2626' }}>{error || 'Không tìm thấy thông tin chiến dịch'}</p>
-        <button
-          onClick={() => navigate('/admin/campaigns')}
-          onMouseEnter={() => setHoveredBackToListButton(true)}
-          onMouseLeave={() => setHoveredBackToListButton(false)}
-          className="mt-4 px-4 py-2 rounded-lg text-xs font-semibold"
-          style={{
-            backgroundColor: hoveredBackToListButton ? '#1d4ed8' : '#2563eb',
-            color: 'white'
-          }}
-        >
-          Quay lại danh sách
-        </button>
+      <div className="px-2 sm:px-3 py-3">
+        <div className="rounded-lg border p-4 text-center" style={{ backgroundColor: 'white', borderColor: '#e5e7eb' }}>
+          <p className="text-xs" style={{ color: '#dc2626' }}>{error || 'Không tìm thấy thông tin chiến dịch'}</p>
+          <button
+            onClick={() => navigate('/admin/campaigns')}
+            onMouseEnter={() => setHoveredBackToListButton(true)}
+            onMouseLeave={() => setHoveredBackToListButton(false)}
+            className="mt-3 px-3 py-1.5 rounded-full text-[11px] sm:text-xs font-semibold"
+            style={{ backgroundColor: hoveredBackToListButton ? '#1d4ed8' : '#2563eb', color: 'white' }}
+          >
+            Quay lại danh sách
+          </button>
+        </div>
       </div>
     );
   }
@@ -173,254 +169,229 @@ const AdminCampaignDetailPage = () => {
   const statusStyle = statusInfo.style;
 
   return (
-    <div className="space-y-3">
-      {/* Header */}
-      <div className="rounded-lg p-4 border flex items-center justify-between" style={{ backgroundColor: 'white', borderColor: '#e5e7eb' }}>
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => navigate('/admin/campaigns')}
-            onMouseEnter={() => setHoveredBackButton(true)}
-            onMouseLeave={() => setHoveredBackButton(false)}
-            className="p-2 rounded-lg transition-colors"
-            style={{
-              backgroundColor: hoveredBackButton ? '#f3f4f6' : 'transparent'
-            }}
-          >
-            <ArrowLeft className="w-4 h-4" style={{ color: '#4b5563' }} />
-          </button>
-          <div>
-            <h1 className="text-lg font-bold" style={{ color: '#111827' }}>Chi tiết chiến dịch</h1>
-            <p className="text-xs mt-1" style={{ color: '#6b7280' }}>
-              ID: {campaign.id} - {campaign.name || 'N/A'}
-            </p>
+    <div className="h-full flex flex-col overflow-hidden">
+      <div className="flex-1 overflow-y-auto min-h-0 px-2 sm:px-3 py-1.5 space-y-3">
+        <div className="rounded-lg p-3 border flex items-center justify-between flex-shrink-0" style={{ backgroundColor: 'white', borderColor: '#e5e7eb' }}>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => navigate('/admin/campaigns')}
+              onMouseEnter={() => setHoveredBackButton(true)}
+              onMouseLeave={() => setHoveredBackButton(false)}
+              className="p-1.5 rounded-lg transition-colors"
+              style={{ backgroundColor: hoveredBackButton ? '#f3f4f6' : 'transparent' }}
+            >
+              <ArrowLeft className="w-4 h-4" style={{ color: '#4b5563' }} />
+            </button>
+            <div>
+              <h1 className="text-base font-bold" style={{ color: '#111827' }}>Chi tiết chiến dịch</h1>
+              <p className="text-[10px] sm:text-xs mt-0.5" style={{ color: '#6b7280' }}>
+                ID: {campaign.id} - {campaign.name || 'N/A'}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="px-2.5 py-1 rounded-full text-[10px] font-semibold border flex items-center gap-1" style={statusStyle}>
+              <StatusIcon className="w-3 h-3" />
+              {statusInfo.label}
+            </span>
+            <button
+              onClick={() => navigate(`/admin/campaigns/${campaignId}/edit`)}
+              onMouseEnter={() => setHoveredEditButton(true)}
+              onMouseLeave={() => setHoveredEditButton(false)}
+              className="px-3 py-1.5 rounded-full text-[11px] sm:text-xs font-semibold transition-colors flex items-center gap-1.5"
+              style={{ backgroundColor: hoveredEditButton ? '#1d4ed8' : '#2563eb', color: 'white' }}
+            >
+              <Edit className="w-3.5 h-3.5" />
+              Chỉnh sửa
+            </button>
+            <button
+              onClick={handleDelete}
+              disabled={deleting}
+              onMouseEnter={() => !deleting && setHoveredDeleteButton(true)}
+              onMouseLeave={() => setHoveredDeleteButton(false)}
+              className="px-3 py-1.5 rounded-full text-[11px] sm:text-xs font-semibold transition-colors flex items-center gap-1.5"
+              style={{
+                backgroundColor: deleting ? '#fca5a5' : (hoveredDeleteButton ? '#b91c1c' : '#dc2626'),
+                color: 'white',
+                opacity: deleting ? 0.5 : 1,
+                cursor: deleting ? 'not-allowed' : 'pointer'
+              }}
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              Xóa
+            </button>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <span className="px-3 py-1 rounded-full text-xs font-medium border flex items-center gap-1" style={statusStyle}>
-            <StatusIcon className="w-3.5 h-3.5" />
-            {statusInfo.label}
-          </span>
-          <button
-            onClick={() => navigate(`/admin/campaigns/${campaignId}/edit`)}
-            onMouseEnter={() => setHoveredEditButton(true)}
-            onMouseLeave={() => setHoveredEditButton(false)}
-            className="px-4 py-2 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5"
-            style={{
-              backgroundColor: hoveredEditButton ? '#1d4ed8' : '#2563eb',
-              color: 'white'
-            }}
-          >
-            <Edit className="w-3.5 h-3.5" />
-            Chỉnh sửa
-          </button>
-          <button
-            onClick={handleDelete}
-            disabled={deleting}
-            onMouseEnter={() => !deleting && setHoveredDeleteButton(true)}
-            onMouseLeave={() => setHoveredDeleteButton(false)}
-            className="px-4 py-2 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5"
-            style={{
-              backgroundColor: deleting
-                ? '#fca5a5'
-                : (hoveredDeleteButton ? '#dc2626' : '#dc2626'),
-              color: 'white',
-              opacity: deleting ? 0.5 : 1,
-              cursor: deleting ? 'not-allowed' : 'pointer'
-            }}
-          >
-            <Trash2 className="w-3.5 h-3.5" />
-            Xóa
-          </button>
-        </div>
-      </div>
 
-      {/* Main Content */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
-        {/* Left Column - Campaign Info */}
-        <div className="lg:col-span-2 space-y-3">
-          {/* Campaign Information */}
-          <div className="rounded-lg p-4 border" style={{ backgroundColor: 'white', borderColor: '#e5e7eb' }}>
-            <h2 className="text-sm font-bold mb-4 flex items-center gap-2 pb-3 border-b" style={{ color: '#111827', borderColor: '#e5e7eb' }}>
-              <Target className="w-4 h-4" style={{ color: '#2563eb' }} />
-              Thông tin chiến dịch
-            </h2>
-            <div className="space-y-3">
-              <div>
-                <label className="block text-xs font-semibold mb-1" style={{ color: '#6b7280' }}>Tên chiến dịch</label>
-                <p className="text-sm font-semibold" style={{ color: '#111827' }}>{campaign.name || '—'}</p>
-              </div>
-              <div>
-                <label className="block text-xs font-semibold mb-1" style={{ color: '#6b7280' }}>Mô tả</label>
-                <p className="text-sm whitespace-pre-wrap" style={{ color: '#111827' }}>{campaign.description || '—'}</p>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+          <div className="lg:col-span-2 space-y-3">
+            <div className="rounded-lg p-3 border" style={{ backgroundColor: 'white', borderColor: '#e5e7eb' }}>
+              <h2 className="text-xs font-bold mb-2 flex items-center gap-1.5 pb-2 border-b" style={{ color: '#111827', borderColor: '#e5e7eb' }}>
+                <Target className="w-3.5 h-3.5" style={{ color: '#2563eb' }} />
+                Thông tin chiến dịch
+              </h2>
+              <div className="space-y-2">
                 <div>
-                  <label className="block text-xs font-semibold mb-1" style={{ color: '#6b7280' }}>Ngày bắt đầu</label>
-                  <p className="text-sm flex items-center gap-1" style={{ color: '#111827' }}>
-                    <Calendar className="w-3.5 h-3.5" style={{ color: '#9ca3af' }} />
-                    {formatDate(campaign.startDate || campaign.start_date)}
-                  </p>
+                  <label className="block text-[10px] font-semibold mb-0.5" style={{ color: '#6b7280' }}>Tên chiến dịch</label>
+                  <p className="text-xs font-semibold" style={{ color: '#111827' }}>{campaign.name || '—'}</p>
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold mb-1" style={{ color: '#6b7280' }}>Ngày kết thúc</label>
-                  <p className="text-sm flex items-center gap-1" style={{ color: '#111827' }}>
-                    <Calendar className="w-3.5 h-3.5" style={{ color: '#9ca3af' }} />
-                    {formatDate(campaign.endDate || campaign.end_date)}
-                  </p>
+                  <label className="block text-[10px] font-semibold mb-0.5" style={{ color: '#6b7280' }}>Mô tả</label>
+                  <p className="text-xs whitespace-pre-wrap" style={{ color: '#111827' }}>{campaign.description || '—'}</p>
                 </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-semibold mb-1" style={{ color: '#6b7280' }}>Số CV tối đa</label>
-                  <p className="text-sm" style={{ color: '#111827' }}>{campaign.maxCv || campaign.max_cv || 0}</p>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-[10px] font-semibold mb-0.5" style={{ color: '#6b7280' }}>Ngày bắt đầu</label>
+                    <p className="text-xs flex items-center gap-1" style={{ color: '#111827' }}>
+                      <Calendar className="w-3 h-3" style={{ color: '#9ca3af' }} />
+                      {formatDate(campaign.startDate || campaign.start_date)}
+                    </p>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-semibold mb-0.5" style={{ color: '#6b7280' }}>Ngày kết thúc</label>
+                    <p className="text-xs flex items-center gap-1" style={{ color: '#111827' }}>
+                      <Calendar className="w-3 h-3" style={{ color: '#9ca3af' }} />
+                      {formatDate(campaign.endDate || campaign.end_date)}
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-xs font-semibold mb-1" style={{ color: '#6b7280' }}>Phần trăm (%)</label>
-                  <p className="text-sm" style={{ color: '#111827' }}>{campaign.percent || 0}%</p>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-[10px] font-semibold mb-0.5" style={{ color: '#6b7280' }}>Số CV tối đa</label>
+                    <p className="text-xs" style={{ color: '#111827' }}>{campaign.maxCv || campaign.max_cv || 0}</p>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-semibold mb-0.5" style={{ color: '#6b7280' }}>Phần trăm (%)</label>
+                    <p className="text-xs" style={{ color: '#111827' }}>{campaign.percent || 0}%</p>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
 
-          {/* Jobs in Campaign */}
-          <div className="rounded-lg p-4 border" style={{ backgroundColor: 'white', borderColor: '#e5e7eb' }}>
-            <h2 className="text-sm font-bold mb-4 flex items-center gap-2 pb-3 border-b" style={{ color: '#111827', borderColor: '#e5e7eb' }}>
-              <Briefcase className="w-4 h-4" style={{ color: '#2563eb' }} />
-              Danh sách công việc ({jobs.length})
-            </h2>
-            {jobsLoading ? (
-              <div className="text-center py-8">
-                <div className="animate-spin rounded-full h-6 w-6 border-b-2 mx-auto" style={{ borderColor: '#2563eb' }}></div>
-                <p className="text-xs mt-2" style={{ color: '#6b7280' }}>Đang tải...</p>
-              </div>
-            ) : jobs.length === 0 ? (
-              <div className="text-center py-8">
-                <p className="text-sm" style={{ color: '#6b7280' }}>Chưa có công việc nào trong chiến dịch này</p>
-                <button
-                  onClick={() => navigate(`/admin/jobs?campaign=${campaignId}`)}
-                  onMouseEnter={() => setHoveredAddJobButton(true)}
-                  onMouseLeave={() => setHoveredAddJobButton(false)}
-                  className="mt-3 px-4 py-2 rounded-lg text-xs font-semibold"
-                  style={{
-                    backgroundColor: hoveredAddJobButton ? '#1d4ed8' : '#2563eb',
-                    color: 'white'
-                  }}
-                >
-                  Thêm công việc
-                </button>
-              </div>
-            ) : (
-              <div className="space-y-2 max-h-96 overflow-y-auto">
-                {jobs.map((job, index) => (
-                  <div
-                    key={job.id}
-                    className="border rounded-lg p-3 transition-colors"
-                    onMouseEnter={() => setHoveredJobCardIndex(index)}
-                    onMouseLeave={() => setHoveredJobCardIndex(null)}
-                    style={{
-                      borderColor: '#e5e7eb',
-                      backgroundColor: hoveredJobCardIndex === index ? '#f9fafb' : 'transparent'
-                    }}
+            <div className="rounded-lg p-3 border" style={{ backgroundColor: 'white', borderColor: '#e5e7eb' }}>
+              <h2 className="text-xs font-bold mb-2 flex items-center gap-1.5 pb-2 border-b" style={{ color: '#111827', borderColor: '#e5e7eb' }}>
+                <Briefcase className="w-3.5 h-3.5" style={{ color: '#2563eb' }} />
+                Danh sách công việc ({jobs.length})
+              </h2>
+              {jobsLoading ? (
+                <div className="text-center py-6">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 mx-auto" style={{ borderColor: '#2563eb' }}></div>
+                  <p className="text-[10px] mt-1.5" style={{ color: '#6b7280' }}>Đang tải...</p>
+                </div>
+              ) : jobs.length === 0 ? (
+                <div className="text-center py-6">
+                  <p className="text-xs" style={{ color: '#6b7280' }}>Chưa có công việc nào trong chiến dịch này</p>
+                  <button
+                    onClick={() => navigate(`/admin/jobs?campaign=${campaignId}`)}
+                    onMouseEnter={() => setHoveredAddJobButton(true)}
+                    onMouseLeave={() => setHoveredAddJobButton(false)}
+                    className="mt-2 px-3 py-1.5 rounded-full text-[11px] sm:text-xs font-semibold"
+                    style={{ backgroundColor: hoveredAddJobButton ? '#1d4ed8' : '#2563eb', color: 'white' }}
                   >
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1">
-                        <button
-                          onClick={() => navigate(`/admin/jobs/${job.id}`)}
-                          onMouseEnter={() => setHoveredJobLinkIndex(index)}
-                          onMouseLeave={() => setHoveredJobLinkIndex(null)}
-                          className="text-sm font-semibold flex items-center gap-1"
-                          style={{
-                            color: hoveredJobLinkIndex === index ? '#2563eb' : '#111827'
-                          }}
-                        >
-                          {job.title || '—'}
-                          <ExternalLink className="w-3 h-3" />
-                        </button>
-                        <div className="flex items-center gap-2 mt-1">
-                          {job.company && (
-                            <span className="text-xs flex items-center gap-1" style={{ color: '#4b5563' }}>
-                              <Building2 className="w-3 h-3" />
-                              {job.company.name || '—'}
-                            </span>
-                          )}
-                          {job.jobCode && (
-                            <span className="text-xs" style={{ color: '#6b7280' }}>({job.jobCode})</span>
-                          )}
+                    Thêm công việc
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-1.5 max-h-96 overflow-y-auto">
+                  {jobs.map((job, index) => (
+                    <div
+                      key={job.id}
+                      className="border rounded-lg p-2 sm:p-2.5 transition-colors"
+                      onMouseEnter={() => setHoveredJobCardIndex(index)}
+                      onMouseLeave={() => setHoveredJobCardIndex(null)}
+                      style={{ borderColor: '#e5e7eb', backgroundColor: hoveredJobCardIndex === index ? '#f9fafb' : 'transparent' }}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1 min-w-0">
+                          <button
+                            onClick={() => navigate(`/admin/jobs/${job.id}`)}
+                            onMouseEnter={() => setHoveredJobLinkIndex(index)}
+                            onMouseLeave={() => setHoveredJobLinkIndex(null)}
+                            className="text-[10px] sm:text-xs font-semibold flex items-center gap-1 text-left"
+                            style={{ color: hoveredJobLinkIndex === index ? '#2563eb' : '#111827' }}
+                          >
+                            {job.title || '—'}
+                            <ExternalLink className="w-3 h-3 flex-shrink-0" />
+                          </button>
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            {job.company && (
+                              <span className="text-[10px] flex items-center gap-1" style={{ color: '#6b7280' }}>
+                                <Building2 className="w-2.5 h-2.5" />
+                                {job.company.name || '—'}
+                              </span>
+                            )}
+                            {job.jobCode && (
+                              <span className="text-[10px]" style={{ color: '#6b7280' }}>({job.jobCode})</span>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <div className="rounded-lg p-3 border" style={{ backgroundColor: 'white', borderColor: '#e5e7eb' }}>
+              <h2 className="text-xs font-bold mb-2 flex items-center gap-1.5 pb-2 border-b" style={{ color: '#111827', borderColor: '#e5e7eb' }}>
+                <TrendingUp className="w-3.5 h-3.5" style={{ color: '#2563eb' }} />
+                Thống kê
+              </h2>
+              <div className="space-y-2">
+                <div className="border rounded p-2" style={{ backgroundColor: '#eff6ff', borderColor: '#bfdbfe' }}>
+                  <div className="flex items-center gap-1.5 mb-0.5">
+                    <Briefcase className="w-3 h-3" style={{ color: '#2563eb' }} />
+                    <span className="text-[10px] font-medium" style={{ color: '#1e40af' }}>Số job</span>
                   </div>
-                ))}
+                  <div className="text-xs font-bold" style={{ color: '#1e3a8a' }}>{jobs.length}</div>
+                </div>
+                <div className="border rounded p-2" style={{ backgroundColor: '#f0fdf4', borderColor: '#bbf7d0' }}>
+                  <div className="flex items-center gap-1.5 mb-0.5">
+                    <Users className="w-3 h-3" style={{ color: '#16a34a' }} />
+                    <span className="text-[10px] font-medium" style={{ color: '#166534' }}>Ứng tuyển</span>
+                  </div>
+                  <div className="text-xs font-bold" style={{ color: '#14532d' }}>{campaign.applicationsCount || campaign.applications?.length || 0}</div>
+                </div>
+                <div className="border rounded p-2" style={{ backgroundColor: '#faf5ff', borderColor: '#e9d5ff' }}>
+                  <div className="flex items-center gap-1.5 mb-0.5">
+                    <TrendingUp className="w-3 h-3" style={{ color: '#9333ea' }} />
+                    <span className="text-[10px] font-medium" style={{ color: '#6b21a8' }}>Tiến cử</span>
+                  </div>
+                  <div className="text-xs font-bold" style={{ color: '#581c87' }}>{campaign.nominationsCount || 0}</div>
+                </div>
+                <div className="border rounded p-2" style={{ backgroundColor: '#fff7ed', borderColor: '#fed7aa' }}>
+                  <div className="flex items-center gap-1.5 mb-0.5">
+                    <Eye className="w-3 h-3" style={{ color: '#ea580c' }} />
+                    <span className="text-[10px] font-medium" style={{ color: '#9a3412' }}>Lượt xem</span>
+                  </div>
+                  <div className="text-xs font-bold" style={{ color: '#7c2d12' }}>{campaign.viewsCount || 0}</div>
+                </div>
+              </div>
+            </div>
+
+            {campaign.applications && campaign.applications.length > 0 && (
+              <div className="rounded-lg p-3 border" style={{ backgroundColor: 'white', borderColor: '#e5e7eb' }}>
+                <h2 className="text-xs font-bold mb-2 flex items-center gap-1.5 pb-2 border-b" style={{ color: '#111827', borderColor: '#e5e7eb' }}>
+                  <Users className="w-3.5 h-3.5" style={{ color: '#2563eb' }} />
+                  Đơn ứng tuyển ({campaign.applications.length})
+                </h2>
+                <div className="space-y-1.5 max-h-64 overflow-y-auto">
+                  {campaign.applications.map((app) => (
+                    <div key={app.id} className="border rounded p-1.5 text-[10px] sm:text-xs" style={{ borderColor: '#e5e7eb' }}>
+                      <div className="font-medium" style={{ color: '#111827' }}>
+                        {app.collaborator?.name || '—'} - {app.job?.title || '—'}
+                      </div>
+                      <div className="mt-0.5" style={{ color: '#6b7280' }}>
+                        {app.job?.jobCode || app.job?.id || '—'}
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
           </div>
-        </div>
-
-        {/* Right Column - Statistics */}
-        <div className="space-y-3">
-          {/* Statistics */}
-          <div className="rounded-lg p-4 border" style={{ backgroundColor: 'white', borderColor: '#e5e7eb' }}>
-            <h2 className="text-sm font-bold mb-4 flex items-center gap-2 pb-3 border-b" style={{ color: '#111827', borderColor: '#e5e7eb' }}>
-              <TrendingUp className="w-4 h-4" style={{ color: '#2563eb' }} />
-              Thống kê
-            </h2>
-            <div className="space-y-3">
-              <div className="border rounded-lg p-3" style={{ backgroundColor: '#eff6ff', borderColor: '#bfdbfe' }}>
-                <div className="flex items-center gap-2 mb-1">
-                  <Briefcase className="w-3.5 h-3.5" style={{ color: '#2563eb' }} />
-                  <span className="text-[10px] font-medium" style={{ color: '#1e40af' }}>Số job</span>
-                </div>
-                <div className="text-lg font-bold" style={{ color: '#1e3a8a' }}>{jobs.length}</div>
-              </div>
-              <div className="border rounded-lg p-3" style={{ backgroundColor: '#f0fdf4', borderColor: '#bbf7d0' }}>
-                <div className="flex items-center gap-2 mb-1">
-                  <Users className="w-3.5 h-3.5" style={{ color: '#16a34a' }} />
-                  <span className="text-[10px] font-medium" style={{ color: '#166534' }}>Ứng tuyển</span>
-                </div>
-                <div className="text-lg font-bold" style={{ color: '#14532d' }}>{campaign.applicationsCount || campaign.applications?.length || 0}</div>
-              </div>
-              <div className="border rounded-lg p-3" style={{ backgroundColor: '#faf5ff', borderColor: '#e9d5ff' }}>
-                <div className="flex items-center gap-2 mb-1">
-                  <TrendingUp className="w-3.5 h-3.5" style={{ color: '#9333ea' }} />
-                  <span className="text-[10px] font-medium" style={{ color: '#6b21a8' }}>Tiến cử</span>
-                </div>
-                <div className="text-lg font-bold" style={{ color: '#581c87' }}>{campaign.nominationsCount || 0}</div>
-              </div>
-              <div className="border rounded-lg p-3" style={{ backgroundColor: '#fff7ed', borderColor: '#fed7aa' }}>
-                <div className="flex items-center gap-2 mb-1">
-                  <Eye className="w-3.5 h-3.5" style={{ color: '#ea580c' }} />
-                  <span className="text-[10px] font-medium" style={{ color: '#9a3412' }}>Lượt xem</span>
-                </div>
-                <div className="text-lg font-bold" style={{ color: '#7c2d12' }}>{campaign.viewsCount || 0}</div>
-              </div>
-            </div>
-          </div>
-
-          {/* Campaign Applications */}
-          {campaign.applications && campaign.applications.length > 0 && (
-            <div className="rounded-lg p-4 border" style={{ backgroundColor: 'white', borderColor: '#e5e7eb' }}>
-              <h2 className="text-sm font-bold mb-4 flex items-center gap-2 pb-3 border-b" style={{ color: '#111827', borderColor: '#e5e7eb' }}>
-                <Users className="w-4 h-4" style={{ color: '#2563eb' }} />
-                Đơn ứng tuyển ({campaign.applications.length})
-              </h2>
-              <div className="space-y-2 max-h-64 overflow-y-auto">
-                {campaign.applications.map((app) => (
-                  <div
-                    key={app.id}
-                    className="border rounded-lg p-2 text-xs"
-                    style={{ borderColor: '#e5e7eb' }}
-                  >
-                    <div className="font-medium" style={{ color: '#111827' }}>
-                      {app.collaborator?.name || '—'} - {app.job?.title || '—'}
-                    </div>
-                    <div className="mt-1" style={{ color: '#6b7280' }}>
-                      {app.job?.jobCode || app.job?.id || '—'}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
       </div>
     </div>

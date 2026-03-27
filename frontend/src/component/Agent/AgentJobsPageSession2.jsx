@@ -26,7 +26,7 @@ import { useLanguage } from '../../context/LanguageContext';
 import apiService from '../../services/api';
 
 
-const AgentJobsPageSession2 = ({ jobs: propJobs, filters, showAllJobs = false, enablePagination = false, useAdminAPI = false, onJobDeleted }) => {
+const AgentJobsPageSession2 = ({ jobs: propJobs, filters, showAllJobs = false, enablePagination = false, useAdminAPI = false, onJobDeleted, onJobClick, hideViewMoreButton = false }) => {
   const { language } = useLanguage();
   const navigate = useNavigate();
   const [jobs, setJobs] = useState([]);
@@ -953,7 +953,7 @@ const mockJobs = [
           scrollbar-color: #cbd5e0 #f1f1f1;
         }
       `}</style>
-      <div className="w-full h-full flex flex-col py-2 sm:py-2">
+      <div className="w-full h-full flex flex-col">
         {/* Job Listings with Scroll */}
         <div className="flex-1 overflow-y-auto pr-1 sm:pr-2 min-h-0 relative">
         {/* Pagination - Show at top if showAllJobs and enablePagination */}
@@ -976,7 +976,7 @@ const mockJobs = [
                   disabled={currentPage === 1 || loading}
                   onMouseEnter={() => setHoveredPaginationButton('first')}
                   onMouseLeave={() => setHoveredPaginationButton(null)}
-                  className="flex items-center justify-center w-8 h-8 text-sm font-medium rounded-lg transition-colors"
+                  className="flex items-center justify-center w-4 h-4 text-sm font-medium rounded-lg transition-colors"
                   title={language === 'vi' ? 'Trang đầu' : language === 'en' ? 'First page' : '最初のページ'}
                   style={{
                     color: '#374151',
@@ -1092,6 +1092,10 @@ const mockJobs = [
             <div
               key={job.id}
               onClick={() => {
+                if (onJobClick) {
+                  onJobClick(job);
+                  return;
+                }
                 if (useAdminAPI) {
                   const currentPath = window.location.pathname;
                   if (currentPath.includes('/admin/group-jobs')) {
@@ -1184,19 +1188,11 @@ const mockJobs = [
                 {/* Side Panel - Right: đủ rộng để hiển thị commission (900.000 - 2.250.000 JPY) */}
                 <div className="w-full lg:w-72 xl:w-80 flex-shrink-0 flex flex-col gap-2">
                   {job.commissionTiers && job.commissionTiers.length > 0 ? (
-                    <div className="flex-shrink-0 flex flex-col gap-1.5 relative">
-                      {job.isInCampaign && (
-                        <span
-                          className="absolute top-0 left-0 z-10 px-1.5 py-0.5 text-[9px] font-bold uppercase rounded-br-md text-white"
-                          style={{ backgroundColor: '#dc2626' }}
-                        >
-                          Campaign
-                        </span>
-                      )}
+                    <div className="flex-shrink-0 flex flex-col gap-1.5">
                       <div
                         className="flex rounded-md overflow-hidden shadow-sm border"
                         style={{
-                          borderColor: useAdminAPI ? '#7c3aed' : '#0d6bbd',
+                          borderColor: '#7c3aed',
                         }}
                       >
                         {/* Left label spanning rows */}
@@ -1222,7 +1218,7 @@ const mockJobs = [
                           <div
                             className="flex-1 min-w-0 px-2 sm:px-3 py-2 text-[10px] sm:text-[12px] font-bold flex items-center justify-center text-center leading-snug"
                             style={{
-                              backgroundColor: useAdminAPI ? '#DF2020' : '#007ac3',
+                              backgroundColor: '#DF2020',
                               color: '#ffffff',
                             }}
                           >
@@ -1237,14 +1233,18 @@ const mockJobs = [
                                 key={index}
                                 className="flex min-h-[36px]"
                                 style={{
-                                  borderTop: index === 0 ? 'none' : `1px solid ${useAdminAPI ? '#9ca3af' : '#d1d5db'}`,
+                                  borderTop: index === 0 ? 'none' : '1px solid #9ca3af',
                                 }}
                               >
                                 <div
                                   className="w-24 sm:w-28 flex-shrink-0 px-2 py-1.5 text-[10px] sm:text-[11px] font-semibold flex items-center justify-center text-center leading-snug"
                                   style={{
-                                    backgroundColor: (useAdminAPI && !job.isInCampaign) ? '#EB9696' : '#e5f0fb',
-                                    color: (useAdminAPI && !job.isInCampaign) ? '#ffffff' : '#0d6bbd',
+                                    backgroundColor: useAdminAPI
+                                      ? (job.isInCampaign ? '#e5f0fb' : '#EB9696')
+                                      : '#EB9696',
+                                    color: useAdminAPI
+                                      ? (job.isInCampaign ? '#0d6bbd' : '#ffffff')
+                                      : '#ffffff',
                                   }}
                                 >
                                   <span className="break-words line-clamp-2">{tier.label}</span>
@@ -1252,7 +1252,7 @@ const mockJobs = [
                                 <div
                                   className="flex-1 min-w-0 px-2 sm:px-3 py-1.5 text-[10px] sm:text-[12px] font-bold flex items-center justify-center text-center leading-snug"
                                   style={{
-                                    backgroundColor: useAdminAPI ? '#DF2020' : '#007ac3',
+                                    backgroundColor: '#DF2020',
                                     color: '#ffffff',
                                   }}
                                 >
@@ -1267,18 +1267,10 @@ const mockJobs = [
                       </div>
                     </div>
                   ) : job.commission ? (
-                    <div className="flex-shrink-0 flex flex-col gap-1.5 relative">
-                      {job.isInCampaign && (
-                        <span
-                          className="absolute top-0 left-0 z-10 px-1.5 py-0.5 text-[9px] font-bold uppercase rounded-br-md text-white"
-                          style={{ backgroundColor: '#dc2626' }}
-                        >
-                          Campaign
-                        </span>
-                      )}
+                    <div className="flex-shrink-0 flex flex-col gap-1.5">
                       <div
                         className="flex items-stretch rounded-md overflow-hidden shadow-sm border"
-                        style={{ borderColor: useAdminAPI ? '#7c3aed' : '#0d6bbd' }}
+                        style={{ borderColor: '#7c3aed' }}
                       >
                         <div
                           className="flex-[0_0_45%] min-w-0 px-2 py-1 text-[10px] font-medium flex items-center justify-center text-center leading-snug whitespace-normal"
@@ -1300,7 +1292,7 @@ const mockJobs = [
                         <div
                           className="flex-1 min-w-0 px-2 py-1.5 text-[10px] sm:text-[11px] font-bold flex items-center justify-center text-center break-words"
                           style={{
-                            backgroundColor: useAdminAPI ? '#DF2020' : '#007ac3',
+                            backgroundColor: '#DF2020',
                             color: '#ffffff',
                           }}
                           title={job.commission}
@@ -1410,19 +1402,25 @@ const mockJobs = [
                               className="w-full text-left px-3 py-1.5 hover:bg-gray-50 transition-colors"
                               onClick={() => handleDownloadJD(job, 'jdFile')}
                             >
-                              JD tiếng Việt
+                              {language === 'vi' ? 'JD tiếng Việt' : language === 'en' ? 'JD Vietnamese' : 'JDベトナム語'}
                             </button>
                             <button
                               className="w-full text-left px-3 py-1.5 hover:bg-gray-50 transition-colors"
-                              onClick={() => handleDownloadJD(job, 'jdFile')}
+                              onClick={() => handleDownloadJD(job, 'jdFileEn')}
                             >
-                              JD tiếng Anh
+                              {language === 'vi' ? 'JD tiếng Anh' : language === 'en' ? 'JD English' : 'JD英語'}
                             </button>
                             <button
                               className="w-full text-left px-3 py-1.5 hover:bg-gray-50 transition-colors"
-                              onClick={() => handleDownloadJD(job, 'jdFile')}
+                              onClick={() => handleDownloadJD(job, 'jdFileJp')}
                             >
-                              JD tiếng Nhật
+                              {language === 'vi' ? 'JD tiếng Nhật' : language === 'en' ? 'JD Japanese' : 'JD日本語'}
+                            </button>
+                            <button
+                              className="w-full text-left px-3 py-1.5 hover:bg-gray-50 transition-colors"
+                              onClick={() => handleDownloadJD(job, 'jdOriginalFile')}
+                            >
+                              {language === 'vi' ? 'JD gốc' : language === 'en' ? 'JD original' : 'JD原本'}
                             </button>
                           </div>
                         )}
@@ -1498,21 +1496,27 @@ const mockJobs = [
                       >
                         <button
                           className="w-full text-left px-3 py-1.5 hover:bg-gray-50 transition-colors"
-                          onClick={() => handleDownloadJD(job)}
+                          onClick={() => handleDownloadJD(job, 'jdFile')}
                         >
-                          JD tiếng Việt
+                          {language === 'vi' ? 'JD tiếng Việt' : language === 'en' ? 'JD Vietnamese' : 'JDベトナム語'}
                         </button>
                         <button
                           className="w-full text-left px-3 py-1.5 hover:bg-gray-50 transition-colors"
-                          onClick={() => handleDownloadJD(job)}
+                          onClick={() => handleDownloadJD(job, 'jdFileEn')}
                         >
-                          JD tiếng Anh
+                          {language === 'vi' ? 'JD tiếng Anh' : language === 'en' ? 'JD English' : 'JD英語'}
                         </button>
                         <button
                           className="w-full text-left px-3 py-1.5 hover:bg-gray-50 transition-colors"
-                          onClick={() => handleDownloadJD(job)}
+                          onClick={() => handleDownloadJD(job, 'jdFileJp')}
                         >
-                          JD tiếng Nhật
+                          {language === 'vi' ? 'JD tiếng Nhật' : language === 'en' ? 'JD Japanese' : 'JD日本語'}
+                        </button>
+                        <button
+                          className="w-full text-left px-3 py-1.5 hover:bg-gray-50 transition-colors"
+                          onClick={() => handleDownloadJD(job, 'jdOriginalFile')}
+                        >
+                          {language === 'vi' ? 'JD gốc' : language === 'en' ? 'JD original' : 'JD原本'}
                         </button>
                       </div>
                     )}
@@ -1529,7 +1533,7 @@ const mockJobs = [
                   </button>
                   )}
                   <button
-                    onClick={(e) => { e.stopPropagation(); console.log('Suggest candidate for job:', job.id); }}
+                    onClick={(e) => { e.stopPropagation(); navigate(`/agent/jobs/${job.id}/nominate`); }}
                     onMouseEnter={() => setHoveredSuggestButtonIndex(job.id)}
                     onMouseLeave={() => setHoveredSuggestButtonIndex(null)}
                     className="flex items-center gap-1 px-2 py-1.5 rounded-md text-[11px] font-medium transition-colors"
@@ -1546,8 +1550,8 @@ const mockJobs = [
         </div>
         )}
         
-        {/* Footer - Show viewMore button if not pagination */}
-        {!showAllJobs || !enablePagination ? (
+        {/* Footer - Show viewMore button if not pagination and not hidden (e.g. in slide-in panel) */}
+        {!hideViewMoreButton && (!showAllJobs || !enablePagination) ? (
           <div className="sticky bottom-4 text-center z-10 mt-4">
             <button 
               onClick={() => navigate(useAdminAPI ? '/admin/jobs' : '/agent/jobs')}

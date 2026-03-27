@@ -1438,112 +1438,106 @@ const AdminAddNominationPage = () => {
     };
 
     return (
-      <div className="space-y-3">
-        {/* Header */}
-        <div className="rounded-lg p-4 border flex items-center justify-between" style={{ backgroundColor: 'white', borderColor: '#e5e7eb' }}>
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => setStep('form')}
-              onMouseEnter={() => setHoveredBackButton(true)}
-              onMouseLeave={() => setHoveredBackButton(false)}
-              className="p-2 rounded-lg transition-colors"
-              style={{
-                backgroundColor: hoveredBackButton ? '#f3f4f6' : 'transparent'
-              }}
-            >
-              <ArrowLeft className="w-4 h-4" style={{ color: '#4b5563' }} />
-            </button>
-            <div>
-              <h1 className="text-lg font-bold" style={{ color: '#111827' }}>Xác nhận tiến cử</h1>
-              <p className="text-xs mt-1" style={{ color: '#6b7280' }}>Kiểm tra và chỉnh sửa thông tin trước khi tiến cử</p>
-            </div>
-          </div>
-          <div className="flex gap-2">
-            <button
-              onClick={() => setStep('form')}
-              onMouseEnter={() => setHoveredCancelButton(true)}
-              onMouseLeave={() => setHoveredCancelButton(false)}
-              className="px-4 py-2 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5"
-              style={{
-                backgroundColor: hoveredCancelButton ? '#e5e7eb' : '#f3f4f6',
-                color: '#374151'
-              }}
-            >
-              <X className="w-3.5 h-3.5" />
-              Quay lại
-            </button>
-            <button
-              onClick={handleSubmit}
-              disabled={loading || editingCV}
-              onMouseEnter={() => !loading && !editingCV && setHoveredConfirmButton(true)}
-              onMouseLeave={() => setHoveredConfirmButton(false)}
-              className="px-4 py-2 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5"
-              style={{
-                backgroundColor: loading || editingCV
-                  ? '#86efac'
-                  : (hoveredConfirmButton ? '#15803d' : '#16a34a'),
-                color: 'white',
-                opacity: loading || editingCV ? 0.5 : 1,
-                cursor: loading || editingCV ? 'not-allowed' : 'pointer'
-              }}
-            >
-              <Save className="w-3.5 h-3.5" />
-              {loading ? (nominationId ? 'Đang cập nhật...' : 'Đang lưu...') : (nominationId ? 'Cập nhật đơn tiến cử' : 'Xác nhận và tạo đơn tiến cử')}
-            </button>
-          </div>
-        </div>
-
-        {/* Job Information */}
-        {selectedJob && (
-          <div className="rounded-lg p-6 border" style={{ backgroundColor: 'white', borderColor: '#e5e7eb' }}>
-            <div className="flex items-center gap-3 mb-4">
-              <Briefcase className="w-6 h-6" style={{ color: '#2563eb' }} />
-              <h2 className="text-lg font-bold" style={{ color: '#111827' }}>Thông tin công việc</h2>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="h-full flex flex-col overflow-hidden">
+        <div className="flex-1 overflow-y-auto min-h-0 px-2 sm:px-3 py-1.5 space-y-3">
+          <div className="rounded-lg p-3 border flex items-center justify-between flex-shrink-0" style={{ backgroundColor: 'white', borderColor: '#e5e7eb' }}>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setStep('form')}
+                onMouseEnter={() => setHoveredBackButton(true)}
+                onMouseLeave={() => setHoveredBackButton(false)}
+                className="p-1.5 rounded-lg transition-colors"
+                style={{ backgroundColor: hoveredBackButton ? '#f3f4f6' : 'transparent' }}
+              >
+                <ArrowLeft className="w-4 h-4" style={{ color: '#4b5563' }} />
+              </button>
               <div>
-                <label className="block text-xs font-semibold mb-1" style={{ color: '#6b7280' }}>Tiêu đề</label>
-                <p className="text-sm font-medium" style={{ color: '#111827' }}>{selectedJob.title}</p>
+                <h1 className="text-base font-bold" style={{ color: '#111827' }}>Xác nhận tiến cử</h1>
+                <p className="text-[10px] sm:text-xs mt-0.5" style={{ color: '#6b7280' }}>Kiểm tra và chỉnh sửa thông tin trước khi tiến cử</p>
               </div>
-              {selectedJob.company && (
-                <div>
-                  <label className="block text-xs font-semibold mb-1" style={{ color: '#6b7280' }}>Công ty</label>
-                  <p className="text-sm" style={{ color: '#111827' }}>{selectedJob.company.name}</p>
-                </div>
-              )}
-              {selectedJob.recruitingCompany?.companyName && (
-                <div>
-                  <label className="block text-xs font-semibold mb-1" style={{ color: '#6b7280' }}>Công ty tuyển dụng</label>
-                  <p className="text-sm" style={{ color: '#111827' }}>{selectedJob.recruitingCompany.companyName}</p>
-                </div>
-              )}
-              {selectedJob.workLocation && (
-                <div>
-                  <label className="block text-xs font-semibold mb-1" style={{ color: '#6b7280' }}>Địa điểm</label>
-                  <p className="text-sm flex items-center gap-1" style={{ color: '#111827' }}>
-                    <MapPin className="w-3.5 h-3.5" style={{ color: '#9ca3af' }} />
-                    {selectedJob.workLocation}
-                  </p>
-                </div>
-              )}
-              {selectedJob.estimatedSalary && (
-                <div>
-                  <label className="block text-xs font-semibold mb-1" style={{ color: '#6b7280' }}>Lương ước tính</label>
-                  <p className="text-sm flex items-center gap-1" style={{ color: '#111827' }}>
-                    <DollarSign className="w-3.5 h-3.5" style={{ color: '#9ca3af' }} />
-                    {selectedJob.estimatedSalary}
-                  </p>
-                </div>
-              )}
-              {selectedJob.category && (
-                <div>
-                  <label className="block text-xs font-semibold mb-1" style={{ color: '#6b7280' }}>Danh mục</label>
-                  <p className="text-sm" style={{ color: '#111827' }}>{selectedJob.category.name}</p>
-                </div>
-              )}
+            </div>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setStep('form')}
+                onMouseEnter={() => setHoveredCancelButton(true)}
+                onMouseLeave={() => setHoveredCancelButton(false)}
+                className="px-3 py-1.5 rounded-full text-[11px] sm:text-xs font-semibold transition-colors flex items-center gap-1.5"
+                style={{ backgroundColor: hoveredCancelButton ? '#e5e7eb' : '#f3f4f6', color: '#374151' }}
+              >
+                <X className="w-3.5 h-3.5" />
+                Quay lại
+              </button>
+              <button
+                type="button"
+                onClick={handleSubmit}
+                disabled={loading || editingCV}
+                onMouseEnter={() => !loading && !editingCV && setHoveredConfirmButton(true)}
+                onMouseLeave={() => setHoveredConfirmButton(false)}
+                className="px-3 py-1.5 rounded-full text-[11px] sm:text-xs font-semibold transition-colors flex items-center gap-1.5"
+                style={{
+                  backgroundColor: loading || editingCV ? '#86efac' : (hoveredConfirmButton ? '#15803d' : '#16a34a'),
+                  color: 'white',
+                  opacity: loading || editingCV ? 0.5 : 1,
+                  cursor: loading || editingCV ? 'not-allowed' : 'pointer'
+                }}
+              >
+                <Save className="w-3.5 h-3.5" />
+                {loading ? (nominationId ? 'Đang cập nhật...' : 'Đang lưu...') : (nominationId ? 'Cập nhật đơn tiến cử' : 'Xác nhận và tạo đơn tiến cử')}
+              </button>
             </div>
           </div>
-        )}
+
+          {selectedJob && (
+            <div className="rounded-lg p-3 border" style={{ backgroundColor: 'white', borderColor: '#e5e7eb' }}>
+              <div className="flex items-center gap-2 mb-2 pb-2 border-b" style={{ borderColor: '#e5e7eb' }}>
+                <Briefcase className="w-3.5 h-3.5" style={{ color: '#2563eb' }} />
+                <h2 className="text-xs font-bold" style={{ color: '#111827' }}>Thông tin công việc</h2>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-[10px] font-semibold mb-0.5" style={{ color: '#6b7280' }}>Tiêu đề</label>
+                  <p className="text-xs font-medium" style={{ color: '#111827' }}>{selectedJob.title}</p>
+                </div>
+                {selectedJob.company && (
+                  <div>
+                    <label className="block text-[10px] font-semibold mb-0.5" style={{ color: '#6b7280' }}>Công ty</label>
+                    <p className="text-xs" style={{ color: '#111827' }}>{selectedJob.company.name}</p>
+                  </div>
+                )}
+                {selectedJob.recruitingCompany?.companyName && (
+                  <div>
+                    <label className="block text-[10px] font-semibold mb-0.5" style={{ color: '#6b7280' }}>Công ty tuyển dụng</label>
+                    <p className="text-xs" style={{ color: '#111827' }}>{selectedJob.recruitingCompany.companyName}</p>
+                  </div>
+                )}
+                {selectedJob.workLocation && (
+                  <div>
+                    <label className="block text-[10px] font-semibold mb-0.5" style={{ color: '#6b7280' }}>Địa điểm</label>
+                    <p className="text-xs flex items-center gap-1" style={{ color: '#111827' }}>
+                      <MapPin className="w-3 h-3" style={{ color: '#9ca3af' }} />
+                      {selectedJob.workLocation}
+                    </p>
+                  </div>
+                )}
+                {selectedJob.estimatedSalary && (
+                  <div>
+                    <label className="block text-[10px] font-semibold mb-0.5" style={{ color: '#6b7280' }}>Lương ước tính</label>
+                    <p className="text-xs flex items-center gap-1" style={{ color: '#111827' }}>
+                      <DollarSign className="w-3 h-3" style={{ color: '#9ca3af' }} />
+                      {selectedJob.estimatedSalary}
+                    </p>
+                  </div>
+                )}
+                {selectedJob.category && (
+                  <div>
+                    <label className="block text-[10px] font-semibold mb-0.5" style={{ color: '#6b7280' }}>Danh mục</label>
+                    <p className="text-xs" style={{ color: '#111827' }}>{selectedJob.category.name}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
         {/* Candidate Information */}
         {selectedCandidate && candidateTab === 'existing' && (
@@ -2086,117 +2080,108 @@ const AdminAddNominationPage = () => {
             </div>
           </div>
         )}
+        </div>
       </div>
     );
   }
 
   // Form Step
   return (
-    <div className="space-y-3">
-      {/* Header */}
-      <div className="rounded-lg p-4 border flex items-center justify-between" style={{ backgroundColor: 'white', borderColor: '#e5e7eb' }}>
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => navigate(nominationId ? `/admin/nominations/${nominationId}` : '/admin/nominations')}
-            onMouseEnter={() => setHoveredBackButton(true)}
-            onMouseLeave={() => setHoveredBackButton(false)}
-            className="p-2 rounded-lg transition-colors"
-            style={{
-              backgroundColor: hoveredBackButton ? '#f3f4f6' : 'transparent'
-            }}
-          >
-            <ArrowLeft className="w-4 h-4" style={{ color: '#4b5563' }} />
-          </button>
-          <div>
-            <h1 className="text-lg font-bold" style={{ color: '#111827' }}>{nominationId ? 'Chỉnh sửa đơn tiến cử' : 'Tạo đơn tiến cử'}</h1>
-            <p className="text-xs mt-1" style={{ color: '#6b7280' }}>{nominationId ? 'Cập nhật thông tin đơn tiến cử' : 'Thêm đơn tiến cử ứng viên vào job mới'}</p>
+    <div className="h-full flex flex-col overflow-hidden">
+      <div className="flex-1 overflow-y-auto min-h-0 px-2 sm:px-3 py-1.5 space-y-3">
+        <div className="rounded-lg p-3 border flex items-center justify-between flex-shrink-0" style={{ backgroundColor: 'white', borderColor: '#e5e7eb' }}>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => navigate(nominationId ? `/admin/nominations/${nominationId}` : '/admin/nominations')}
+              onMouseEnter={() => setHoveredBackButton(true)}
+              onMouseLeave={() => setHoveredBackButton(false)}
+              className="p-1.5 rounded-lg transition-colors"
+              style={{ backgroundColor: hoveredBackButton ? '#f3f4f6' : 'transparent' }}
+            >
+              <ArrowLeft className="w-4 h-4" style={{ color: '#4b5563' }} />
+            </button>
+            <div>
+              <h1 className="text-base font-bold" style={{ color: '#111827' }}>{nominationId ? 'Chỉnh sửa đơn tiến cử' : 'Tạo đơn tiến cử'}</h1>
+              <p className="text-[10px] sm:text-xs mt-0.5" style={{ color: '#6b7280' }}>{nominationId ? 'Cập nhật thông tin đơn tiến cử' : 'Thêm đơn tiến cử ứng viên vào job mới'}</p>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={handleCancel}
+              onMouseEnter={() => setHoveredCancelButton(true)}
+              onMouseLeave={() => setHoveredCancelButton(false)}
+              className="px-3 py-1.5 rounded-full text-[11px] sm:text-xs font-semibold transition-colors flex items-center gap-1.5"
+              style={{ backgroundColor: hoveredCancelButton ? '#e5e7eb' : '#f3f4f6', color: '#374151' }}
+            >
+              <X className="w-3.5 h-3.5" />
+              Hủy
+            </button>
+            {step === 'form' ? (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  handleGoToConfirm();
+                }}
+                disabled={loading}
+                onMouseEnter={() => !loading && setHoveredConfirmButton(true)}
+                onMouseLeave={() => setHoveredConfirmButton(false)}
+                className="px-3 py-1.5 rounded-full text-[11px] sm:text-xs font-semibold transition-colors flex items-center gap-1.5"
+                style={{
+                  backgroundColor: loading ? '#93c5fd' : (hoveredConfirmButton ? '#1d4ed8' : '#2563eb'),
+                  color: 'white',
+                  opacity: loading ? 0.5 : 1,
+                  cursor: loading ? 'not-allowed' : 'pointer'
+                }}
+              >
+                <ChevronRight className="w-3.5 h-3.5" />
+                Xác nhận tiến cử
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handleSubmit}
+                disabled={loading || editingCV}
+                onMouseEnter={() => !loading && !editingCV && setHoveredSaveButton(true)}
+                onMouseLeave={() => setHoveredSaveButton(false)}
+                className="px-3 py-1.5 rounded-full text-[11px] sm:text-xs font-semibold transition-colors flex items-center gap-1.5"
+                style={{
+                  backgroundColor: loading || editingCV ? '#86efac' : (hoveredSaveButton ? '#15803d' : '#16a34a'),
+                  color: 'white',
+                  opacity: loading || editingCV ? 0.5 : 1,
+                  cursor: loading || editingCV ? 'not-allowed' : 'pointer'
+                }}
+              >
+                <Save className="w-3.5 h-3.5" />
+                {loading ? (nominationId ? 'Đang cập nhật...' : 'Đang lưu...') : (nominationId ? 'Cập nhật đơn tiến cử' : 'Xác nhận và tạo đơn tiến cử')}
+              </button>
+            )}
           </div>
         </div>
-        <div className="flex gap-2">
-          <button
-            onClick={handleCancel}
-            onMouseEnter={() => setHoveredCancelButton(true)}
-            onMouseLeave={() => setHoveredCancelButton(false)}
-            className="px-4 py-2 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5"
-            style={{
-              backgroundColor: hoveredCancelButton ? '#e5e7eb' : '#f3f4f6',
-              color: '#374151'
-            }}
-          >
-            <X className="w-3.5 h-3.5" />
-            Hủy
-          </button>
-          {step === 'form' ? (
-            <button
-              onClick={(e) => {
-                e.preventDefault();
-                handleGoToConfirm();
-              }}
-              disabled={loading}
-              onMouseEnter={() => !loading && setHoveredConfirmButton(true)}
-              onMouseLeave={() => setHoveredConfirmButton(false)}
-              className="px-4 py-2 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5"
-              style={{
-                backgroundColor: loading
-                  ? '#93c5fd'
-                  : (hoveredConfirmButton ? '#1d4ed8' : '#2563eb'),
-                color: 'white',
-                opacity: loading ? 0.5 : 1,
-                cursor: loading ? 'not-allowed' : 'pointer'
-              }}
-            >
-              <ChevronRight className="w-3.5 h-3.5" />
-              Xác nhận tiến cử
-            </button>
-          ) : (
-            <button
-              onClick={handleSubmit}
-              disabled={loading || editingCV}
-              onMouseEnter={() => !loading && !editingCV && setHoveredSaveButton(true)}
-              onMouseLeave={() => setHoveredSaveButton(false)}
-              className="px-4 py-2 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5"
-              style={{
-                backgroundColor: loading || editingCV
-                  ? '#86efac'
-                  : (hoveredSaveButton ? '#15803d' : '#16a34a'),
-                color: 'white',
-                opacity: loading || editingCV ? 0.5 : 1,
-                cursor: loading || editingCV ? 'not-allowed' : 'pointer'
-              }}
-            >
-              <Save className="w-3.5 h-3.5" />
-              {loading ? (nominationId ? 'Đang cập nhật...' : 'Đang lưu...') : (nominationId ? 'Cập nhật đơn tiến cử' : 'Xác nhận và tạo đơn tiến cử')}
-            </button>
-          )}
-        </div>
-      </div>
 
-      {/* Form */}
-      <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-        {/* Left Column */}
-        <div className="space-y-3">
-          {/* Candidate Selection */}
-          <div className="rounded-lg p-4 border" style={{ backgroundColor: 'white', borderColor: '#e5e7eb' }}>
-            <div className="flex items-center justify-between mb-4 pb-3 border-b" style={{ borderColor: '#e5e7eb' }}>
-              <h2 className="text-sm font-bold flex items-center gap-2" style={{ color: '#111827' }}>
-                <User className="w-4 h-4" style={{ color: '#2563eb' }} />
-                Ứng viên <span className="text-red-500">*</span>
-              </h2>
-              {formData.candidateId && (
-                <button
-                  type="button"
-                  onClick={() => navigate(`/admin/candidates/${formData.candidateId}/edit`)}
-                  className="text-xs flex items-center gap-1 px-2 py-1 rounded border"
-                  style={{
-                    borderColor: '#d1d5db',
-                    color: '#2563eb'
-                  }}
-                >
-                  <Edit className="w-3 h-3" />
-                  Chỉnh sửa hồ sơ
-                </button>
-              )}
-            </div>
+        {/* Form */}
+        <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+          <div className="space-y-3">
+            <div className="rounded-lg p-3 border" style={{ backgroundColor: 'white', borderColor: '#e5e7eb' }}>
+              <div className="flex items-center justify-between mb-2 pb-2 border-b" style={{ borderColor: '#e5e7eb' }}>
+                <h2 className="text-xs font-bold flex items-center gap-1.5" style={{ color: '#111827' }}>
+                  <User className="w-3.5 h-3.5" style={{ color: '#2563eb' }} />
+                  Ứng viên <span className="text-red-500">*</span>
+                </h2>
+                {formData.candidateId && (
+                  <button
+                    type="button"
+                    onClick={() => navigate(`/admin/candidates/${formData.candidateId}/edit`)}
+                    className="text-[10px] sm:text-xs flex items-center gap-1 px-2 py-1 rounded-full border"
+                    style={{ borderColor: '#d1d5db', color: '#2563eb' }}
+                  >
+                    <Edit className="w-3 h-3" />
+                    Chỉnh sửa hồ sơ
+                  </button>
+                )}
+              </div>
             
             {/* Tabs – không cho đổi loại ứng viên khi đang sửa đơn */}
             {!isEditMode && (
@@ -2249,7 +2234,7 @@ const AdminAddNominationPage = () => {
                 )}
                 {!isEditMode && (
                   <div>
-                    <label className="block text-xs font-semibold mb-2" style={{ color: '#111827' }}>
+                    <label className="block text-[10px] sm:text-xs font-semibold mb-1" style={{ color: '#111827' }}>
                       Tìm kiếm ứng viên
                       {formData.collaboratorId && (
                         <span className="text-[10px] font-normal ml-1" style={{ color: '#6b7280' }}>
@@ -2258,32 +2243,25 @@ const AdminAddNominationPage = () => {
                       )}
                     </label>
                     <div className="relative">
-                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-3.5 h-3.5" style={{ color: '#9ca3af' }} />
-                      <input
-                        type="text"
-                        placeholder="Nhập tên hoặc ID ứng viên..."
-                        value={candidateSearch}
-                        onChange={(e) => {
-                          setCandidateSearch(e.target.value);
-                          setShowCandidateDropdown(true);
-                        }}
-                        className="w-full pl-10 pr-3 py-2 border rounded-lg text-xs"
-                        style={{
-                          borderColor: '#d1d5db',
-                          outline: 'none'
-                        }}
-                        onFocus={(e) => {
-                          setShowCandidateDropdown(true);
-                          e.target.style.borderColor = '#2563eb';
-                          e.target.style.boxShadow = '0 0 0 2px rgba(37, 99, 235, 0.5)';
-                        }}
-                        onBlur={(e) => {
-                          e.target.style.borderColor = '#d1d5db';
-                          e.target.style.boxShadow = 'none';
-                        }}
-                      />
+                      <div className="flex items-center px-3 py-1.5 rounded-full bg-white text-[12px] sm:text-xs min-w-0 border" style={{ borderColor: '#e5e7eb' }}>
+                        <Search className="w-3.5 h-3.5 mr-2 flex-shrink-0" style={{ color: '#9ca3af' }} />
+                        <input
+                          type="text"
+                          placeholder="Nhập tên hoặc ID ứng viên..."
+                          value={candidateSearch}
+                          onChange={(e) => {
+                            setCandidateSearch(e.target.value);
+                            setShowCandidateDropdown(true);
+                          }}
+                          onFocus={(e) => {
+                            setShowCandidateDropdown(true);
+                            e.target.style.outline = 'none';
+                          }}
+                          className="flex-1 bg-transparent outline-none min-w-0 text-[12px] sm:text-xs"
+                        />
+                      </div>
                       {showCandidateDropdown && filteredCandidates.length > 0 && (
-                        <div className="absolute z-10 w-full mt-1 border rounded-lg shadow-lg max-h-60 overflow-y-auto" style={{ backgroundColor: 'white', borderColor: '#d1d5db' }}>
+                        <div className="absolute z-20 w-full mt-2 rounded-xl border p-3 max-h-60 overflow-y-auto text-[11px] sm:text-xs" style={{ backgroundColor: 'white', borderColor: '#e5e7eb' }}>
                           {filteredCandidates.map((candidate, index) => (
                             <button
                               key={candidate.id}
@@ -2291,7 +2269,7 @@ const AdminAddNominationPage = () => {
                               onClick={() => handleCandidateSelect(candidate)}
                               onMouseEnter={() => setHoveredCandidateDropdownItemIndex(index)}
                               onMouseLeave={() => setHoveredCandidateDropdownItemIndex(null)}
-                              className="w-full px-3 py-2 text-left text-xs flex items-center justify-between"
+                              className="w-full px-2 py-1.5 text-left rounded-lg"
                               style={{
                                 backgroundColor: hoveredCandidateDropdownItemIndex === index ? '#f3f4f6' : 'transparent'
                               }}
@@ -2305,13 +2283,13 @@ const AdminAddNominationPage = () => {
                         </div>
                       )}
                       {showCandidateDropdown && filteredCandidates.length === 0 && candidateSearch && formData.collaboratorId && (
-                        <div className="absolute z-10 w-full mt-1 border rounded-lg shadow-lg p-3" style={{ backgroundColor: 'white', borderColor: '#d1d5db' }}>
-                          <p className="text-xs" style={{ color: '#6b7280' }}>Không tìm thấy ứng viên nào phù hợp với từ khóa "{candidateSearch}"</p>
+                        <div className="absolute z-20 w-full mt-2 rounded-xl border p-3" style={{ backgroundColor: 'white', borderColor: '#e5e7eb' }}>
+                          <p className="text-[11px] sm:text-xs" style={{ color: '#6b7280' }}>Không tìm thấy ứng viên nào phù hợp với từ khóa "{candidateSearch}"</p>
                         </div>
                       )}
                       {showCandidateDropdown && candidates.length === 0 && !candidateSearch && formData.collaboratorId && (
-                        <div className="absolute z-10 w-full mt-1 border rounded-lg shadow-lg p-3" style={{ backgroundColor: 'white', borderColor: '#d1d5db' }}>
-                          <p className="text-xs" style={{ color: '#6b7280' }}>CTV này chưa có ứng viên nào. Vui lòng tạo ứng viên mới.</p>
+                        <div className="absolute z-20 w-full mt-2 rounded-xl border p-3" style={{ backgroundColor: 'white', borderColor: '#e5e7eb' }}>
+                          <p className="text-[11px] sm:text-xs" style={{ color: '#6b7280' }}>CTV này chưa có ứng viên nào. Vui lòng tạo ứng viên mới.</p>
                         </div>
                       )}
                     </div>
@@ -3736,22 +3714,19 @@ onBlur={(e) => {
           </div>
 
           {/* Job Selection */}
-          <div className="rounded-lg p-4 border" style={{ backgroundColor: 'white', borderColor: '#e5e7eb' }}>
-            <div className="flex items-center justify-between mb-4 pb-3 border-b" style={{ borderColor: '#e5e7eb' }}>
-              <h2 className="text-sm font-bold flex items-center gap-2" style={{ color: '#111827' }}>
-                <Briefcase className="w-4 h-4" style={{ color: '#2563eb' }} />
+          <div className="rounded-lg p-3 border" style={{ backgroundColor: 'white', borderColor: '#e5e7eb' }}>
+            <div className="flex items-center justify-between mb-2 pb-2 border-b" style={{ borderColor: '#e5e7eb' }}>
+              <h2 className="text-xs font-bold flex items-center gap-1.5" style={{ color: '#111827' }}>
+                <Briefcase className="w-3.5 h-3.5" style={{ color: '#2563eb' }} />
                 Công việc <span style={{ color: '#ef4444' }}>*</span>
               </h2>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5">
                 {formData.jobId && (
                   <button
                     type="button"
                     onClick={() => navigate(`/admin/jobs/${formData.jobId}/edit`)}
-                    className="text-xs flex items-center gap-1 px-2 py-1 rounded border"
-                    style={{
-                      borderColor: '#d1d5db',
-                      color: '#2563eb'
-                    }}
+                    className="text-[10px] sm:text-xs flex items-center gap-1 px-2 py-1 rounded-full border"
+                    style={{ borderColor: '#d1d5db', color: '#2563eb' }}
                   >
                     <Edit className="w-3 h-3" />
                     Chỉnh sửa job
@@ -3763,10 +3738,8 @@ onBlur={(e) => {
                     onClick={() => navigate('/admin/jobs/create')}
                     onMouseEnter={() => setHoveredCreateJobButton(true)}
                     onMouseLeave={() => setHoveredCreateJobButton(false)}
-                    className="text-xs flex items-center gap-1"
-                    style={{
-                      color: hoveredCreateJobButton ? '#1d4ed8' : '#2563eb'
-                    }}
+                    className="text-[10px] sm:text-xs flex items-center gap-1 px-2 py-1 rounded-full font-semibold"
+                    style={{ color: hoveredCreateJobButton ? '#1d4ed8' : '#2563eb' }}
                   >
                     <Plus className="w-3 h-3" />
                     Tạo job mới
@@ -3774,50 +3747,22 @@ onBlur={(e) => {
                 )}
               </div>
             </div>
-            <div className="space-y-3">
-              {/* Search */}
+            <div className="space-y-2">
               {!isEditMode && (
               <div>
-                <label className="block text-xs font-semibold mb-2" style={{ color: '#111827' }}>
+                <label className="block text-[10px] sm:text-xs font-semibold mb-1" style={{ color: '#111827' }}>
                   Tìm kiếm công việc
                 </label>
-                <div className="flex gap-2">
-                  <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-3.5 h-3.5" style={{ color: '#9ca3af' }} />
-                    <input
-                      type="text"
-                      placeholder="Nhập tên job, ID hoặc công ty..."
-                      value={jobSearch}
-                      onChange={(e) => setJobSearch(e.target.value)}
-                      onKeyPress={(e) => e.key === 'Enter' && handleJobSearch()}
-                      className="w-full pl-10 pr-3 py-2 border rounded-lg text-xs"
-                      style={{
-                        borderColor: '#d1d5db',
-                        outline: 'none'
-                      }}
-                      onFocus={(e) => {
-                        e.target.style.borderColor = '#2563eb';
-                        e.target.style.boxShadow = '0 0 0 2px rgba(37, 99, 235, 0.5)';
-                      }}
-                      onBlur={(e) => {
-                        e.target.style.borderColor = '#d1d5db';
-                        e.target.style.boxShadow = 'none';
-                      }}
-                    />
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleJobSearch}
-                    onMouseEnter={() => setHoveredSearchButton(true)}
-                    onMouseLeave={() => setHoveredSearchButton(false)}
-                    className="px-4 py-2 rounded-lg text-xs font-semibold transition-colors"
-                    style={{
-                      backgroundColor: hoveredSearchButton ? '#1d4ed8' : '#2563eb',
-                      color: 'white'
-                    }}
-                  >
-                    Tìm
-                  </button>
+                <div className="flex items-center px-3 py-1.5 rounded-full bg-white text-[12px] sm:text-xs min-w-0 border" style={{ borderColor: '#e5e7eb' }}>
+                  <Search className="w-3.5 h-3.5 mr-2 flex-shrink-0" style={{ color: '#9ca3af' }} />
+                  <input
+                    type="text"
+                    placeholder="Nhập tên job, ID hoặc công ty..."
+                    value={jobSearch}
+                    onChange={(e) => setJobSearch(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && handleJobSearch()}
+                    className="flex-1 bg-transparent outline-none min-w-0 text-[12px] sm:text-xs"
+                  />
                 </div>
               </div>
               )}
@@ -3921,8 +3866,8 @@ onBlur={(e) => {
 
                       {/* Pagination */}
                       {jobsPagination.totalPages > 1 && (
-                        <div className="px-4 py-3 border-t flex items-center justify-between" style={{ borderColor: '#e5e7eb', backgroundColor: '#f9fafb' }}>
-                          <div className="text-xs" style={{ color: '#374151' }}>
+                        <div className="px-2 py-2 border-t flex items-center justify-between flex-wrap gap-2" style={{ borderColor: '#e5e7eb', backgroundColor: '#f9fafb' }}>
+                          <div className="text-[10px]" style={{ color: '#374151' }}>
                             Hiển thị {(jobsPagination.currentPage - 1) * jobsPagination.itemsPerPage + 1} - {Math.min(jobsPagination.currentPage * jobsPagination.itemsPerPage, jobsPagination.total)} của {jobsPagination.total}
                           </div>
                           <div className="flex items-center gap-1">
@@ -3932,11 +3877,8 @@ onBlur={(e) => {
                               disabled={jobsPagination.currentPage === 1 || jobsLoading}
                               onMouseEnter={() => !(jobsPagination.currentPage === 1 || jobsLoading) && setHoveredPaginationButton('first')}
                               onMouseLeave={() => setHoveredPaginationButton(null)}
-                              className="p-1.5 border rounded disabled:opacity-50 disabled:cursor-not-allowed"
-                              style={{
-                                borderColor: '#d1d5db',
-                                backgroundColor: hoveredPaginationButton === 'first' ? '#f3f4f6' : 'transparent'
-                              }}
+                              className="w-7 h-7 flex items-center justify-center border rounded-full text-[10px] font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                              style={{ borderColor: '#d1d5db', backgroundColor: hoveredPaginationButton === 'first' ? '#f3f4f6' : 'transparent' }}
                             >
                               <ChevronsLeft className="w-3 h-3" />
                             </button>
@@ -3949,16 +3891,13 @@ onBlur={(e) => {
                               disabled={jobsPagination.currentPage === 1 || jobsLoading}
                               onMouseEnter={() => !(jobsPagination.currentPage === 1 || jobsLoading) && setHoveredPaginationButton('prev')}
                               onMouseLeave={() => setHoveredPaginationButton(null)}
-                              className="p-1.5 border rounded disabled:opacity-50 disabled:cursor-not-allowed"
-                              style={{
-                                borderColor: '#d1d5db',
-                                backgroundColor: hoveredPaginationButton === 'prev' ? '#f3f4f6' : 'transparent'
-                              }}
+                              className="w-7 h-7 flex items-center justify-center border rounded-full text-[10px] font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                              style={{ borderColor: '#d1d5db', backgroundColor: hoveredPaginationButton === 'prev' ? '#f3f4f6' : 'transparent' }}
                             >
                               <ChevronLeft className="w-3 h-3" />
                             </button>
-                            <span className="text-xs px-2" style={{ color: '#374151' }}>
-                              Trang {jobsPagination.currentPage} / {jobsPagination.totalPages}
+                            <span className="text-[10px] font-semibold px-1.5" style={{ color: '#374151' }}>
+                              {jobsPagination.currentPage} / {jobsPagination.totalPages}
                             </span>
                             <button
                               type="button"
@@ -3969,11 +3908,8 @@ onBlur={(e) => {
                               disabled={jobsPagination.currentPage === jobsPagination.totalPages || jobsLoading}
                               onMouseEnter={() => !(jobsPagination.currentPage === jobsPagination.totalPages || jobsLoading) && setHoveredPaginationButton('next')}
                               onMouseLeave={() => setHoveredPaginationButton(null)}
-                              className="p-1.5 border rounded disabled:opacity-50 disabled:cursor-not-allowed"
-                              style={{
-                                borderColor: '#d1d5db',
-                                backgroundColor: hoveredPaginationButton === 'next' ? '#f3f4f6' : 'transparent'
-                              }}
+                              className="w-7 h-7 flex items-center justify-center border rounded-full text-[10px] font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                              style={{ borderColor: '#d1d5db', backgroundColor: hoveredPaginationButton === 'next' ? '#f3f4f6' : 'transparent' }}
                             >
                               <ChevronRight className="w-3 h-3" />
                             </button>
@@ -3983,11 +3919,8 @@ onBlur={(e) => {
                               disabled={jobsPagination.currentPage === jobsPagination.totalPages || jobsLoading}
                               onMouseEnter={() => !(jobsPagination.currentPage === jobsPagination.totalPages || jobsLoading) && setHoveredPaginationButton('last')}
                               onMouseLeave={() => setHoveredPaginationButton(null)}
-                              className="p-1.5 border rounded disabled:opacity-50 disabled:cursor-not-allowed"
-                              style={{
-                                borderColor: '#d1d5db',
-                                backgroundColor: hoveredPaginationButton === 'last' ? '#f3f4f6' : 'transparent'
-                              }}
+                              className="w-7 h-7 flex items-center justify-center border rounded-full text-[10px] font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                              style={{ borderColor: '#d1d5db', backgroundColor: hoveredPaginationButton === 'last' ? '#f3f4f6' : 'transparent' }}
                             >
                               <ChevronsRight className="w-3 h-3" />
                             </button>
@@ -4005,8 +3938,8 @@ onBlur={(e) => {
         {/* Right Column */}
         <div className="space-y-3">
           {/* Dates */}
-          <div className="rounded-lg p-4 border" style={{ backgroundColor: 'white', borderColor: '#e5e7eb' }}>
-            <h2 className="text-sm font-bold mb-4 flex items-center gap-2 pb-3 border-b" style={{ color: '#111827', borderColor: '#e5e7eb' }}>
+          <div className="rounded-lg p-3 border" style={{ backgroundColor: 'white', borderColor: '#e5e7eb' }}>
+            <h2 className="text-xs font-bold mb-2 flex items-center gap-1.5 pb-2 border-b" style={{ color: '#111827', borderColor: '#e5e7eb' }}>
               <Calendar className="w-4 h-4" style={{ color: '#2563eb' }} />
               Ngày tháng
             </h2>
@@ -4070,9 +4003,9 @@ onBlur={(e) => {
           </div>
 
           {/* Status */}
-          <div className="rounded-lg p-4 border" style={{ backgroundColor: 'white', borderColor: '#e5e7eb' }}>
-            <h2 className="text-sm font-bold mb-4 flex items-center gap-2 pb-3 border-b" style={{ color: '#111827', borderColor: '#e5e7eb' }}>
-              <Clock className="w-4 h-4" style={{ color: '#2563eb' }} />
+          <div className="rounded-lg p-3 border" style={{ backgroundColor: 'white', borderColor: '#e5e7eb' }}>
+            <h2 className="text-xs font-bold mb-2 flex items-center gap-1.5 pb-2 border-b" style={{ color: '#111827', borderColor: '#e5e7eb' }}>
+              <Clock className="w-3.5 h-3.5" style={{ color: '#2563eb' }} />
               Trạng thái
             </h2>
             <div className="space-y-3">
@@ -4122,9 +4055,9 @@ onBlur={(e) => {
           </div>
 
           {/* Financial Information */}
-          <div className="rounded-lg p-4 border" style={{ backgroundColor: 'white', borderColor: '#e5e7eb' }}>
-            <h2 className="text-sm font-bold mb-4 flex items-center gap-2 pb-3 border-b" style={{ color: '#111827', borderColor: '#e5e7eb' }}>
-              <DollarSign className="w-4 h-4" style={{ color: '#2563eb' }} />
+          <div className="rounded-lg p-3 border" style={{ backgroundColor: 'white', borderColor: '#e5e7eb' }}>
+            <h2 className="text-xs font-bold mb-2 flex items-center gap-1.5 pb-2 border-b" style={{ color: '#111827', borderColor: '#e5e7eb' }}>
+              <DollarSign className="w-3.5 h-3.5" style={{ color: '#2563eb' }} />
               Thông tin tài chính
             </h2>
             <div className="space-y-3">
@@ -4192,9 +4125,9 @@ onBlur={(e) => {
           </div>
 
           {/* Notes */}
-          <div className="rounded-lg p-4 border" style={{ backgroundColor: 'white', borderColor: '#e5e7eb' }}>
-            <h2 className="text-sm font-bold mb-4 flex items-center gap-2 pb-3 border-b" style={{ color: '#111827', borderColor: '#e5e7eb' }}>
-              <FileText className="w-4 h-4" style={{ color: '#2563eb' }} />
+          <div className="rounded-lg p-3 border" style={{ backgroundColor: 'white', borderColor: '#e5e7eb' }}>
+            <h2 className="text-xs font-bold mb-2 flex items-center gap-1.5 pb-2 border-b" style={{ color: '#111827', borderColor: '#e5e7eb' }}>
+              <FileText className="w-3.5 h-3.5" style={{ color: '#2563eb' }} />
               Ghi chú
             </h2>
             <div>
@@ -4226,41 +4159,37 @@ onBlur={(e) => {
         </div>
       </form>
 
-      {/* Action Buttons */}
-      <div className="rounded-lg border p-4 flex items-center justify-end gap-3" style={{ backgroundColor: 'white', borderColor: '#e5e7eb' }}>
-        <button
-          type="button"
-          onClick={handleCancel}
-          onMouseEnter={() => setHoveredCancelButton(true)}
-          onMouseLeave={() => setHoveredCancelButton(false)}
-          className="px-5 py-2.5 rounded-lg text-xs font-semibold transition-colors flex items-center gap-2"
-          style={{
-            backgroundColor: hoveredCancelButton ? '#e5e7eb' : '#f3f4f6',
-            color: '#374151'
-          }}
-        >
-          <X className="w-3.5 h-3.5" />
-          Hủy
-        </button>
-        <button
-          type="submit"
-          onClick={handleSubmit}
-          disabled={loading}
-          onMouseEnter={() => !loading && setHoveredSaveButton(true)}
-          onMouseLeave={() => setHoveredSaveButton(false)}
-          className="px-5 py-2.5 rounded-lg text-xs font-semibold transition-colors flex items-center gap-2"
-          style={{
-            backgroundColor: loading
-              ? '#93c5fd'
-              : (hoveredSaveButton ? '#1d4ed8' : '#2563eb'),
-            color: 'white',
-            opacity: loading ? 0.5 : 1,
-            cursor: loading ? 'not-allowed' : 'pointer'
-          }}
-        >
-          <Save className="w-3.5 h-3.5" />
-          {loading ? 'Đang lưu...' : 'Lưu đơn tiến cử'}
-        </button>
+        {/* Action Buttons */}
+        <div className="rounded-lg border p-3 flex items-center justify-end gap-2" style={{ backgroundColor: 'white', borderColor: '#e5e7eb' }}>
+          <button
+            type="button"
+            onClick={handleCancel}
+            onMouseEnter={() => setHoveredCancelButton(true)}
+            onMouseLeave={() => setHoveredCancelButton(false)}
+            className="px-3 py-1.5 rounded-full text-[11px] sm:text-xs font-semibold transition-colors flex items-center gap-1.5"
+            style={{ backgroundColor: hoveredCancelButton ? '#e5e7eb' : '#f3f4f6', color: '#374151' }}
+          >
+            <X className="w-3.5 h-3.5" />
+            Hủy
+          </button>
+          <button
+            type="submit"
+            onClick={handleSubmit}
+            disabled={loading}
+            onMouseEnter={() => !loading && setHoveredSaveButton(true)}
+            onMouseLeave={() => setHoveredSaveButton(false)}
+            className="px-3 py-1.5 rounded-full text-[11px] sm:text-xs font-semibold transition-colors flex items-center gap-1.5"
+            style={{
+              backgroundColor: loading ? '#93c5fd' : (hoveredSaveButton ? '#1d4ed8' : '#2563eb'),
+              color: 'white',
+              opacity: loading ? 0.5 : 1,
+              cursor: loading ? 'not-allowed' : 'pointer'
+            }}
+          >
+            <Save className="w-3.5 h-3.5" />
+            {loading ? 'Đang lưu...' : 'Lưu đơn tiến cử'}
+          </button>
+        </div>
       </div>
     </div>
   );

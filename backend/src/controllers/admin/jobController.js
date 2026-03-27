@@ -31,9 +31,13 @@ import { Op } from 'sequelize';
 import sequelize from '../../config/database.js';
 import { v4 as uuidv4 } from 'uuid';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import fs from 'fs/promises';
-import { isS3Key, getSignedUrlForFile, buildJdTemplatePdfKey, uploadBufferToS3, s3Enabled, deleteFileFromS3, makeDownloadDisposition } from '../../services/s3Service.js';
+import { isS3Key, getSignedUrlForFile, buildJdTemplatePdfKey, buildJdFileKey, uploadBufferToS3, s3Enabled, deleteFileFromS3, makeDownloadDisposition } from '../../services/s3Service.js';
 import { generateJdPdfBuffer } from '../../services/jdPdfService.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Helper function to map model field names to database column names
 const mapOrderField = (fieldName) => {
@@ -454,21 +458,32 @@ export const jobController = {
 
   /**
    * Lấy URL xem/tải file JD hoặc required CV form (S3 signed URL hoặc URL tĩnh)
-   * GET /api/admin/jobs/:id/view-url?fileType=jdFile|requiredCvForm&purpose=view|download
+   * GET /api/admin/jobs/:id/view-url?fileType=jdFile|jdFileEn|jdFileJp|jdOriginalFile|requiredCvForm&purpose=view|download
    */
   getJobFileUrl: async (req, res, next) => {
     try {
       const { id } = req.params;
       const { fileType = 'jdFile', purpose = 'view' } = req.query;
 
-      const job = await Job.findByPk(id, { attributes: ['id', 'jdFile', 'requiredCvForm'] });
+      const job = await Job.findByPk(id, {
+        attributes: ['id', 'jdFile', 'jdFileEn', 'jdFileJp', 'jdOriginalFile', 'requiredCvForm']
+      });
       if (!job) {
         return res.status(404).json({ success: false, message: 'Không tìm thấy việc làm' });
       }
 
-      const filePath = fileType === 'requiredCvForm'
-        ? (job.requiredCvForm ?? job.get?.('required_cv_form'))
-        : (job.jdFile ?? job.get?.('jd_file'));
+      let filePath;
+      if (fileType === 'requiredCvForm') {
+        filePath = job.requiredCvForm ?? job.get?.('required_cv_form');
+      } else if (fileType === 'jdFileEn') {
+        filePath = job.jdFileEn ?? job.get?.('jd_file_en');
+      } else if (fileType === 'jdFileJp') {
+        filePath = job.jdFileJp ?? job.get?.('jd_file_jp');
+      } else if (fileType === 'jdOriginalFile') {
+        filePath = job.jdOriginalFile ?? job.get?.('jd_original_file');
+      } else {
+        filePath = job.jdFile ?? job.get?.('jd_file');
+      }
       if (!filePath) {
         return res.status(404).json({ success: false, message: 'File không tồn tại' });
       }
@@ -536,13 +551,25 @@ export const jobController = {
         overtimeEn,
         overtimeJp,
         recruitmentType,
+        residenceStatus,
+        residenceStatusEn,
+        residenceStatusJp,
         contractPeriod,
         contractPeriodEn,
         contractPeriodJp,
+        probationPeriod,
+        probationPeriodEn,
+        probationPeriodJp,
+        probationDetail,
+        probationDetailEn,
+        probationDetailJp,
         companyId,
         recruitmentProcess,
         recruitmentProcessEn,
         recruitmentProcessJp,
+        transferAbility,
+        transferAbilityEn,
+        transferAbilityJp,
         highlights,
         deadline,
         status = 1,
@@ -626,6 +653,7 @@ export const jobController = {
         const job = await Job.create({
           jobCode,
           jobCategoryId,
+          businessSectorKey: req.body.businessSectorKey || null,
           title,
           titleEn: titleEn || null,
           titleJp: titleJp || null,
@@ -659,13 +687,25 @@ export const jobController = {
           overtimeEn: overtimeEn || null,
           overtimeJp: overtimeJp || null,
           recruitmentType,
+          residenceStatus: residenceStatus || null,
+          residenceStatusEn: residenceStatusEn || null,
+          residenceStatusJp: residenceStatusJp || null,
           contractPeriod,
           contractPeriodEn: contractPeriodEn || null,
           contractPeriodJp: contractPeriodJp || null,
+          probationPeriod: probationPeriod || null,
+          probationPeriodEn: probationPeriodEn || null,
+          probationPeriodJp: probationPeriodJp || null,
+          probationDetail: probationDetail || null,
+          probationDetailEn: probationDetailEn || null,
+          probationDetailJp: probationDetailJp || null,
           companyId: companyId || null,
           recruitmentProcess,
           recruitmentProcessEn: recruitmentProcessEn || null,
           recruitmentProcessJp: recruitmentProcessJp || null,
+          transferAbility: transferAbility || null,
+          transferAbilityEn: transferAbilityEn || null,
+          transferAbilityJp: transferAbilityJp || null,
           highlights: highlights || null,
           deadline,
           status,
@@ -1043,24 +1083,51 @@ export const jobController = {
           ]
         });
 
-        // Generate JD template PDF, upload to S3 (jsshare/job_descriptions/{id}/jd-template.pdf), save path to jdFile
+        // Generate JD template PDFs (vi, en, jp), upload to S3 job_descriptions/{id}/file_vn.pdf, file_eng.pdf, file_jp.pdf
         try {
-          const pdfBuffer = await generateJdPdfBuffer(job);
-          if (pdfBuffer) {
-            if (s3Enabled()) {
-              const s3Key = buildJdTemplatePdfKey(job.id);
-              await uploadBufferToS3(pdfBuffer, s3Key, 'application/pdf');
-              job.jdFile = s3Key;
-              await job.save();
-            } else {
-              const uploadDir = path.join(path.dirname(path.dirname(path.dirname(__dirname))), 'uploads');
-              const jdFolder = path.join(uploadDir, 'job_descriptions', String(job.id));
-              await fs.mkdir(jdFolder, { recursive: true });
-              const pdfPath = path.join(jdFolder, 'jd-template.pdf');
-              await fs.writeFile(pdfPath, pdfBuffer);
-              job.jdFile = path.relative(path.join(__dirname, '../../../'), pdfPath);
-              await job.save();
+          const [pdfBufferVi, pdfBufferEn, pdfBufferJp] = await Promise.all([
+            generateJdPdfBuffer(job, 'vi'),
+            generateJdPdfBuffer(job, 'en'),
+            generateJdPdfBuffer(job, 'jp')
+          ]);
+          const uploadDir = path.join(path.dirname(path.dirname(path.dirname(__dirname))), 'uploads');
+          const jdFolder = path.join(uploadDir, 'job_descriptions', String(job.id));
+          if (s3Enabled()) {
+            const tasks = [];
+            if (pdfBufferVi) {
+              const keyVn = buildJdFileKey(job.id, 'file_vn');
+              tasks.push(uploadBufferToS3(pdfBufferVi, keyVn, 'application/pdf').then(() => { job.jdFile = keyVn; }).catch((e) => { console.warn('[Admin createJob] JD file_vn upload failed:', e.message); }));
             }
+            if (pdfBufferEn) {
+              const keyEn = buildJdFileKey(job.id, 'file_eng');
+              tasks.push(uploadBufferToS3(pdfBufferEn, keyEn, 'application/pdf').then(() => { job.jdFileEn = keyEn; }).catch((e) => { console.warn('[Admin createJob] JD file_eng upload failed:', e.message); }));
+            }
+            if (pdfBufferJp) {
+              const keyJp = buildJdFileKey(job.id, 'file_jp');
+              tasks.push(uploadBufferToS3(pdfBufferJp, keyJp, 'application/pdf').then(() => { job.jdFileJp = keyJp; }).catch((e) => { console.warn('[Admin createJob] JD file_jp upload failed:', e.message); }));
+            }
+            await Promise.all(tasks);
+          } else {
+            await fs.mkdir(jdFolder, { recursive: true });
+            const base = path.join(__dirname, '../../../');
+            if (pdfBufferVi) {
+              const p = path.join(jdFolder, 'file_vn.pdf');
+              await fs.writeFile(p, pdfBufferVi);
+              job.jdFile = path.relative(base, p);
+            }
+            if (pdfBufferEn) {
+              const p = path.join(jdFolder, 'file_eng.pdf');
+              await fs.writeFile(p, pdfBufferEn);
+              job.jdFileEn = path.relative(base, p);
+            }
+            if (pdfBufferJp) {
+              const p = path.join(jdFolder, 'file_jp.pdf');
+              await fs.writeFile(p, pdfBufferJp);
+              job.jdFileJp = path.relative(base, p);
+            }
+          }
+          if (job.jdFile != null || job.jdFileEn != null || job.jdFileJp != null) {
+            await job.save();
             await job.reload({ include: [{ model: JobCategory, as: 'category', required: false }, { model: Company, as: 'company', required: false }, { model: JobRecruitingCompany, as: 'recruitingCompany', required: false, include: [{ model: JobRecruitingCompanyService, as: 'services', required: false }, { model: JobRecruitingCompanyBusinessSector, as: 'businessSectors', required: false }] }] });
           }
         } catch (pdfErr) {
@@ -1692,32 +1759,60 @@ export const jobController = {
           ]
         });
 
-        // Generate JD template PDF, upload to S3, cập nhật jdFile (xóa file cũ nếu có)
+        // Generate JD template PDFs (vi, en, jp), upload to S3; xóa file cũ trước
         try {
-          if (job.jdFile) {
-            if (isS3Key(job.jdFile)) {
-              await deleteFileFromS3(job.jdFile).catch(() => {});
+          const keysToDelete = [job.jdFile, job.jdFileEn, job.jdFileJp, job.jdOriginalFile].filter(Boolean);
+          for (const key of keysToDelete) {
+            if (isS3Key(key)) {
+              await deleteFileFromS3(key).catch(() => {});
             } else {
-              const oldPath = path.join(__dirname, '../../../', job.jdFile);
+              const oldPath = path.join(__dirname, '../../../', key);
               await fs.unlink(oldPath).catch(() => {});
             }
           }
-          const pdfBuffer = await generateJdPdfBuffer(job);
-          if (pdfBuffer) {
-            if (s3Enabled()) {
-              const s3Key = buildJdTemplatePdfKey(job.id);
-              await uploadBufferToS3(pdfBuffer, s3Key, 'application/pdf');
-              job.jdFile = s3Key;
-              await job.save();
-            } else {
-              const uploadDir = path.join(path.dirname(path.dirname(path.dirname(__dirname))), 'uploads');
-              const jdFolder = path.join(uploadDir, 'job_descriptions', String(job.id));
-              await fs.mkdir(jdFolder, { recursive: true });
-              const pdfPath = path.join(jdFolder, 'jd-template.pdf');
-              await fs.writeFile(pdfPath, pdfBuffer);
-              job.jdFile = path.relative(path.join(__dirname, '../../../'), pdfPath);
-              await job.save();
+          const [pdfBufferVi, pdfBufferEn, pdfBufferJp] = await Promise.all([
+            generateJdPdfBuffer(job, 'vi'),
+            generateJdPdfBuffer(job, 'en'),
+            generateJdPdfBuffer(job, 'jp')
+          ]);
+          const uploadDir = path.join(path.dirname(path.dirname(path.dirname(__dirname))), 'uploads');
+          const jdFolder = path.join(uploadDir, 'job_descriptions', String(job.id));
+          if (s3Enabled()) {
+            const tasks = [];
+            if (pdfBufferVi) {
+              const keyVn = buildJdFileKey(job.id, 'file_vn');
+              tasks.push(uploadBufferToS3(pdfBufferVi, keyVn, 'application/pdf').then(() => { job.jdFile = keyVn; }).catch((e) => { console.warn('[Admin updateJob] JD file_vn upload failed:', e.message); }));
             }
+            if (pdfBufferEn) {
+              const keyEn = buildJdFileKey(job.id, 'file_eng');
+              tasks.push(uploadBufferToS3(pdfBufferEn, keyEn, 'application/pdf').then(() => { job.jdFileEn = keyEn; }).catch((e) => { console.warn('[Admin updateJob] JD file_eng upload failed:', e.message); }));
+            }
+            if (pdfBufferJp) {
+              const keyJp = buildJdFileKey(job.id, 'file_jp');
+              tasks.push(uploadBufferToS3(pdfBufferJp, keyJp, 'application/pdf').then(() => { job.jdFileJp = keyJp; }).catch((e) => { console.warn('[Admin updateJob] JD file_jp upload failed:', e.message); }));
+            }
+            await Promise.all(tasks);
+          } else {
+            await fs.mkdir(jdFolder, { recursive: true });
+            const base = path.join(__dirname, '../../../');
+            if (pdfBufferVi) {
+              const p = path.join(jdFolder, 'file_vn.pdf');
+              await fs.writeFile(p, pdfBufferVi);
+              job.jdFile = path.relative(base, p);
+            }
+            if (pdfBufferEn) {
+              const p = path.join(jdFolder, 'file_eng.pdf');
+              await fs.writeFile(p, pdfBufferEn);
+              job.jdFileEn = path.relative(base, p);
+            }
+            if (pdfBufferJp) {
+              const p = path.join(jdFolder, 'file_jp.pdf');
+              await fs.writeFile(p, pdfBufferJp);
+              job.jdFileJp = path.relative(base, p);
+            }
+          }
+          if (job.jdFile != null || job.jdFileEn != null || job.jdFileJp != null) {
+            await job.save();
             await job.reload({ include: [{ model: JobCategory, as: 'category', required: false }, { model: Company, as: 'company', required: false }, { model: JobRecruitingCompany, as: 'recruitingCompany', required: false, include: [{ model: JobRecruitingCompanyService, as: 'services', required: false }, { model: JobRecruitingCompanyBusinessSector, as: 'businessSectors', required: false }] }] });
           }
         } catch (pdfErr) {

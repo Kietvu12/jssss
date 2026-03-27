@@ -1,5 +1,6 @@
 import { Post } from '../../models/index.js';
 import { Op } from 'sequelize';
+import { getSignedUrlForFile, s3Enabled } from '../../services/s3Service.js';
 
 // Helper function to map model field names to database column names
 const mapOrderField = (fieldName) => {
@@ -12,6 +13,16 @@ const mapOrderField = (fieldName) => {
   };
   return fieldMap[fieldName] || fieldName;
 };
+
+async function resolvePostThumbnailUrl(thumbnail) {
+  if (!thumbnail || typeof thumbnail !== 'string') return thumbnail;
+  if (thumbnail.startsWith('http://') || thumbnail.startsWith('https://')) return thumbnail;
+  if (s3Enabled()) {
+    const url = await getSignedUrlForFile(thumbnail, 'view');
+    return url || thumbnail;
+  }
+  return thumbnail;
+}
 
 /**
  * Post Controller (CTV)
@@ -73,6 +84,12 @@ export const postController = {
         order: orderClause
       });
 
+      for (const post of rows) {
+        if (post.thumbnail) {
+          post.dataValues.thumbnail = await resolvePostThumbnailUrl(post.thumbnail);
+        }
+      }
+
       res.json({
         success: true,
         data: {
@@ -110,6 +127,10 @@ export const postController = {
           success: false,
           message: 'Không tìm thấy post hoặc post chưa được publish'
         });
+      }
+
+      if (post.thumbnail) {
+        post.dataValues.thumbnail = await resolvePostThumbnailUrl(post.thumbnail);
       }
 
       res.json({

@@ -2,6 +2,70 @@ import { Collaborator, Group, RankLevel } from '../../models/index.js';
 import { hashPassword, comparePassword } from '../../utils/password.js';
 import { generateToken } from '../../utils/jwt.js';
 import { Op } from 'sequelize';
+import crypto from 'crypto';
+import emailService from '../../services/emailService.js';
+
+const EMAIL_VERIFY_EXPIRES_HOURS = parseInt(process.env.EMAIL_VERIFY_EXPIRES_HOURS || '72', 10);
+const FRONTEND_URL = (process.env.FRONTEND_URL || process.env.WEB_URL || 'http://localhost:5173').replace(/\/+$/, '');
+
+function buildEmailVerificationData() {
+  const token = crypto.randomBytes(32).toString('hex');
+  const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+  const expiresAt = new Date(Date.now() + EMAIL_VERIFY_EXPIRES_HOURS * 60 * 60 * 1000);
+  return { token, tokenHash, expiresAt };
+}
+
+function buildVerifyEmailUrl(token) {
+  return `${FRONTEND_URL}/register/verify-email?token=${encodeURIComponent(token)}`;
+}
+
+function buildRegistrationVerificationEmail(verifyUrl) {
+  const subject = '[WS Job Share] 登録完了のお知らせ / Registration Completed / Xác nhận đăng ký cộng tác viên';
+  const text = `ご登録いただき、誠にありがとうございました。
+アカウントが作成されました。
+以下のリンクよりログインしてご利用ください:
+${verifyUrl}
+
+========================================
+Your account has been successfully created.
+Please click the link below to verify your email and activate your account:
+${verifyUrl}
+
+========================================
+Cảm ơn bạn đã đăng ký tham gia cộng tác viên.
+Tài khoản của bạn đã được tạo thành công.
+Vui lòng nhấn vào link dưới đây để xác thực email và kích hoạt tài khoản:
+${verifyUrl}
+
+ご不明な点がございましたら、本文返信にてお問い合わせください。`;
+
+  const html = `
+    <div style="font-family: Arial, Helvetica, sans-serif; color: #111827; line-height: 1.55;">
+      <p style="margin: 0 0 8px;">ご登録いただき、誠にありがとうございました。<br/>アカウントが作成されました。<br/>以下のリンクよりログインしてご利用ください:<br/>
+        <a href="${verifyUrl}" style="color: #2563eb; text-decoration: underline;">${verifyUrl}</a>
+      </p>
+
+      <p style="margin: 14px 0;">========================================</p>
+
+      <p style="margin: 0 0 8px;">Your account has been successfully created.<br/>Please click the link below to verify your email and activate your account:<br/>
+        <a href="${verifyUrl}" style="color: #2563eb; text-decoration: underline;">${verifyUrl}</a>
+      </p>
+
+      <p style="margin: 14px 0;">========================================</p>
+
+      <p style="margin: 0 0 8px;">Cảm ơn bạn đã đăng ký tham gia cộng tác viên.<br/>Tài khoản của bạn đã được tạo thành công.<br/>Vui lòng nhấn vào link dưới đây để xác thực email và kích hoạt tài khoản:<br/>
+        <a href="${verifyUrl}" style="color: #2563eb; text-decoration: underline;">${verifyUrl}</a>
+      </p>
+
+      <p style="margin: 16px 0 0;">ご不明な点がございましたら、本文返信にてお問い合わせください。</p>
+      <p style="margin: 16px 0 0; font-weight: 700;">Workstation JobShare</p>
+      <p style="margin: 4px 0 0;">Email: <a href="mailto:jobshare@work-station.vn" style="color: #111827;">jobshare@work-station.vn</a></p>
+      <p style="margin: 2px 0 0;">Hotline: (+81)944811975（日本）/ (+84) 906130296（ベトナム）</p>
+    </div>
+  `;
+
+  return { subject, text, html };
+}
 
 /**
  * CTV Authentication Controller
@@ -72,6 +136,7 @@ export const collaboratorAuthController = {
 
       // Hash password
       const hashedPassword = await hashPassword(password);
+      const verifyData = buildEmailVerificationData();
 
       // Create collaborator
       const collaborator = await Collaborator.create({
@@ -101,8 +166,26 @@ export const collaboratorAuthController = {
         description,
         status: 0, // Inactive cho đến khi admin phê duyệt
         points: 0,
-        approvedAt: null // Admin phê duyệt sẽ set approvedAt + status = 1
+        approvedAt: null, // Admin phê duyệt sẽ set approvedAt + status = 1
+        emailVerifiedAt: null,
+        emailVerificationTokenHash: verifyData.tokenHash,
+        emailVerificationExpiresAt: verifyData.expiresAt,
+        emailVerificationSentAt: new Date()
       });
+
+      // Send verification email (non-blocking flow)
+      try {
+        const verifyUrl = buildVerifyEmailUrl(verifyData.token);
+        const emailContent = buildRegistrationVerificationEmail(verifyUrl);
+        await emailService.sendEmail({
+          to: collaborator.email,
+          subject: emailContent.subject,
+          text: emailContent.text,
+          html: emailContent.html
+        });
+      } catch (emailError) {
+        console.error('[register] Send verification email failed:', emailError);
+      }
 
       // Return collaborator data (without password)
       const collaboratorData = collaborator.toJSON();
@@ -111,7 +194,7 @@ export const collaboratorAuthController = {
 
       res.status(201).json({
         success: true,
-        message: 'Đăng ký thành công. Tài khoản của bạn đang chờ được duyệt bởi quản trị viên.',
+        message: 'Dang ky thanh cong. Vui long kiem tra email de xac thuc tai khoan.',
         data: {
           collaborator: collaboratorData
         }
@@ -242,6 +325,77 @@ export const collaboratorAuthController = {
         data: {
           collaborator: collaboratorData,
           token
+        }
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  /**
+   * Verify collaborator email and auto approve account
+   * GET /api/ctv/auth/verify-email?token=...
+   */
+  verifyEmail: async (req, res, next) => {
+    try {
+      const token = String(req.query.token || '').trim();
+      if (!token) {
+        return res.status(400).json({
+          success: false,
+          message: 'Thieu token xac thuc email'
+        });
+      }
+
+      const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+      const collaborator = await Collaborator.findOne({
+        where: {
+          emailVerificationTokenHash: tokenHash
+        }
+      });
+
+      if (!collaborator) {
+        return res.status(400).json({
+          success: false,
+          message: 'Link xác thực không hợp lệ hoặc đã được sử dụng'
+        });
+      }
+
+      const now = new Date();
+      const isExpired =
+        collaborator.emailVerificationExpiresAt &&
+        new Date(collaborator.emailVerificationExpiresAt).getTime() < now.getTime();
+      const alreadyApproved = !!collaborator.approvedAt || collaborator.status === 1;
+
+      if (isExpired && !alreadyApproved) {
+        return res.status(400).json({
+          success: false,
+          message: 'Link xác thực đã hết hạn'
+        });
+      }
+
+      const updates = {
+        emailVerifiedAt: collaborator.emailVerifiedAt || now,
+        emailVerificationTokenHash: null,
+        emailVerificationExpiresAt: null
+      };
+
+      let result = 'verified_and_approved';
+      if (alreadyApproved) {
+        result = 'already_approved';
+      } else {
+        updates.status = 1;
+        updates.approvedAt = now;
+      }
+
+      await collaborator.update(updates);
+
+      return res.json({
+        success: true,
+        message: result === 'already_approved'
+          ? 'Tài khoản đã được phê duyệt trước đó'
+          : 'Xác thực email thành công và tài khoản đã được phê duyệt',
+        data: {
+          result
         }
       });
     } catch (error) {

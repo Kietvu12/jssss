@@ -26,7 +26,7 @@ const getResourceUrl = (pathOrUrl) => {
   if (!pathOrUrl || typeof pathOrUrl !== 'string') return null;
   const p = pathOrUrl.trim();
   if (p.startsWith('http://') || p.startsWith('https://')) return p;
-  const baseUrl = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+  const baseUrl = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || 'https://73mlvrh5-3000.asse.devtunnels.ms/api';
   const apiBase = (baseUrl || '').replace(/\/api\/?$/, '');
   const clean = p.startsWith('/') ? p.slice(1) : p;
   return `${apiBase}/${clean}`;

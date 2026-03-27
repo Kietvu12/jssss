@@ -7,6 +7,7 @@ import {
 } from '../../models/index.js';
 import { Op, col } from 'sequelize';
 import sequelize from '../../config/database.js';
+import { uploadBufferToS3, buildMessageAttachmentKey, getSignedUrlForFile, makeDownloadDisposition } from '../../services/s3Service.js';
 
 /**
  * Message Controller (CTV)
@@ -73,9 +74,22 @@ export const messageController = {
         paranoid: true
       });
 
+      const enrichedMessages = await Promise.all(
+        messages.map(async (message) => {
+          const item = message.toJSON();
+          if (item.attachmentKey) {
+            const disposition = makeDownloadDisposition(item.attachmentName || 'attachment');
+            item.attachmentUrl = await getSignedUrlForFile(item.attachmentKey, 'download', disposition);
+          } else {
+            item.attachmentUrl = null;
+          }
+          return item;
+        })
+      );
+
       res.json({
         success: true,
-        data: { messages }
+        data: { messages: enrichedMessages }
       });
     } catch (error) {
       next(error);
@@ -94,14 +108,17 @@ export const messageController = {
         senderType = 2, // Default: Collaborator
         adminId // Optional: specify which admin to send to
       } = req.body;
+      const senderTypeNum = parseInt(senderType, 10);
+      const trimmedContent = (content || '').trim();
+      const hasAttachment = !!req.file;
 
       const collaboratorId = req.collaborator.id;
 
       // Validate required fields
-      if (!jobApplicationId || !content) {
+      if (!jobApplicationId || (!trimmedContent && !hasAttachment)) {
         return res.status(400).json({
           success: false,
-          message: 'ID đơn ứng tuyển và nội dung tin nhắn là bắt buộc'
+          message: 'ID đơn ứng tuyển và nội dung hoặc tệp đính kèm là bắt buộc'
         });
       }
 
@@ -121,7 +138,7 @@ export const messageController = {
       }
 
       // Validate sender type (CTV can only send as Collaborator or System)
-      if (![2, 3].includes(senderType)) {
+      if (![2, 3].includes(senderTypeNum)) {
         return res.status(400).json({
           success: false,
           message: 'Loại người gửi không hợp lệ (2: Collaborator, 3: System)'
@@ -148,12 +165,29 @@ export const messageController = {
         adminIdToUse = parseInt(adminId);
       }
 
+      let attachmentKey = null;
+      let attachmentName = null;
+      let attachmentMimeType = null;
+      let attachmentSize = null;
+
+      if (hasAttachment) {
+        attachmentName = req.file.originalname || 'attachment';
+        attachmentMimeType = req.file.mimetype || 'application/octet-stream';
+        attachmentSize = req.file.size || 0;
+        attachmentKey = buildMessageAttachmentKey(jobApplicationId, attachmentName);
+        await uploadBufferToS3(req.file.buffer, attachmentKey, attachmentMimeType);
+      }
+
       const message = await Message.create({
         jobApplicationId,
         adminId: adminIdToUse,
         collaboratorId: collaboratorId,
-        senderType,
-        content,
+        senderType: senderTypeNum,
+        content: trimmedContent || '[Attachment]',
+        attachmentName,
+        attachmentKey,
+        attachmentMimeType,
+        attachmentSize,
         isReadByAdmin: false,
         isReadByCollaborator: true // CTV đã đọc tin nhắn của chính mình
       });
@@ -185,11 +219,18 @@ export const messageController = {
           }
         ]
       });
+      const messageData = message.toJSON();
+      if (messageData.attachmentKey) {
+        const disposition = makeDownloadDisposition(messageData.attachmentName || 'attachment');
+        messageData.attachmentUrl = await getSignedUrlForFile(messageData.attachmentKey, 'download', disposition);
+      } else {
+        messageData.attachmentUrl = null;
+      }
 
       res.status(201).json({
         success: true,
         message: 'Gửi tin nhắn thành công',
-        data: { message }
+        data: { message: messageData }
       });
     } catch (error) {
       next(error);

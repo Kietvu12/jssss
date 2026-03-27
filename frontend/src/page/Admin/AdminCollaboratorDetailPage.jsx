@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
-  ArrowLeft,
   User,
   Mail,
   Phone,
@@ -30,11 +29,10 @@ const AdminCollaboratorDetailPage = () => {
   const [collaborator, setCollaborator] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [activeTab, setActiveTab] = useState('info');
+  const [activeTab, setActiveTab] = useState('contact');
   const [deleting, setDeleting] = useState(false);
   
   // Hover states
-  const [hoveredBackButton, setHoveredBackButton] = useState(false);
   const [hoveredEditButton, setHoveredEditButton] = useState(false);
   const [hoveredDeleteButton, setHoveredDeleteButton] = useState(false);
   const [hoveredBackToListButton, setHoveredBackToListButton] = useState(false);
@@ -151,7 +149,6 @@ const AdminCollaboratorDetailPage = () => {
   }
 
   const tabs = [
-    { id: 'info', label: 'Thông tin cơ bản', icon: User },
     { id: 'contact', label: 'Liên hệ', icon: Mail },
     { id: 'organization', label: 'Tổ chức', icon: Building2 },
     { id: 'banking', label: 'Ngân hàng', icon: CreditCard },
@@ -159,64 +156,110 @@ const AdminCollaboratorDetailPage = () => {
     { id: 'survey', label: 'Khảo sát đăng ký (Form HQA)', icon: ClipboardList },
   ];
 
+  const initials = (collaborator.name || '')
+    .split(' ')
+    .filter(Boolean)
+    .slice(-2)
+    .map((p) => p[0])
+    .join('')
+    .toUpperCase() || 'CV';
+
   return (
     <div className="space-y-3">
-      {/* Header */}
-      <div className="rounded-lg p-4 border flex items-center justify-between" style={{ backgroundColor: 'white', borderColor: '#e5e7eb' }}>
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => navigate('/admin/collaborators')}
-            onMouseEnter={() => setHoveredBackButton(true)}
-            onMouseLeave={() => setHoveredBackButton(false)}
-            className="p-2 rounded-lg transition-colors"
-            style={{
-              backgroundColor: hoveredBackButton ? '#f3f4f6' : 'transparent'
-            }}
-          >
-            <ArrowLeft className="w-4 h-4" style={{ color: '#4b5563' }} />
-          </button>
-          <div>
-            <h1 className="text-lg font-bold" style={{ color: '#111827' }}>Chi tiết CTV</h1>
-            <p className="text-xs mt-1" style={{ color: '#6b7280' }}>
-              {collaborator.code || collaboratorId} - {collaborator.name || 'N/A'}
-            </p>
+      {/* Card thông tin cơ bản */}
+      <div className="rounded-lg border p-4" style={{ backgroundColor: 'white', borderColor: '#e5e7eb' }}>
+        <div className="flex items-start gap-4">
+          {/* Avatar */}
+          <div className="flex flex-col items-center gap-2">
+            <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-blue-50 flex items-center justify-center text-xs sm:text-sm font-semibold text-blue-700 border border-blue-100">
+              {initials}
+            </div>
+            <span className="px-2 py-0.5 rounded-full text-[10px] font-medium border" style={getStatusColor(collaborator.status)}>
+              {formatStatus(collaborator.status)}
+            </span>
           </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="px-3 py-1 rounded-full text-xs font-medium border" style={getStatusColor(collaborator.status)}>
-            {formatStatus(collaborator.status)}
-          </span>
-          <button
-            onClick={() => navigate(`/admin/collaborators/${collaboratorId}/edit`)}
-            onMouseEnter={() => setHoveredEditButton(true)}
-            onMouseLeave={() => setHoveredEditButton(false)}
-            className="px-4 py-2 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5"
-            style={{
-              backgroundColor: hoveredEditButton ? '#1d4ed8' : '#2563eb',
-              color: 'white'
-            }}
-          >
-            <Edit className="w-3.5 h-3.5" />
-            Chỉnh sửa
-          </button>
-          <button
-            onClick={handleDelete}
-            disabled={deleting}
-            onMouseEnter={() => !deleting && setHoveredDeleteButton(true)}
-            onMouseLeave={() => setHoveredDeleteButton(false)}
-            className="px-4 py-2 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5"
-            style={{
-              backgroundColor: deleting
-                ? '#fca5a5'
-                : (hoveredDeleteButton ? '#b91c1c' : '#dc2626'),
-              color: 'white',
-              opacity: deleting ? 0.5 : 1,
-              cursor: deleting ? 'not-allowed' : 'pointer'
-            }}
-          >
-            <Trash2 className="w-3.5 h-3.5" />
-            Xóa
-          </button>
+
+          {/* Info + actions */}
+          <div className="flex-1 space-y-3">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h1 className="text-base sm:text-lg font-bold" style={{ color: '#111827' }}>
+                  {collaborator.name || 'CTV không tên'}
+                </h1>
+                <p className="text-xs mt-1" style={{ color: '#6b7280' }}>
+                  Mã CTV: {collaborator.code || collaboratorId || '—'}
+                </p>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={() => navigate(`/admin/collaborators/${collaboratorId}/edit`)}
+                  onMouseEnter={() => setHoveredEditButton(true)}
+                  onMouseLeave={() => setHoveredEditButton(false)}
+                  className="px-3 py-1.5 rounded-full text-[11px] font-semibold transition-colors flex items-center gap-1.5"
+                  style={{
+                    backgroundColor: hoveredEditButton ? '#1d4ed8' : '#2563eb',
+                    color: 'white'
+                  }}
+                >
+                  <Edit className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Chỉnh sửa</span>
+                </button>
+                <button
+                  onClick={handleDelete}
+                  disabled={deleting}
+                  onMouseEnter={() => !deleting && setHoveredDeleteButton(true)}
+                  onMouseLeave={() => setHoveredDeleteButton(false)}
+                  className="px-3 py-1.5 rounded-full text-[11px] font-semibold transition-colors flex items-center gap-1.5"
+                  style={{
+                    backgroundColor: deleting
+                      ? '#fca5a5'
+                      : (hoveredDeleteButton ? '#b91c1c' : '#dc2626'),
+                    color: 'white',
+                    opacity: deleting ? 0.5 : 1,
+                    cursor: deleting ? 'not-allowed' : 'pointer'
+                  }}
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Xóa</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-semibold mb-1" style={{ color: '#6b7280' }}>Email</label>
+                <p className="text-sm flex items-center gap-1" style={{ color: '#111827' }}>
+                  <Mail className="w-3.5 h-3.5" style={{ color: '#9ca3af' }} />
+                  {collaborator.email || '—'}
+                </p>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold mb-1" style={{ color: '#6b7280' }}>Số điện thoại</label>
+                <p className="text-sm flex items-center gap-1" style={{ color: '#111827' }}>
+                  <Phone className="w-3.5 h-3.5" style={{ color: '#9ca3af' }} />
+                  {collaborator.phone || '—'}
+                </p>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold mb-1" style={{ color: '#6b7280' }}>Ngày sinh</label>
+                <p className="text-sm flex items-center gap-1" style={{ color: '#111827' }}>
+                  <Calendar className="w-3.5 h-3.5" style={{ color: '#9ca3af' }} />
+                  {formatDate(collaborator.birthday)}
+                </p>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold mb-1" style={{ color: '#6b7280' }}>Giới tính</label>
+                <p className="text-sm" style={{ color: '#111827' }}>{formatGender(collaborator.gender)}</p>
+              </div>
+              <div className="md:col-span-2">
+                <label className="block text-xs font-semibold mb-1" style={{ color: '#6b7280' }}>Địa chỉ</label>
+                <p className="text-sm flex items-center gap-1" style={{ color: '#111827' }}>
+                  <MapPin className="w-3.5 h-3.5" style={{ color: '#9ca3af' }} />
+                  {collaborator.address || '—'}
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -252,60 +295,6 @@ const AdminCollaboratorDetailPage = () => {
 
         {/* Tab Content */}
         <div className="p-6">
-          {activeTab === 'info' && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-semibold mb-1" style={{ color: '#6b7280' }}>Mã CTV</label>
-                <p className="text-sm font-medium" style={{ color: '#111827' }}>{collaborator.code || '—'}</p>
-              </div>
-              <div>
-                <label className="block text-xs font-semibold mb-1" style={{ color: '#6b7280' }}>Tên CTV</label>
-                <p className="text-sm" style={{ color: '#111827' }}>{collaborator.name || '—'}</p>
-              </div>
-              <div>
-                <label className="block text-xs font-semibold mb-1" style={{ color: '#6b7280' }}>Email</label>
-                <p className="text-sm flex items-center gap-1" style={{ color: '#111827' }}>
-                  <Mail className="w-3.5 h-3.5" style={{ color: '#9ca3af' }} />
-                  {collaborator.email || '—'}
-                </p>
-              </div>
-              <div>
-                <label className="block text-xs font-semibold mb-1" style={{ color: '#6b7280' }}>Số điện thoại</label>
-                <p className="text-sm flex items-center gap-1" style={{ color: '#111827' }}>
-                  <Phone className="w-3.5 h-3.5" style={{ color: '#9ca3af' }} />
-                  {collaborator.phone || '—'}
-                </p>
-              </div>
-              <div>
-                <label className="block text-xs font-semibold mb-1" style={{ color: '#6b7280' }}>Ngày sinh</label>
-                <p className="text-sm flex items-center gap-1" style={{ color: '#111827' }}>
-                  <Calendar className="w-3.5 h-3.5" style={{ color: '#9ca3af' }} />
-                  {formatDate(collaborator.birthday)}
-                </p>
-              </div>
-              <div>
-                <label className="block text-xs font-semibold mb-1" style={{ color: '#6b7280' }}>Giới tính</label>
-                <p className="text-sm" style={{ color: '#111827' }}>{formatGender(collaborator.gender)}</p>
-              </div>
-              <div>
-                <label className="block text-xs font-semibold mb-1" style={{ color: '#6b7280' }}>Loại tổ chức</label>
-                <p className="text-sm" style={{ color: '#111827' }}>{formatOrganizationType(collaborator.organizationType)}</p>
-              </div>
-              <div>
-                <label className="block text-xs font-semibold mb-1" style={{ color: '#6b7280' }}>Trạng thái</label>
-                <span className="inline-block px-2 py-1 rounded text-xs font-medium border" style={getStatusColor(collaborator.status)}>
-                  {formatStatus(collaborator.status)}
-                </span>
-              </div>
-              {collaborator.description && (
-                <div className="md:col-span-2">
-                  <label className="block text-xs font-semibold mb-1" style={{ color: '#6b7280' }}>Mô tả</label>
-                  <p className="text-sm" style={{ color: '#111827' }}>{collaborator.description}</p>
-                </div>
-              )}
-            </div>
-          )}
-
           {activeTab === 'contact' && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>

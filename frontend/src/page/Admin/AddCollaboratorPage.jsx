@@ -4,7 +4,6 @@ import apiService from '../../services/api';
 import { useLanguage } from '../../context/LanguageContext';
 import { translations } from '../../translations/translations';
 import {
-  ArrowLeft,
   User,
   Mail,
   Phone,
@@ -40,7 +39,6 @@ const AddCollaboratorPage = () => {
   const [loading, setLoading] = useState(false);
   
   // Hover states
-  const [hoveredBackButton, setHoveredBackButton] = useState(false);
   const [hoveredCancelButton, setHoveredCancelButton] = useState(false);
   const [hoveredSaveButton, setHoveredSaveButton] = useState(false);
 
@@ -154,52 +152,6 @@ const AddCollaboratorPage = () => {
 
   return (
     <div className="space-y-3">
-      {/* Header */}
-      <div className="rounded-lg p-4 border flex items-center justify-between" style={{ backgroundColor: 'white', borderColor: '#e5e7eb' }}>
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => navigate('/admin/collaborators')}
-            onMouseEnter={() => setHoveredBackButton(true)}
-            onMouseLeave={() => setHoveredBackButton(false)}
-            className="p-2 rounded-lg transition-colors"
-            style={{
-              backgroundColor: hoveredBackButton ? '#f3f4f6' : 'transparent'
-            }}
-          >
-            <ArrowLeft className="w-4 h-4" style={{ color: '#4b5563' }} />
-          </button>
-          <h1 className="text-lg font-bold" style={{ color: '#111827' }}>{t.addCtvHeaderTitle}</h1>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={handleCancel}
-            onMouseEnter={() => setHoveredCancelButton(true)}
-            onMouseLeave={() => setHoveredCancelButton(false)}
-            className="px-4 py-2 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5"
-            style={{
-              backgroundColor: hoveredCancelButton ? '#e5e7eb' : '#f3f4f6',
-              color: '#374151'
-            }}
-          >
-            <X className="w-3.5 h-3.5" />
-            {t.cancel}
-          </button>
-          <button
-            onClick={handleSubmit}
-            onMouseEnter={() => setHoveredSaveButton(true)}
-            onMouseLeave={() => setHoveredSaveButton(false)}
-            className="px-4 py-2 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5"
-            style={{
-              backgroundColor: hoveredSaveButton ? '#1d4ed8' : '#2563eb',
-              color: 'white'
-            }}
-          >
-            <Save className="w-3.5 h-3.5" />
-            {t.save}
-          </button>
-        </div>
-      </div>
-
       {/* Form */}
       <form onSubmit={handleSubmit} className="space-y-3">
         {/* Thông tin cơ bản */}
@@ -324,33 +276,33 @@ const AddCollaboratorPage = () => {
               {errors.phone && <p className="text-[10px] mt-1" style={{ color: '#ef4444' }}>{errors.phone}</p>}
             </div>
 
-            <div>
-              <label className="block text-xs font-semibold mb-2" style={{ color: '#374151' }}>
-                {t.addCtvAddressLabel}
-              </label>
-              <div className="relative">
-                <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4" style={{ color: '#9ca3af' }} />
-                <input
-                  type="text"
-                  name="address"
-                  value={formData.address}
-                  onChange={handleInputChange}
-                  className="w-full pl-10 pr-3 py-2 border rounded-lg text-xs"
-                  style={{
-                    borderColor: '#d1d5db',
-                    outline: 'none'
-                  }}
-                  onFocus={(e) => {
-                    e.target.style.borderColor = '#2563eb';
-                    e.target.style.boxShadow = '0 0 0 2px rgba(37, 99, 235, 0.5)';
-                  }}
-                  onBlur={(e) => {
-                    e.target.style.borderColor = '#d1d5db';
-                    e.target.style.boxShadow = 'none';
-                  }}
-                  placeholder={t.addCtvAddressPlaceholder}
-                />
-              </div>
+          </div>
+          <div className="mt-4">
+            <label className="block text-xs font-semibold mb-2" style={{ color: '#374151' }}>
+              {t.addCtvAddressLabel}
+            </label>
+            <div className="relative">
+              <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4" style={{ color: '#9ca3af' }} />
+              <input
+                type="text"
+                name="address"
+                value={formData.address}
+                onChange={handleInputChange}
+                className="w-full pl-10 pr-3 py-2 border rounded-lg text-xs"
+                style={{
+                  borderColor: '#d1d5db',
+                  outline: 'none'
+                }}
+                onFocus={(e) => {
+                  e.target.style.borderColor = '#2563eb';
+                  e.target.style.boxShadow = '0 0 0 2px rgba(37, 99, 235, 0.5)';
+                }}
+                onBlur={(e) => {
+                  e.target.style.borderColor = '#d1d5db';
+                  e.target.style.boxShadow = 'none';
+                }}
+                placeholder={t.addCtvAddressPlaceholder}
+              />
             </div>
           </div>
         </div>
@@ -521,7 +473,7 @@ const AddCollaboratorPage = () => {
         {/* Trạng thái và ghi chú */}
         <div className="rounded-lg border p-4" style={{ backgroundColor: 'white', borderColor: '#e5e7eb' }}>
           <h2 className="text-sm font-bold mb-4 pb-3 border-b" style={{ color: '#111827', borderColor: '#e5e7eb' }}>{t.addCtvStatusNote}</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-4">
             <div>
               <label className="block text-xs font-semibold mb-2" style={{ color: '#374151' }}>
                 {t.addCtvStatusLabel}

@@ -20,6 +20,27 @@ router.get('/dashboard', authenticate, isSuperAdminOrBackoffice, dashboardContro
 router.get('/dashboard/nomination-over-time', authenticate, isSuperAdminOrBackoffice, dashboardController.getNominationOverTime);
 
 /**
+ * @route   GET /api/admin/dashboard/job-nomination-by-month
+ * @desc    Số lượng job có / không có đơn tiến cử theo tháng trong năm
+ * @access  Private (Admin)
+ */
+router.get('/dashboard/job-nomination-by-month', authenticate, isSuperAdminOrBackoffice, dashboardController.getJobNominationByMonth);
+
+/**
+ * @route   GET /api/admin/dashboard/registrations-over-time
+ * @desc    Số lượt đăng ký hệ thống theo ngày trong tháng (filter month)
+ * @access  Private (Admin)
+ */
+router.get('/dashboard/registrations-over-time', authenticate, isSuperAdminOrBackoffice, dashboardController.getRegistrationsOverTime);
+
+/**
+ * @route   GET /api/admin/dashboard/approvals-by-day
+ * @desc    Số lượt phê duyệt đăng ký (approved/pending/rejected) theo ngày
+ * @access  Private (Admin)
+ */
+router.get('/dashboard/approvals-by-day', authenticate, isSuperAdminOrBackoffice, dashboardController.getApprovalsByDay);
+
+/**
  * @route   GET /api/admin/dashboard/job-statistics
  * @desc    Thống kê jobs (hot jobs) cho dashboard
  * @access  Private (Admin)

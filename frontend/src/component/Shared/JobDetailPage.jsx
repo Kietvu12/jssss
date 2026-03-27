@@ -32,7 +32,10 @@ import {
   Plus,
   Download,
   Zap,
-  Edit
+  Edit,
+  Sparkles,
+  Loader2,
+  ExternalLink,
 } from 'lucide-react';
 import { useLanguage } from '../../context/LanguageContext';
 import apiService from '../../services/api';
@@ -90,6 +93,7 @@ const LABELS = {
   jdVietnamese: { vi: 'JD tiếng Việt', en: 'JD Vietnamese', ja: 'JDベトナム語' },
   jdEnglish: { vi: 'JD tiếng Anh', en: 'JD English', ja: 'JD英語' },
   jdJapanese: { vi: 'JD tiếng Nhật', en: 'JD Japanese', ja: 'JD日本語' },
+  jdOriginal: { vi: 'JD gốc', en: 'JD original', ja: 'JD原本' },
   h2Rejected: { vi: 'Thông tin tiến cử bị từ chối', en: 'Rejected nominations', ja: '辞退された推薦' },
   h2Success: { vi: 'Thông tin tiến cử thành công', en: 'Successful nominations', ja: '成功した推薦' },
   pRejected: { vi: 'Các đơn tiến cử vào công việc này (theo cá nhân Admin/CTV đăng nhập) có trạng thái từ chối/trượt và lý do.', en: 'Nominations for this job (for the logged-in Admin/CTV) with rejected/failed status and reason.', ja: 'この仕事への推薦（ログイン中のAdmin/CTV）で辞退・不合格の状態と理由。' },
@@ -138,6 +142,17 @@ const LABELS = {
   labelJobCategory: { vi: 'Phân loại công việc:', en: 'Job category:', ja: '求人分類:' },
   labelRecruitingCompanies: { vi: 'Các công ty tuyển dụng:', en: 'Recruiting companies:', ja: '採用企業:' },
   backToJobList: { vi: 'Quay lại danh sách việc làm', en: 'Back to job list', ja: '求人一覧に戻る' },
+  matchingTitle: { vi: 'Ứng viên phù hợp (AI)', en: 'Matching candidates (AI)', ja: 'マッチ候補（AI）' },
+  matchingLoading: { vi: 'Đang tải gợi ý AI...', en: 'Loading AI suggestions...', ja: 'AI提案を読み込み中…' },
+  matchingError: { vi: 'Không tải được gợi ý AI.', en: 'Could not load AI suggestions.', ja: 'AI提案を読み込めませんでした。' },
+  matchingEmpty: { vi: 'Chưa có gợi ý phù hợp.', en: 'No suggestions yet.', ja: '該当する候補がありません。' },
+  matchingScore: { vi: 'Điểm match', en: 'Match score', ja: 'マッチ度' },
+  matchingReason: { vi: 'Lý do', en: 'Reason', ja: '理由' },
+  matchingViewReason: { vi: 'Xem lý do', en: 'View reason', ja: '理由を見る' },
+  matchingHideReason: { vi: 'Ẩn lý do', en: 'Hide reason', ja: '閉じる' },
+  matchingOpenCandidate: { vi: 'Mở hồ sơ', en: 'Open profile', ja: 'プロフィール' },
+  matchingFilteredNote: { vi: 'Chỉ hiển thị hồ sơ trong phạm vi của bạn (CTV).', en: 'Only profiles you can access (CTV).', ja: 'あなたが閲覧できる候補のみ表示（CTV）。' },
+  matchingReasonLoadError: { vi: 'Không lấy được lý do.', en: 'Could not load the reason.', ja: '理由を取得できませんでした。' },
 };
 
 // Helper function to strip HTML tags and format text
@@ -243,9 +258,27 @@ const JobDetailPage = ({ getJobApi, backPath = '/agent/jobs', showEditButton = f
   const [creatingListInSaveModal, setCreatingListInSaveModal] = useState(false);
   const [openDownloadMenu, setOpenDownloadMenu] = useState(false);
 
+  const VIEWPORT_ZOOM_BREAKPOINT = 1300;
+  const ZOOM_SCALE = 0.8;
+  const [zoomOut, setZoomOut] = useState(() => typeof window !== 'undefined' && window.innerWidth < VIEWPORT_ZOOM_BREAKPOINT);
+  useEffect(() => {
+    const check = () => setZoomOut(window.innerWidth < VIEWPORT_ZOOM_BREAKPOINT);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
+
   const [activeTab, setActiveTab] = useState('general'); // 'general' | 'qa' | 'rejected' | 'success'
   const [jobApplications, setJobApplications] = useState([]);
   const [loadingApplications, setLoadingApplications] = useState(false);
+
+  const [aiMatches, setAiMatches] = useState([]);
+  const [aiMatchLoading, setAiMatchLoading] = useState(false);
+  const [aiMatchError, setAiMatchError] = useState(null);
+  const [aiCvNames, setAiCvNames] = useState({});
+  const [expandedAiCvId, setExpandedAiCvId] = useState(null);
+  const [aiReasonByCvId, setAiReasonByCvId] = useState({});
+  const [aiReasonLoadingId, setAiReasonLoadingId] = useState(null);
 
   const useAdminAPI = backPath?.startsWith('/admin');
 
@@ -274,6 +307,118 @@ const JobDetailPage = ({ getJobApi, backPath = '/agent/jobs', showEditButton = f
       .finally(() => { if (!cancelled) setLoadingApplications(false); });
     return () => { cancelled = true; };
   }, [jobId, job, useAdminAPI]);
+
+  useEffect(() => {
+    if (!jobId || !job?.id) return;
+    let cancelled = false;
+    const run = async () => {
+      setAiMatchLoading(true);
+      setAiMatchError(null);
+      setAiMatches([]);
+      setAiCvNames({});
+      setExpandedAiCvId(null);
+      setAiReasonByCvId({});
+      try {
+        let allowedCvIds = null;
+        if (!useAdminAPI) {
+          allowedCvIds = new Set();
+          let page = 1;
+          const limit = 500;
+          for (let guard = 0; guard < 30; guard += 1) {
+            const res = await apiService.getCVStorages({ page, limit });
+            const cvs = res?.data?.cvs || [];
+            cvs.forEach((c) => {
+              if (c?.id != null) allowedCvIds.add(Number(c.id));
+            });
+            const pg = res?.data?.pagination;
+            const totalPages = pg?.totalPages ?? 1;
+            if (page >= totalPages || cvs.length < limit) break;
+            page += 1;
+          }
+        }
+        const raw = await apiService.getAiMatchCvsForJob(job.id);
+        const list = Array.isArray(raw) ? raw : [];
+        let filtered = list;
+        if (allowedCvIds) {
+          filtered = list.filter((row) => allowedCvIds.has(Number(row.id)));
+        }
+        filtered = [...filtered].sort((a, b) => (Number(b.similarity_score) || 0) - (Number(a.similarity_score) || 0));
+        if (!cancelled) setAiMatches(filtered);
+      } catch (e) {
+        console.error('AI match cvs:', e);
+        if (!cancelled) setAiMatchError(e?.message || t('matchingError'));
+      } finally {
+        if (!cancelled) setAiMatchLoading(false);
+      }
+    };
+    run();
+    return () => { cancelled = true; };
+  }, [jobId, job?.id, useAdminAPI]);
+
+  useEffect(() => {
+    if (!aiMatches.length) return;
+    let cancelled = false;
+    const ids = aiMatches.slice(0, 30).map((m) => Number(m.id)).filter((n) => !Number.isNaN(n));
+    const loadNames = async () => {
+      const fn = useAdminAPI ? apiService.getAdminCVById : apiService.getCVStorageById;
+      const entries = await Promise.all(
+        ids.map(async (id) => {
+          try {
+            const r = await fn(id);
+            const cv = r?.data?.cv;
+            const name = cv?.name || cv?.fullName || cv?.code || `#${id}`;
+            return [id, name];
+          } catch {
+            return [id, `#${id}`];
+          }
+        })
+      );
+      if (!cancelled) setAiCvNames(Object.fromEntries(entries));
+    };
+    loadNames();
+    return () => { cancelled = true; };
+  }, [aiMatches, useAdminAPI]);
+
+  const parseAiCoreSkillsRaw = (raw) => {
+    if (raw == null || raw === '') return [];
+    if (Array.isArray(raw)) return raw;
+    if (typeof raw === 'string') {
+      try {
+        const p = JSON.parse(raw);
+        return Array.isArray(p) ? p : [];
+      } catch {
+        return [];
+      }
+    }
+    return [];
+  };
+
+  const toggleAiCvReason = async (cvIdNum) => {
+    const key = String(cvIdNum);
+    if (expandedAiCvId === key) {
+      setExpandedAiCvId(null);
+      return;
+    }
+    setExpandedAiCvId(key);
+    if (aiReasonByCvId[key]) return;
+    setAiReasonLoadingId(key);
+    try {
+      const res = await apiService.getAiMatchingReasons({
+        jd_id: Number(job.id),
+        candidate_id: cvIdNum,
+      });
+      const reason =
+        res?.matching_reasons?.reason ??
+        res?.data?.matching_reasons?.reason ??
+        '';
+      const text = reason != null && String(reason).trim() ? String(reason).trim() : '';
+      setAiReasonByCvId((prev) => ({ ...prev, [key]: text || t('matchingReasonLoadError') }));
+    } catch (e) {
+      setAiReasonByCvId((prev) => ({ ...prev, [key]: e?.message || t('matchingReasonLoadError') }));
+    } finally {
+      setAiReasonLoadingId(null);
+    }
+  };
 
   useEffect(() => {
     if (!showSaveToListModal) return;
@@ -828,6 +973,8 @@ const JobDetailPage = ({ getJobApi, backPath = '/agent/jobs', showEditButton = f
   const displayInstruction = stripHtml(pick(job.instruction, job.instructionEn || job.instruction_en, job.instructionJp || job.instruction_jp) || '');
   const displayJobTags = jobTags;
 
+  const zoomStyle = zoomOut ? { width: `${100 / ZOOM_SCALE}%`, height: `${100 / ZOOM_SCALE}%`, transform: `scale(${ZOOM_SCALE})`, transformOrigin: 'top left' } : undefined;
+
   return (
     <>
       <style>{`
@@ -846,6 +993,8 @@ const JobDetailPage = ({ getJobApi, backPath = '/agent/jobs', showEditButton = f
           background: #a0aec0;
         }
       `}</style>
+      <div className="w-full h-full overflow-hidden">
+        <div style={zoomStyle} className="h-full w-full origin-top-left">
       <div className="flex flex-col lg:flex-row gap-4 lg:gap-6 h-full overflow-hidden p-4 sm:p-5 lg:p-6" style={{ backgroundColor: '#f9fafb' }}>
       {/* Main Content - Left Column */}
       <div className="flex-1 overflow-y-auto min-w-0 custom-scrollbar">
@@ -1097,6 +1246,87 @@ const JobDetailPage = ({ getJobApi, backPath = '/agent/jobs', showEditButton = f
 
           {activeTab === 'general' && (
           <>
+          <div className="border rounded-lg p-4 sm:p-5 mb-5" style={{ backgroundColor: 'white', borderColor: '#e5e7eb', boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)' }}>
+            <h2 className="text-sm sm:text-base font-bold mb-3 flex items-center gap-2" style={{ color: '#111827' }}>
+              <Sparkles className="w-4 h-4 shrink-0" style={{ color: '#2563eb' }} />
+              {t('matchingTitle')}
+            </h2>
+            {!useAdminAPI && (
+              <p className="text-xs mb-3" style={{ color: '#6b7280' }}>{t('matchingFilteredNote')}</p>
+            )}
+            {aiMatchLoading && (
+              <div className="flex items-center gap-2 text-sm" style={{ color: '#6b7280' }}>
+                <Loader2 className="w-4 h-4 animate-spin shrink-0" />
+                {t('matchingLoading')}
+              </div>
+            )}
+            {aiMatchError && !aiMatchLoading && (
+              <p className="text-sm" style={{ color: '#dc2626' }}>{aiMatchError}</p>
+            )}
+            {!aiMatchLoading && !aiMatchError && aiMatches.length === 0 && (
+              <p className="text-sm" style={{ color: '#6b7280' }}>{t('matchingEmpty')}</p>
+            )}
+            {!aiMatchLoading && !aiMatchError && aiMatches.length > 0 && (
+              <div className="space-y-3 max-h-[420px] overflow-y-auto pr-1">
+                {aiMatches.map((row) => {
+                  const cvId = Number(row.id);
+                  const key = String(cvId);
+                  const meta = row.metadata || {};
+                  const skills = parseAiCoreSkillsRaw(meta.core_skills_raw);
+                  const name = aiCvNames[cvId] || `#${cvId}`;
+                  const expanded = expandedAiCvId === key;
+                  const candPath = useAdminAPI ? `/admin/candidates/${cvId}` : `/agent/candidates/${cvId}`;
+                  return (
+                    <div key={key} className="rounded-lg border p-3 text-sm" style={{ borderColor: '#e5e7eb', backgroundColor: '#fafafa' }}>
+                      <div className="flex flex-wrap items-start justify-between gap-2">
+                        <div className="min-w-0 flex-1">
+                          <div className="font-semibold truncate" style={{ color: '#111827' }}>{name}</div>
+                          <div className="text-xs mt-0.5" style={{ color: '#6b7280' }}>
+                            ID: {cvId} · {t('matchingScore')}: {Number(row.similarity_score ?? 0).toFixed(2)}
+                          </div>
+                          {meta.desired_position && (
+                            <div className="text-xs mt-1" style={{ color: '#4b5563' }}>{meta.desired_position}</div>
+                          )}
+                          {skills.length > 0 && (
+                            <div className="text-xs mt-1 line-clamp-2" style={{ color: '#6b7280' }}>{skills.join(', ')}</div>
+                          )}
+                        </div>
+                        <div className="flex flex-col gap-1 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => navigate(candPath)}
+                            className="inline-flex items-center justify-center gap-1 px-2 py-1 rounded text-xs font-semibold border"
+                            style={{ borderColor: '#2563eb', color: '#2563eb' }}
+                          >
+                            <ExternalLink className="w-3 h-3" />
+                            {t('matchingOpenCandidate')}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => toggleAiCvReason(cvId)}
+                            className="inline-flex items-center justify-center gap-1 px-2 py-1 rounded text-xs font-semibold"
+                            style={{ backgroundColor: '#eff6ff', color: '#1d4ed8' }}
+                          >
+                            {expanded ? t('matchingHideReason') : t('matchingViewReason')}
+                          </button>
+                        </div>
+                      </div>
+                      {expanded && (
+                        <div className="mt-3 pt-3 border-t text-xs whitespace-pre-wrap" style={{ borderColor: '#e5e7eb', color: '#374151' }}>
+                          <span className="font-semibold">{t('matchingReason')}: </span>
+                          {aiReasonLoadingId === key && !aiReasonByCvId[key] ? (
+                            <span className="inline-flex items-center gap-1"><Loader2 className="w-3 h-3 animate-spin" /> …</span>
+                          ) : (
+                            aiReasonByCvId[key] || '—'
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
           <CollapsibleCard
             title={t('sectionMain')}
             icon={FileText}
@@ -1613,24 +1843,41 @@ const JobDetailPage = ({ getJobApi, backPath = '/agent/jobs', showEditButton = f
                   style={{ borderColor: '#e5e7eb' }}
                   onMouseLeave={() => setOpenDownloadMenu(false)}
                 >
-                  <button
-                    className="w-full text-left px-3 py-1.5 hover:bg-gray-50 transition-colors"
-                    onClick={() => { handleDownloadJD('jdFile'); setOpenDownloadMenu(false); }}
-                  >
-                    {t('jdVietnamese')}
-                  </button>
-                  <button
-                    className="w-full text-left px-3 py-1.5 hover:bg-gray-50"
-                    onClick={() => { handleDownloadJD('jdFile'); setOpenDownloadMenu(false); }}
-                  >
-                    {t('jdEnglish')}
-                  </button>
-                  <button
-                    className="w-full text-left px-3 py-1.5 hover:bg-gray-50"
-                    onClick={() => { handleDownloadJD('jdFile'); setOpenDownloadMenu(false); }}
-                  >
-                    {t('jdJapanese')}
-                  </button>
+                  {job?.jdFile && (
+                    <button
+                      className="w-full text-left px-3 py-1.5 hover:bg-gray-50 transition-colors"
+                      onClick={() => { handleDownloadJD('jdFile'); setOpenDownloadMenu(false); }}
+                    >
+                      {t('jdVietnamese')}
+                    </button>
+                  )}
+                  {job?.jdFileEn && (
+                    <button
+                      className="w-full text-left px-3 py-1.5 hover:bg-gray-50"
+                      onClick={() => { handleDownloadJD('jdFileEn'); setOpenDownloadMenu(false); }}
+                    >
+                      {t('jdEnglish')}
+                    </button>
+                  )}
+                  {job?.jdFileJp && (
+                    <button
+                      className="w-full text-left px-3 py-1.5 hover:bg-gray-50"
+                      onClick={() => { handleDownloadJD('jdFileJp'); setOpenDownloadMenu(false); }}
+                    >
+                      {t('jdJapanese')}
+                    </button>
+                  )}
+                  {job?.jdOriginalFile && (
+                    <button
+                      className="w-full text-left px-3 py-1.5 hover:bg-gray-50"
+                      onClick={() => { handleDownloadJD('jdOriginalFile'); setOpenDownloadMenu(false); }}
+                    >
+                      {t('jdOriginal')}
+                    </button>
+                  )}
+                  {!job?.jdFile && !job?.jdFileEn && !job?.jdFileJp && !job?.jdOriginalFile && (
+                    <div className="px-3 py-1.5 text-gray-500">{language === 'vi' ? 'Chưa có file JD' : 'No JD file'}</div>
+                  )}
                 </div>
               )}
             </div>
@@ -1748,6 +1995,8 @@ const JobDetailPage = ({ getJobApi, backPath = '/agent/jobs', showEditButton = f
         </div>
       </div>
     )}
+        </div>
+      </div>
     </>
   );
 };

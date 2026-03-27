@@ -4,7 +4,9 @@ import {
   JobCategory,
   Company,
   JobRecruitingCompany,
-  CVStorage
+  CVStorage,
+  Message,
+  Collaborator
 } from '../../models/index.js';
 import { Op } from 'sequelize';
 import {
@@ -14,6 +16,8 @@ import {
   STATUSES_ENDED
 } from '../../constants/jobApplicationStatus.js';
 import { canCVBeNominated } from '../../constants/cvStatus.js';
+import { collaboratorNotificationService } from '../../services/collaboratorNotificationService.js';
+import { nominationEmailService } from '../../services/nominationEmailService.js';
 
 // Helper function to map model field names to database column names
 const mapOrderField = (fieldName) => {
@@ -295,18 +299,31 @@ export const jobApplicationController = {
           });
         }
 
+        const normalizePath = (value) => String(value || '').replace(/\\/g, '/').trim().replace(/\/+$/, '');
         const normalizedBodyPath = bodyCvPath && typeof bodyCvPath === 'string'
-          ? String(bodyCvPath).replace(/\\/g, '/').trim()
+          ? normalizePath(bodyCvPath)
           : '';
-        const cvIdStr = String(cv.id);
         if (normalizedBodyPath.length > 0) {
-          if (!normalizedBodyPath.includes(cvIdStr) || (!normalizedBodyPath.includes('CV_original') && !normalizedBodyPath.includes('CV_Template'))) {
+          const originalBasePath = normalizePath(cv.cvOriginalPath);
+          const templateBasePath = normalizePath(cv.curriculumVitae);
+          const allowedTemplateBasePaths = ['Common', 'IT', 'Technical']
+            .map((tpl) => `${templateBasePath}/${tpl}`)
+            .filter(Boolean);
+          const isOriginalPath = !!originalBasePath && (
+            normalizedBodyPath === originalBasePath || normalizedBodyPath.startsWith(`${originalBasePath}/`)
+          );
+          const isTemplatePath = !!templateBasePath && (
+            normalizedBodyPath === templateBasePath ||
+            normalizedBodyPath.startsWith(`${templateBasePath}/`) ||
+            allowedTemplateBasePaths.some((p) => normalizedBodyPath === p || normalizedBodyPath.startsWith(`${p}/`))
+          );
+          if (!isOriginalPath && !isTemplatePath) {
             return res.status(400).json({
               success: false,
               message: 'Đường dẫn CV không hợp lệ hoặc không thuộc hồ sơ này'
             });
           }
-          selectedCvPath = normalizedBodyPath.replace(/\/+$/, '');
+          selectedCvPath = normalizedBodyPath;
         } else {
           const source = (cvSource ? String(cvSource) : 'original').toLowerCase();
           if (source === 'template') {
@@ -403,6 +420,55 @@ export const jobApplicationController = {
           }
         ]
       });
+
+      // Tạo tin nhắn hệ thống mặc định sau khi tạo đơn tiến cử
+      try {
+        const candidateName = String(jobApplication.cv?.name || 'ứng viên').trim();
+        const jobTitleText = String(jobApplication.job?.title || job.title || '').trim();
+        const introMessage = `Cảm ơn bạn đã tiến cử ${candidateName} tới job: ${jobTitleText}`;
+        await Message.create({
+          jobApplicationId: jobApplication.id,
+          collaboratorId: req.collaborator.id,
+          senderType: 3, // System
+          content: introMessage,
+          isReadByAdmin: true,
+          isReadByCollaborator: true
+        });
+      } catch (messageError) {
+        console.error('[CTV createJobApplication] Error creating intro message:', messageError);
+      }
+
+      try {
+        await collaboratorNotificationService.notifyNominationCreated({
+          collaboratorId: req.collaborator.id,
+          candidateName: jobApplication.cv?.name || null,
+          jobCode: jobApplication.job?.jobCode || job.jobCode || String(jobApplication.id),
+          jobId: jobApplication.jobId || null,
+          jobApplicationId: jobApplication.id,
+          createdByAdmin: false
+        });
+      } catch (notificationError) {
+        console.error('[CTV createJobApplication] Error creating notification:', notificationError);
+      }
+
+      try {
+        let recipientEmail = req.collaborator?.email || null;
+        if (!recipientEmail) {
+          const collaborator = await Collaborator.findByPk(req.collaborator.id, { attributes: ['email'] });
+          recipientEmail = collaborator?.email || null;
+        }
+        await nominationEmailService.sendNominationSubmittedEmail({
+          to: recipientEmail,
+          jobApplicationId: jobApplication.id,
+          jobCode: jobApplication.job?.jobCode || job.jobCode || String(jobApplication.id),
+          candidateName: jobApplication.cv?.name || null,
+          jobTitleVi: jobApplication.job?.title || job.title || null,
+          jobTitleEn: jobApplication.job?.titleEn || jobApplication.job?.title_en || null,
+          jobTitleJp: jobApplication.job?.titleJp || jobApplication.job?.title_jp || null
+        });
+      } catch (emailError) {
+        console.error('[CTV createJobApplication] Error sending nomination email:', emailError);
+      }
 
       res.status(201).json({
         success: true,

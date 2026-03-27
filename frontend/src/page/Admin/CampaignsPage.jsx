@@ -15,6 +15,7 @@ import {
   ChevronRight,
   ChevronsLeft,
   ChevronsRight,
+  ChevronDown,
   Calendar,
   Target,
   DollarSign,
@@ -38,7 +39,6 @@ const CampaignsPage = () => {
   const { language } = useLanguage();
   const t = translations[language] || translations.vi;
   const dateLocale = language === 'en' ? 'en-US' : language === 'ja' ? 'ja-JP' : 'vi-VN';
-  const [searchMode, setSearchMode] = useState('OR');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('');
   const [dateFrom, setDateFrom] = useState('');
@@ -56,9 +56,6 @@ const CampaignsPage = () => {
   });
   
   // Hover states
-  const [hoveredSearchModeOR, setHoveredSearchModeOR] = useState(false);
-  const [hoveredSearchModeAND, setHoveredSearchModeAND] = useState(false);
-  const [hoveredSearchButton, setHoveredSearchButton] = useState(false);
   const [hoveredResetButton, setHoveredResetButton] = useState(false);
   const [hoveredInfoButton, setHoveredInfoButton] = useState(false);
   const [hoveredAddCampaignButton, setHoveredAddCampaignButton] = useState(false);
@@ -72,10 +69,29 @@ const CampaignsPage = () => {
   const [hoveredViewButtonIndex, setHoveredViewButtonIndex] = useState(null);
   const [hoveredEditButtonIndex, setHoveredEditButtonIndex] = useState(null);
   const [hoveredDeleteButtonIndex, setHoveredDeleteButtonIndex] = useState(null);
+  const [isStatusFilterOpen, setIsStatusFilterOpen] = useState(false);
+  const [isDateFilterOpen, setIsDateFilterOpen] = useState(false);
+  const [expandedCampaignIds, setExpandedCampaignIds] = useState(new Set());
 
   useEffect(() => {
     loadCampaigns();
-  }, [currentPage, itemsPerPage, selectedStatus, dateFrom, dateTo]);
+  }, [currentPage, itemsPerPage, selectedStatus, dateFrom, dateTo, searchQuery]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery]);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      const inFilters = event.target.closest('.campaigns-filters-container');
+      if (!inFilters) {
+        setIsStatusFilterOpen(false);
+        setIsDateFilterOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const loadCampaigns = async () => {
     try {
@@ -290,12 +306,6 @@ const CampaignsPage = () => {
     setSelectedStatus('');
     setDateFrom('');
     setDateTo('');
-    setSearchMode('OR');
-    setCurrentPage(1);
-    loadCampaigns();
-  };
-
-  const handleSearch = () => {
     setCurrentPage(1);
     loadCampaigns();
   };
@@ -363,201 +373,169 @@ const CampaignsPage = () => {
 
   return (
     <div className="h-full flex flex-col overflow-hidden">
-      {/* Filter Section */}
-      <div className="rounded-lg p-3 border mb-3 flex-shrink-0" style={{ backgroundColor: 'white', borderColor: '#e5e7eb' }}>
-        {/* Search Bar */}
-        <div className="flex items-center gap-2 flex-wrap mb-3">
-          <div className="flex gap-1">
+      <div className="flex-1 overflow-y-auto min-h-0 px-2 sm:px-3 py-1.5 space-y-3">
+        {/* Filter bar */}
+        <div className="campaigns-filters-container flex items-center gap-2.5 flex-wrap justify-between flex-shrink-0">
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <div className="flex items-center px-3 py-1.5 rounded-full bg-white text-[12px] sm:text-[13px] min-w-[220px] flex-1">
+              <Search className="w-3.5 h-3.5 mr-2" style={{ color: '#9ca3af' }} />
+              <input
+                type="text"
+                placeholder={t.campaignsSearchPlaceholder || 'ID, tên chiến dịch, mô tả'}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full bg-transparent outline-none text-[12px] sm:text-[13px]"
+                style={{ border: 'none' }}
+              />
+            </div>
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsStatusFilterOpen(!isStatusFilterOpen);
+                  setIsDateFilterOpen(false);
+                }}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white text-[11px] sm:text-xs font-semibold"
+                style={{ color: '#374151' }}
+              >
+                {t.statusFilterLabel || 'Trạng thái'}
+                <ChevronDown className="w-3 h-3" />
+              </button>
+              {isStatusFilterOpen && (
+                <div className="absolute right-0 mt-2 w-52 rounded-xl border bg-white p-3 z-20 text-[11px] sm:text-xs" style={{ borderColor: '#e5e7eb' }}>
+                  <div className="flex flex-col gap-1.5">
+                    {[
+                      { value: '', label: t.allStatus || 'Tất cả' },
+                      { value: 'active', label: t.campaignStatusLabelActive || 'Đang hoạt động' },
+                      { value: 'upcoming', label: t.campaignStatusLabelUpcoming || 'Sắp diễn ra' },
+                      { value: 'ended', label: t.campaignStatusLabelEnded || 'Đã kết thúc' },
+                      { value: 'inactive', label: t.campaignStatusLabelInactive || 'Ngừng hoạt động' },
+                    ].map((opt) => (
+                      <label key={opt.value || 'all'} className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="statusFilter"
+                          checked={selectedStatus === opt.value}
+                          onChange={() => setSelectedStatus(opt.value)}
+                          className="w-3.5 h-3.5"
+                          style={{ accentColor: '#2563eb' }}
+                        />
+                        <span>{opt.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsDateFilterOpen(!isDateFilterOpen);
+                  setIsStatusFilterOpen(false);
+                }}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white text-[11px] sm:text-xs font-semibold"
+                style={{ color: '#374151' }}
+              >
+                {t.dateRangeFilterLabel || 'Khoảng ngày'}
+                <ChevronDown className="w-3 h-3" />
+              </button>
+              {isDateFilterOpen && (
+                <div className="absolute right-0 mt-2 w-64 rounded-xl border bg-white p-3 z-20 text-[11px] sm:text-xs" style={{ borderColor: '#e5e7eb' }}>
+                  <div className="flex flex-col gap-2">
+                    <label className="flex flex-col gap-1">
+                      <span className="font-semibold" style={{ color: '#374151' }}>{t.dateFromShort || 'Từ ngày'}</span>
+                      <input
+                        type="date"
+                        value={dateFrom}
+                        onChange={(e) => setDateFrom(e.target.value)}
+                        className="px-2 py-1 border rounded"
+                        style={{ borderColor: '#d1d5db', outline: 'none' }}
+                      />
+                    </label>
+                    <label className="flex flex-col gap-1">
+                      <span className="font-semibold" style={{ color: '#374151' }}>{t.dateToShort || 'Đến ngày'}</span>
+                      <input
+                        type="date"
+                        value={dateTo}
+                        onChange={(e) => setDateTo(e.target.value)}
+                        className="px-2 py-1 border rounded"
+                        style={{ borderColor: '#d1d5db', outline: 'none' }}
+                      />
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => { setDateFrom(''); setDateTo(''); }}
+                      className="self-end mt-1 text-[10px] font-semibold px-2 py-0.5 rounded-full"
+                      style={{ backgroundColor: '#f3f4f6', color: '#4b5563' }}
+                    >
+                      {t.clearFilter || 'Xóa lọc'}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+          <div className="flex items-center gap-2.5 flex-wrap">
             <button
-              onClick={() => setSearchMode('OR')}
-              onMouseEnter={() => searchMode !== 'OR' && setHoveredSearchModeOR(true)}
-              onMouseLeave={() => setHoveredSearchModeOR(false)}
-              className="px-3 py-1.5 rounded text-xs font-semibold transition-colors"
+              onClick={handleReset}
+              onMouseEnter={() => setHoveredResetButton(true)}
+              onMouseLeave={() => setHoveredResetButton(false)}
+              className="px-3 py-1.5 rounded-full text-[11px] sm:text-xs font-semibold transition-colors"
               style={{
-                backgroundColor: searchMode === 'OR' ? '#2563eb' : (hoveredSearchModeOR ? '#e5e7eb' : '#f3f4f6'),
-                color: searchMode === 'OR' ? 'white' : '#374151'
+                backgroundColor: hoveredResetButton ? '#e5e7eb' : '#f3f4f6',
+                color: '#374151'
               }}
             >
-              OR
+              {t.resetButton || 'Reset'}
             </button>
             <button
-              onClick={() => setSearchMode('AND')}
-              onMouseEnter={() => searchMode !== 'AND' && setHoveredSearchModeAND(true)}
-              onMouseLeave={() => setHoveredSearchModeAND(false)}
-              className="px-3 py-1.5 rounded text-xs font-semibold transition-colors"
+              onMouseEnter={() => setHoveredInfoButton(true)}
+              onMouseLeave={() => setHoveredInfoButton(false)}
+              className="p-1.5"
               style={{
-                backgroundColor: searchMode === 'AND' ? '#2563eb' : (hoveredSearchModeAND ? '#e5e7eb' : '#f3f4f6'),
-                color: searchMode === 'AND' ? 'white' : '#374151'
+                color: hoveredInfoButton ? '#1f2937' : '#4b5563'
               }}
             >
-              AND
+              <Info className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => navigate('/admin/campaigns/create')}
+              onMouseEnter={() => setHoveredAddCampaignButton(true)}
+              onMouseLeave={() => setHoveredAddCampaignButton(false)}
+              className="px-3 py-1.5 rounded-full text-[11px] sm:text-xs font-semibold transition-colors flex items-center gap-1.5"
+              style={{
+                backgroundColor: hoveredAddCampaignButton ? '#b91c1c' : '#dc2626',
+                color: 'white'
+              }}
+            >
+              <Plus className="w-3.5 h-3.5" />
+              {t.addCampaignButton || '+ Thêm chiến dịch'}
+            </button>
+            <button
+              onMouseEnter={() => setHoveredSettingsButton(true)}
+              onMouseLeave={() => setHoveredSettingsButton(false)}
+              className="px-3 py-1.5 rounded-full text-[11px] sm:text-xs font-semibold transition-colors flex items-center gap-1.5"
+              style={{
+                backgroundColor: hoveredSettingsButton ? '#111827' : '#1f2937',
+                color: 'white'
+              }}
+            >
+              <Settings className="w-3.5 h-3.5" />
+              {t.settingsButton || 'Cài đặt'}
             </button>
           </div>
-          <div className="flex-1 min-w-[250px]">
-            <input
-              type="text"
-              placeholder={t.campaignsSearchPlaceholder || 'ID, tên chiến dịch, mô tả'}
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full px-3 py-1.5 border rounded text-xs"
-              style={{
-                borderColor: '#d1d5db',
-                outline: 'none'
-              }}
-              onFocus={(e) => {
-                e.target.style.borderColor = '#2563eb';
-                e.target.style.boxShadow = '0 0 0 2px rgba(37, 99, 235, 0.5)';
-              }}
-              onBlur={(e) => {
-                e.target.style.borderColor = '#d1d5db';
-                e.target.style.boxShadow = 'none';
-              }}
-            />
-          </div>
-          <button
-            onClick={handleSearch}
-            onMouseEnter={() => setHoveredSearchButton(true)}
-            onMouseLeave={() => setHoveredSearchButton(false)}
-            className="px-4 py-1.5 rounded text-xs font-semibold transition-colors flex items-center gap-1.5"
-            style={{
-              backgroundColor: hoveredSearchButton ? '#1d4ed8' : '#2563eb',
-              color: 'white'
-            }}
-          >
-            <Search className="w-3.5 h-3.5" />
-            {t.searchButton || 'Tìm kiếm'}
-          </button>
-          <button
-            onClick={handleReset}
-            onMouseEnter={() => setHoveredResetButton(true)}
-            onMouseLeave={() => setHoveredResetButton(false)}
-            className="px-3 py-1.5 rounded text-xs font-semibold transition-colors"
-            style={{
-              backgroundColor: hoveredResetButton ? '#e5e7eb' : '#f3f4f6',
-              color: '#374151'
-            }}
-          >
-            {t.resetButton || 'Reset'}
-          </button>
-          <button
-            onMouseEnter={() => setHoveredInfoButton(true)}
-            onMouseLeave={() => setHoveredInfoButton(false)}
-            className="p-1.5"
-            style={{
-              color: hoveredInfoButton ? '#1f2937' : '#4b5563'
-            }}
-          >
-            <Info className="w-4 h-4" />
-          </button>
-          <button
-            onClick={() => navigate('/admin/campaigns/create')}
-            onMouseEnter={() => setHoveredAddCampaignButton(true)}
-            onMouseLeave={() => setHoveredAddCampaignButton(false)}
-            className="px-3 py-1.5 rounded text-xs font-semibold transition-colors flex items-center gap-1.5"
-            style={{
-              backgroundColor: hoveredAddCampaignButton ? '#eab308' : '#facc15',
-              color: '#111827'
-            }}
-          >
-            <Plus className="w-3.5 h-3.5" />
-            {t.addCampaignButton || '+ Thêm chiến dịch'}
-          </button>
-          <button
-            onMouseEnter={() => setHoveredSettingsButton(true)}
-            onMouseLeave={() => setHoveredSettingsButton(false)}
-            className="px-3 py-1.5 rounded text-xs font-semibold transition-colors flex items-center gap-1.5"
-            style={{
-              backgroundColor: hoveredSettingsButton ? '#111827' : '#1f2937',
-              color: 'white'
-            }}
-          >
-            <Settings className="w-3.5 h-3.5" />
-            {t.settingsButton || 'Cài đặt'}
-          </button>
         </div>
 
-        {/* Additional Filters */}
-        <div className="flex items-center gap-3 flex-wrap">
-          <div className="flex items-center gap-1.5">
-            <label className="text-xs font-semibold" style={{ color: '#111827' }}>{t.statusFilterLabel || 'Trạng thái:'}</label>
-            <select
-              value={selectedStatus}
-              onChange={(e) => setSelectedStatus(e.target.value)}
-              className="px-2 py-1 border rounded text-xs"
-              style={{
-                borderColor: '#d1d5db',
-                outline: 'none'
-              }}
-              onFocus={(e) => {
-                e.target.style.borderColor = '#2563eb';
-                e.target.style.boxShadow = '0 0 0 2px rgba(37, 99, 235, 0.5)';
-              }}
-              onBlur={(e) => {
-                e.target.style.borderColor = '#d1d5db';
-                e.target.style.boxShadow = 'none';
-              }}
-            >
-              <option value="">{t.allStatus || 'Tất cả'}</option>
-              <option value="active">{t.campaignStatusLabelActive || 'Đang hoạt động'}</option>
-              <option value="upcoming">{t.campaignStatusLabelUpcoming || 'Sắp diễn ra'}</option>
-              <option value="ended">{t.campaignStatusLabelEnded || 'Đã kết thúc'}</option>
-              <option value="inactive">{t.campaignStatusLabelInactive || 'Ngừng hoạt động'}</option>
-            </select>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <label className="text-xs font-semibold" style={{ color: '#111827' }}>{t.dateFromShort || 'Từ ngày:'}</label>
-            <input
-              type="date"
-              value={dateFrom}
-              onChange={(e) => setDateFrom(e.target.value)}
-              className="px-2 py-1 border rounded text-xs"
-              style={{
-                borderColor: '#d1d5db',
-                outline: 'none'
-              }}
-              onFocus={(e) => {
-                e.target.style.borderColor = '#2563eb';
-                e.target.style.boxShadow = '0 0 0 2px rgba(37, 99, 235, 0.5)';
-              }}
-              onBlur={(e) => {
-                e.target.style.borderColor = '#d1d5db';
-                e.target.style.boxShadow = 'none';
-              }}
-            />
-          </div>
-          <div className="flex items-center gap-1.5">
-            <label className="text-xs font-semibold" style={{ color: '#111827' }}>{t.dateToShort || 'Đến ngày:'}</label>
-            <input
-              type="date"
-              value={dateTo}
-              onChange={(e) => setDateTo(e.target.value)}
-              className="px-2 py-1 border rounded text-xs"
-              style={{
-                borderColor: '#d1d5db',
-                outline: 'none'
-              }}
-              onFocus={(e) => {
-                e.target.style.borderColor = '#2563eb';
-                e.target.style.boxShadow = '0 0 0 2px rgba(37, 99, 235, 0.5)';
-              }}
-              onBlur={(e) => {
-                e.target.style.borderColor = '#d1d5db';
-                e.target.style.boxShadow = 'none';
-              }}
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Pagination Controls */}
-      <div className="flex items-center justify-between mb-3 flex-shrink-0">
+        {/* Pagination Controls */}
+        <div className="flex items-center justify-between flex-shrink-0">
         <div className="flex items-center gap-1.5">
           <button
             onClick={() => setCurrentPage(1)}
             disabled={currentPage === 1}
             onMouseEnter={() => currentPage !== 1 && setHoveredPaginationNavButton('first')}
             onMouseLeave={() => setHoveredPaginationNavButton(null)}
-            className="px-1.5 py-1 border rounded text-xs font-semibold transition-colors"
+            className="w-7 h-7 rounded-full border text-[10px] font-semibold transition-colors flex items-center justify-center"
             style={{
               backgroundColor: hoveredPaginationNavButton === 'first' ? '#f9fafb' : 'white',
               borderColor: '#d1d5db',
@@ -573,7 +551,7 @@ const CampaignsPage = () => {
             disabled={currentPage === 1}
             onMouseEnter={() => currentPage !== 1 && setHoveredPaginationNavButton('prev')}
             onMouseLeave={() => setHoveredPaginationNavButton(null)}
-            className="px-1.5 py-1 border rounded text-xs font-semibold transition-colors"
+            className="w-7 h-7 rounded-full border text-[10px] font-semibold transition-colors flex items-center justify-center"
             style={{
               backgroundColor: hoveredPaginationNavButton === 'prev' ? '#f9fafb' : 'white',
               borderColor: '#d1d5db',
@@ -592,12 +570,12 @@ const CampaignsPage = () => {
                 onClick={() => setCurrentPage(pageNum)}
                 onMouseEnter={() => currentPage !== pageNum && setHoveredPaginationButtonIndex(pageNum)}
                 onMouseLeave={() => setHoveredPaginationButtonIndex(null)}
-                className="px-2.5 py-1 rounded text-xs font-semibold transition-colors"
+                className="w-7 h-7 rounded-full border text-[10px] font-semibold transition-colors flex items-center justify-center"
                 style={{
                   backgroundColor: currentPage === pageNum
                     ? '#2563eb'
                     : (hoveredPaginationButtonIndex === pageNum ? '#f9fafb' : 'white'),
-                  border: currentPage === pageNum ? 'none' : '1px solid #d1d5db',
+                  borderColor: '#d1d5db',
                   color: currentPage === pageNum ? 'white' : '#374151'
                 }}
               >
@@ -610,7 +588,7 @@ const CampaignsPage = () => {
             disabled={currentPage === totalPages}
             onMouseEnter={() => currentPage !== totalPages && setHoveredPaginationNavButton('next')}
             onMouseLeave={() => setHoveredPaginationNavButton(null)}
-            className="px-1.5 py-1 border rounded text-xs font-semibold transition-colors"
+            className="w-7 h-7 rounded-full border text-[10px] font-semibold transition-colors flex items-center justify-center"
             style={{
               backgroundColor: hoveredPaginationNavButton === 'next' ? '#f9fafb' : 'white',
               borderColor: '#d1d5db',
@@ -626,7 +604,7 @@ const CampaignsPage = () => {
             disabled={currentPage === totalPages}
             onMouseEnter={() => currentPage !== totalPages && setHoveredPaginationNavButton('last')}
             onMouseLeave={() => setHoveredPaginationNavButton(null)}
-            className="px-1.5 py-1 border rounded text-xs font-semibold transition-colors"
+            className="w-7 h-7 rounded-full border text-[10px] font-semibold transition-colors flex items-center justify-center"
             style={{
               backgroundColor: hoveredPaginationNavButton === 'last' ? '#f9fafb' : 'white',
               borderColor: '#d1d5db',
@@ -645,7 +623,7 @@ const CampaignsPage = () => {
               setItemsPerPage(Number(e.target.value));
               setCurrentPage(1);
             }}
-            className="px-2.5 py-1 border rounded text-xs font-semibold"
+            className="px-2.5 py-1 border rounded text-[10px] font-semibold"
             style={{
               borderColor: '#d1d5db',
               color: '#374151',
@@ -664,223 +642,189 @@ const CampaignsPage = () => {
             <option value="50">50</option>
             <option value="100">100</option>
           </select>
-          <span className="text-xs font-semibold" style={{ color: '#374151' }}>{totalItems} {t.itemsCount != null ? t.itemsCount : 'items'}</span>
+          <span className="text-[10px] font-semibold" style={{ color: '#374151' }}>{totalItems} {t.itemsCount != null ? t.itemsCount : 'items'}</span>
         </div>
       </div>
 
-      {/* Table */}
-      <div className="flex-1 overflow-y-auto rounded-lg border min-h-0 relative" style={{ backgroundColor: 'white', borderColor: '#e5e7eb' }}>
-        <div className="overflow-x-auto h-full">
-          <table className="w-full">
-            <thead className="sticky top-0 z-10" style={{ backgroundColor: '#f9fafb' }}>
-              <tr>
-                <th className="px-3 py-2 text-center text-xs font-semibold border-b w-10" style={{ color: '#111827', borderColor: '#e5e7eb' }}>
-                  <input
-                    type="checkbox"
-                    checked={selectedRows.size === campaigns.length && campaigns.length > 0}
-                    onChange={handleSelectAll}
-                    className="w-3.5 h-3.5 rounded"
-                    style={{
-                      accentColor: '#2563eb',
-                      borderColor: '#d1d5db'
-                    }}
-                  />
-                </th>
-                <th className="px-3 py-2 text-left text-xs font-semibold border-b w-[110px]" style={{ color: '#111827', borderColor: '#e5e7eb' }}>
-                  {t.colId || 'ID'}
-                </th>
-                <th className="px-3 py-2 text-left text-xs font-semibold border-b w-[220px]" style={{ color: '#111827', borderColor: '#e5e7eb' }}>
-                  {t.campaignColName || 'Tên chiến dịch'}
-                </th>
-                <th className="px-3 py-2 text-left text-xs font-semibold border-b w-[260px]" style={{ color: '#111827', borderColor: '#e5e7eb' }}>
-                  {t.campaignColDescription || 'Mô tả'}
-                </th>
-                <th className="px-3 py-2 text-center text-xs font-semibold border-b w-[150px]" style={{ color: '#111827', borderColor: '#e5e7eb' }}>
-                  {t.campaignColTime || 'Thời gian'}
-                </th>
-                <th className="px-3 py-2 text-right text-xs font-semibold border-b w-[140px]" style={{ color: '#111827', borderColor: '#e5e7eb' }}>
-                  {t.campaignColBudget || 'Ngân sách'}
-                </th>
-                <th className="px-3 py-2 text-center text-xs font-semibold border-b w-[90px]" style={{ color: '#111827', borderColor: '#e5e7eb' }}>
-                  {t.campaignColJobCount || 'Số job'}
-                </th>
-                <th className="px-3 py-2 text-center text-xs font-semibold border-b w-[90px]" style={{ color: '#111827', borderColor: '#e5e7eb' }}>
-                  {t.campaignColViews || 'Lượt xem'}
-                </th>
-                <th className="px-3 py-2 text-center text-xs font-semibold border-b w-[90px]" style={{ color: '#111827', borderColor: '#e5e7eb' }}>
-                  {t.campaignColApplications || 'Ứng tuyển'}
-                </th>
-                <th className="px-3 py-2 text-center text-xs font-semibold border-b w-[90px]" style={{ color: '#111827', borderColor: '#e5e7eb' }}>
-                  {t.campaignColNominations || 'Tiến cử'}
-                </th>
-                <th className="px-3 py-2 text-center text-xs font-semibold border-b w-[130px]" style={{ color: '#111827', borderColor: '#e5e7eb' }}>
-                  {t.campaignColStatus || 'Trạng thái'}
-                </th>
-                <th className="px-3 py-2 text-center text-xs font-semibold border-b w-[110px]" style={{ color: '#111827', borderColor: '#e5e7eb' }}>
-                  {t.campaignColCreatedAt || 'Ngày tạo'}
-                </th>
-                <th className="px-3 py-2 text-center text-xs font-semibold border-b" style={{ color: '#111827', borderColor: '#e5e7eb' }}>{t.colActions || 'Thao tác'}</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y" style={{ borderColor: '#e5e7eb' }}>
-              {loading ? (
-                <tr>
-                  <td colSpan="13" className="px-3 py-8 text-center text-xs" style={{ color: '#6b7280' }}>
-                    {t.loadingData || 'Đang tải dữ liệu...'}
-                  </td>
-                </tr>
-              ) : campaigns.length === 0 ? (
-                <tr>
-                  <td colSpan="13" className="px-3 py-8 text-center text-xs" style={{ color: '#6b7280' }}>
-                    {t.noData || 'Không có dữ liệu'}
-                  </td>
-                </tr>
-              ) : (
-                campaigns.map((campaign, index) => {
-                  const campaignStatus = getCampaignStatus(campaign);
-                  const startDate = campaign.startDate || campaign.start_date 
-                    ? new Date(campaign.startDate || campaign.start_date).toLocaleDateString(dateLocale)
-                    : '—';
-                  const endDate = campaign.endDate || campaign.end_date 
-                    ? new Date(campaign.endDate || campaign.end_date).toLocaleDateString(dateLocale)
-                    : '—';
-                  const createdAt = campaign.createdAt || campaign.created_at
-                    ? new Date(campaign.createdAt || campaign.created_at).toLocaleDateString(dateLocale)
-                    : '—';
-                  const displayName = pickByLanguage(
-                    campaign.name,
-                    campaign.nameEn || campaign.name_en,
-                    campaign.nameJp || campaign.name_jp,
-                    language
-                  );
-                  const displayDescription = pickByLanguage(
-                    campaign.description,
-                    campaign.descriptionEn || campaign.description_en,
-                    campaign.descriptionJp || campaign.description_jp,
-                    language
-                  );
-                  
-                  return (
-                <tr
+      {/* Card grid thay cho bảng */}
+      <div className="flex-1 overflow-y-auto min-h-0 rounded-lg relative" style={{ borderColor: '#e5e7eb' }}>
+        {/* Lớp mờ ở mép dưới khi nội dung bị cắt */}
+        <div
+          className="absolute bottom-0 left-0 right-0 h-14 pointer-events-none z-10 rounded-b-lg"
+          style={{
+            background: 'linear-gradient(to top, rgba(255,250,250,0.92), transparent)',
+          }}
+          aria-hidden
+        />
+        {loading ? (
+          <div className="flex items-center justify-center py-16">
+            <span className="inline-flex items-center justify-center gap-2 text-sm" style={{ color: '#6b7280' }}>
+              <span className="h-8 w-8 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: '#2563eb' }} />
+              {t.loadingData || 'Đang tải...'}
+            </span>
+          </div>
+        ) : campaigns.length === 0 ? (
+          <div className="flex items-center justify-center py-16 text-sm" style={{ color: '#6b7280' }}>
+            {t.noData || 'Không có dữ liệu'}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 pb-2">
+            {campaigns.map((campaign, index) => {
+              const campaignStatus = getCampaignStatus(campaign);
+              const startDate = campaign.startDate || campaign.start_date
+                ? new Date(campaign.startDate || campaign.start_date).toLocaleDateString(dateLocale)
+                : '—';
+              const endDate = campaign.endDate || campaign.end_date
+                ? new Date(campaign.endDate || campaign.end_date).toLocaleDateString(dateLocale)
+                : '—';
+              const createdAt = campaign.createdAt || campaign.created_at
+                ? new Date(campaign.createdAt || campaign.created_at).toLocaleDateString(dateLocale)
+                : '—';
+              const displayName = pickByLanguage(
+                campaign.name,
+                campaign.nameEn || campaign.name_en,
+                campaign.nameJp || campaign.name_jp,
+                language
+              );
+              const displayDescription = pickByLanguage(
+                campaign.description,
+                campaign.descriptionEn || campaign.description_en,
+                campaign.descriptionJp || campaign.description_jp,
+                language
+              );
+
+              return (
+                <div
                   key={campaign.id}
-                  className="transition-colors"
+                  className="rounded-xl border bg-white p-4 transition-colors hover:shadow-md"
+                  style={{
+                    borderColor: '#e5e7eb',
+                    backgroundColor: hoveredRowIndex === index ? '#f9fafb' : 'white'
+                  }}
                   onMouseEnter={() => setHoveredRowIndex(index)}
                   onMouseLeave={() => setHoveredRowIndex(null)}
-                  style={{
-                    backgroundColor: hoveredRowIndex === index ? '#f9fafb' : 'transparent'
-                  }}
                 >
-                  <td className="px-3 py-2 text-center">
-                    <input
-                      type="checkbox"
-                      checked={selectedRows.has(index)}
-                      onChange={() => handleSelectRow(index)}
-                      className="w-3.5 h-3.5 rounded"
-                      style={{
-                        accentColor: '#2563eb',
-                        borderColor: '#d1d5db'
-                      }}
-                    />
-                  </td>
-                  <td className="px-3 py-2">
-                    <button
-                      onClick={() => navigate(`/admin/campaigns/${campaign.id}`)}
-                      onMouseEnter={() => setHoveredCampaignIdLinkIndex(index)}
-                      onMouseLeave={() => setHoveredCampaignIdLinkIndex(null)}
-                      className="font-medium text-xs flex items-center gap-1"
-                      style={{
-                        color: hoveredCampaignIdLinkIndex === index ? '#1e40af' : '#2563eb'
-                      }}
-                    >
-                      {campaign.id}
-                      <ExternalLink className="w-3 h-3" />
-                    </button>
-                  </td>
-                  <td className="px-3 py-2">
-                    <div className="flex items-center gap-1.5">
-                      <div className="w-7 h-7 rounded-full flex items-center justify-center text-white font-semibold text-[10px]" style={{ backgroundColor: '#a855f7' }}>
-                        <Target className="w-4 h-4" />
-                      </div>
+                  {/* Header: checkbox + ID + status */}
+                  <div className="flex items-start justify-between gap-2 mb-3">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <input
+                        type="checkbox"
+                        checked={selectedRows.has(index)}
+                        onChange={() => handleSelectRow(index)}
+                        className="w-3.5 h-3.5 rounded flex-shrink-0"
+                        style={{ accentColor: '#2563eb', borderColor: '#d1d5db' }}
+                      />
                       <button
                         onClick={() => navigate(`/admin/campaigns/${campaign.id}`)}
-                        onMouseEnter={() => setHoveredCampaignNameLinkIndex(index)}
-                        onMouseLeave={() => setHoveredCampaignNameLinkIndex(null)}
-                        className="text-xs font-semibold max-w-[200px] truncate"
-                        style={{
-                          color: hoveredCampaignNameLinkIndex === index ? '#2563eb' : '#111827'
-                        }}
+                        onMouseEnter={() => setHoveredCampaignIdLinkIndex(index)}
+                        onMouseLeave={() => setHoveredCampaignIdLinkIndex(null)}
+                        className="font-medium text-[11px] flex items-center gap-0.5 truncate"
+                        style={{ color: hoveredCampaignIdLinkIndex === index ? '#1e40af' : '#2563eb' }}
                       >
-                        {displayName}
+                        {campaign.id}
+                        <ExternalLink className="w-2.5 h-2.5 flex-shrink-0" />
                       </button>
                     </div>
-                  </td>
-                  <td className="px-3 py-2">
-                    <span className="text-xs max-w-[260px] truncate block" style={{ color: '#374151' }}>
-                      {displayDescription}
-                    </span>
-                  </td>
-                  <td className="px-3 py-2 text-center">
-                    <div className="inline-flex items-center justify-center gap-1 text-xs" style={{ color: '#374151' }}>
-                      <Calendar className="w-3 h-3" style={{ color: '#9ca3af' }} />
-                      <span>
-                        {startDate} ~ {endDate}
-                      </span>
+                    {getStatusBadge(campaignStatus)}
+                  </div>
+
+                  {/* Tên chiến dịch */}
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-8 h-8 rounded-full flex items-center justify-center text-white flex-shrink-0" style={{ backgroundColor: '#a855f7' }}>
+                      <Target className="w-4 h-4" />
                     </div>
-                  </td>
-                  <td className="px-3 py-2 text-right">
-                    <div className="inline-flex items-center justify-end gap-1 text-xs" style={{ color: '#374151' }}>
-                      <DollarSign className="w-3 h-3" style={{ color: '#9ca3af' }} />
-                      <span className="font-semibold">—</span>
-                    </div>
-                  </td>
-                  <td className="px-3 py-2 text-center">
+                    <button
+                      onClick={() => navigate(`/admin/campaigns/${campaign.id}`)}
+                      onMouseEnter={() => setHoveredCampaignNameLinkIndex(index)}
+                      onMouseLeave={() => setHoveredCampaignNameLinkIndex(null)}
+                      className="text-sm font-semibold text-left truncate flex-1 min-w-0"
+                      style={{ color: hoveredCampaignNameLinkIndex === index ? '#2563eb' : '#111827' }}
+                    >
+                      {displayName}
+                    </button>
+                  </div>
+
+                  {/* Mô tả + Xem thêm */}
+                  <div className="mb-3">
+                    <p
+                      className={`text-xs ${expandedCampaignIds.has(campaign.id) ? '' : 'line-clamp-2'} min-h-[2.5rem]`}
+                      style={{ color: '#374151' }}
+                    >
+                      {displayDescription || '—'}
+                    </p>
+                    {(displayDescription || '').length > 0 && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setExpandedCampaignIds((prev) => {
+                            const next = new Set(prev);
+                            if (next.has(campaign.id)) next.delete(campaign.id);
+                            else next.add(campaign.id);
+                            return next;
+                          });
+                        }}
+                        className="text-[11px] font-semibold mt-0.5 transition-colors hover:underline"
+                        style={{ color: '#2563eb' }}
+                      >
+                        {expandedCampaignIds.has(campaign.id)
+                          ? (t.adminSidebarCollapse || 'Thu gọn')
+                          : (t.readMore || 'Xem thêm')}
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Thời gian */}
+                  <div className="flex items-center gap-1.5 text-xs mb-2" style={{ color: '#374151' }}>
+                    <Calendar className="w-3.5 h-3.5 flex-shrink-0" style={{ color: '#9ca3af' }} />
+                    <span>{startDate} ~ {endDate}</span>
+                  </div>
+
+                  {/* Thống kê: Job, Views, Applications, Nominations */}
+                  <div className="grid grid-cols-2 gap-2 mb-3">
                     <button
                       onClick={() => navigate(`/admin/jobs?campaign=${campaign.id}`)}
                       onMouseEnter={() => setHoveredJobCountLinkIndex(index)}
                       onMouseLeave={() => setHoveredJobCountLinkIndex(null)}
-                      className="text-xs font-semibold flex items-center gap-1"
+                      className="flex items-center gap-1.5 text-xs rounded-lg py-1.5 px-2 transition-colors"
                       style={{
-                        color: hoveredJobCountLinkIndex === index ? '#1e40af' : '#2563eb'
+                        color: hoveredJobCountLinkIndex === index ? '#1e40af' : '#374151',
+                        backgroundColor: hoveredJobCountLinkIndex === index ? '#eff6ff' : '#f9fafb'
                       }}
                     >
-                      <Briefcase className="w-3 h-3" />
-                      {campaign.jobCampaigns?.length || 0}
+                      <Briefcase className="w-3.5 h-3.5" style={{ color: '#9ca3af' }} />
+                      <span className="font-semibold">{campaign.jobCampaigns?.length || 0}</span>
+                      <span className="opacity-80">{t.campaignColJobCount || 'Số job'}</span>
                     </button>
-                  </td>
-                  <td className="px-3 py-2 text-center">
-                    <div className="inline-flex items-center justify-center gap-1 text-xs" style={{ color: '#374151' }}>
-                      <Eye className="w-3 h-3" style={{ color: '#9ca3af' }} />
-                      {campaign.viewsCount || 0}
+                    <div className="flex items-center gap-1.5 text-xs py-1.5 px-2 rounded-lg" style={{ backgroundColor: '#f9fafb', color: '#374151' }}>
+                      <Eye className="w-3.5 h-3.5" style={{ color: '#9ca3af' }} />
+                      <span className="font-semibold">{campaign.viewsCount || 0}</span>
+                      <span className="opacity-80">{t.campaignColViews || 'Lượt xem'}</span>
                     </div>
-                  </td>
-                  <td className="px-3 py-2 text-center">
-                    <div className="inline-flex items-center justify-center gap-1 text-xs" style={{ color: '#374151' }}>
-                      <Users className="w-3 h-3" style={{ color: '#9ca3af' }} />
-                      {campaign.applicationsCount || 0}
+                    <div className="flex items-center gap-1.5 text-xs py-1.5 px-2 rounded-lg" style={{ backgroundColor: '#f9fafb', color: '#374151' }}>
+                      <Users className="w-3.5 h-3.5" style={{ color: '#9ca3af' }} />
+                      <span className="font-semibold">{campaign.applicationsCount || 0}</span>
+                      <span className="opacity-80">{t.campaignColApplications || 'Ứng tuyển'}</span>
                     </div>
-                  </td>
-                  <td className="px-3 py-2 text-center">
-                    <div className="inline-flex items-center justify-center gap-1 text-xs" style={{ color: '#374151' }}>
-                      <TrendingUp className="w-3 h-3" style={{ color: '#9ca3af' }} />
-                      {campaign.nominationsCount || 0}
+                    <div className="flex items-center gap-1.5 text-xs py-1.5 px-2 rounded-lg" style={{ backgroundColor: '#f9fafb', color: '#374151' }}>
+                      <TrendingUp className="w-3.5 h-3.5" style={{ color: '#9ca3af' }} />
+                      <span className="font-semibold">{campaign.nominationsCount || 0}</span>
+                      <span className="opacity-80">{t.campaignColNominations || 'Tiến cử'}</span>
                     </div>
-                  </td>
-                  <td className="px-3 py-2 text-center">
-                    {getStatusBadge(campaignStatus)}
-                  </td>
-                  <td className="px-3 py-2 text-center text-xs" style={{ color: '#374151' }}>
-                    <div className="inline-flex items-center justify-center gap-1">
+                  </div>
+
+                  {/* Ngày tạo + Actions */}
+                  <div className="flex items-center justify-between gap-2 pt-2 border-t" style={{ borderColor: '#e5e7eb' }}>
+                    <div className="flex items-center gap-1 text-[11px]" style={{ color: '#6b7280' }}>
                       <Calendar className="w-3 h-3" style={{ color: '#9ca3af' }} />
                       {createdAt}
                     </div>
-                  </td>
-                  <td className="px-3 py-2">
-                    <div className="flex items-center justify-center gap-1.5">
+                    <div className="flex items-center gap-1">
                       <button
                         onClick={() => navigate(`/admin/campaigns/${campaign.id}`)}
                         onMouseEnter={() => setHoveredViewButtonIndex(index)}
                         onMouseLeave={() => setHoveredViewButtonIndex(null)}
-                        className="p-1 rounded transition-colors"
+                        className="p-1.5 rounded-lg transition-colors"
                         style={{
                           color: hoveredViewButtonIndex === index ? '#1e40af' : '#2563eb',
                           backgroundColor: hoveredViewButtonIndex === index ? '#eff6ff' : 'transparent'
@@ -893,7 +837,7 @@ const CampaignsPage = () => {
                         onClick={() => navigate(`/admin/campaigns/${campaign.id}/edit`)}
                         onMouseEnter={() => setHoveredEditButtonIndex(index)}
                         onMouseLeave={() => setHoveredEditButtonIndex(null)}
-                        className="p-1 rounded transition-colors"
+                        className="p-1.5 rounded-lg transition-colors"
                         style={{
                           color: hoveredEditButtonIndex === index ? '#1f2937' : '#4b5563',
                           backgroundColor: hoveredEditButtonIndex === index ? '#f3f4f6' : 'transparent'
@@ -906,7 +850,7 @@ const CampaignsPage = () => {
                         onClick={() => handleDelete(campaign.id)}
                         onMouseEnter={() => setHoveredDeleteButtonIndex(index)}
                         onMouseLeave={() => setHoveredDeleteButtonIndex(null)}
-                        className="p-1 rounded transition-colors"
+                        className="p-1.5 rounded-lg transition-colors"
                         style={{
                           color: hoveredDeleteButtonIndex === index ? '#991b1b' : '#dc2626',
                           backgroundColor: hoveredDeleteButtonIndex === index ? '#fef2f2' : 'transparent'
@@ -916,14 +860,13 @@ const CampaignsPage = () => {
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </div>
-                  </td>
-                </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
       </div>
     </div>
   );

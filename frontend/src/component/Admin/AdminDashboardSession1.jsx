@@ -1,14 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { ShoppingCart, DollarSign, Users, Briefcase } from 'lucide-react';
+import { Users, Building2, Briefcase, FileText, ClipboardList, DollarSign } from 'lucide-react';
 import { useLanguage } from '../../context/LanguageContext';
 import { translations } from '../../translations/translations';
 import apiService from '../../services/api.js';
+
+const VALUE_COLOR = '#1e3a5f';
+const ICON_COLOR = '#6366f1';
+const LABEL_COLOR = '#94a3b8';
 
 const AdminDashboardSession1 = () => {
   const { language } = useLanguage();
   const t = translations[language] || translations.vi;
   const [loading, setLoading] = useState(true);
-  const [dashboardData, setDashboardData] = useState(null);
+  const [data, setData] = useState(null);
 
   useEffect(() => {
     fetchDashboardData();
@@ -18,9 +22,7 @@ const AdminDashboardSession1 = () => {
     try {
       setLoading(true);
       const response = await apiService.getAdminDashboard();
-      if (response.success) {
-        setDashboardData(response.data);
-      }
+      if (response.success) setData(response.data);
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
     } finally {
@@ -28,157 +30,91 @@ const AdminDashboardSession1 = () => {
     }
   };
 
-  // Tính toán tổng doanh thu từ payments
-  const calculateTotalRevenue = () => {
-    if (!dashboardData?.paymentRequests) return 0;
-    // Giả sử doanh thu là tổng số tiền đã thanh toán (status = 2)
-    // Cần lấy từ payment statistics
-    return 0; // Sẽ cập nhật sau khi có payment statistics
-  };
-
-  // Format số với dấu phẩy
   const formatNumber = (num) => {
-    if (!num) return '0';
-    return num.toLocaleString('en-US');
+    if (num == null) return '0';
+    return Number(num).toLocaleString('en-US');
   };
 
-  // Tính phần trăm progress
-  const calculateProgress = (current, target) => {
-    if (!target || target === 0) return 0;
-    return Math.min(Math.round((current / target) * 100), 100);
-  };
+  const cards = [
+    {
+      key: 'ctv',
+      title: t.adminDashboardCardTotalCtv,
+      value: formatNumber(data?.collaborators?.total),
+      icon: Users,
+    },
+    {
+      key: 'companies',
+      title: t.adminDashboardCardTotalCompanies,
+      value: formatNumber(data?.companies?.total),
+      icon: Building2,
+    },
+    {
+      key: 'jobs',
+      title: t.adminDashboardCardTotalJobs,
+      value: formatNumber(data?.jobs?.total),
+      icon: Briefcase,
+    },
+    {
+      key: 'candidates',
+      title: t.adminDashboardCardTotalCandidates,
+      value: formatNumber(data?.candidates?.total),
+      icon: FileText,
+    },
+    {
+      key: 'nominations',
+      title: t.adminDashboardCardTotalNominations,
+      value: formatNumber(data?.applications?.total),
+      icon: ClipboardList,
+    },
+    {
+      key: 'paymentRequests',
+      title: t.adminDashboardCardTotalPaymentRequests,
+      value: formatNumber(data?.paymentRequests?.total),
+      icon: DollarSign,
+    },
+  ];
 
   if (loading) {
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {[1, 2, 3, 4].map((i) => (
-          <div key={i} className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm animate-pulse">
-            <div className="h-4 bg-gray-200 rounded w-1/2 mb-4"></div>
-            <div className="h-8 bg-gray-200 rounded w-1/3 mb-4"></div>
-            <div className="h-2 bg-gray-200 rounded w-full"></div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-0.5 sm:gap-1 md:gap-1.5 lg:gap-2">
+        {cards.map((_, i) => (
+          <div key={i} className="bg-white rounded sm:rounded-md p-1.5 sm:p-2 md:p-2.5 lg:p-3 animate-pulse min-h-[40px] sm:min-h-[44px] md:min-h-[50px] lg:min-h-[58px]">
+            <div className="flex items-start gap-1 sm:gap-1.5 md:gap-2">
+              <div className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 lg:w-7 lg:h-7 rounded-full bg-gray-100 shrink-0" />
+              <div className="flex-1 min-w-0">
+                <div className="h-1.5 sm:h-2 md:h-2.5 bg-gray-100 rounded w-3/4 mb-0.5 sm:mb-1" />
+                <div className="h-2.5 sm:h-3 md:h-4 lg:h-5 bg-gray-100 rounded w-1/2" />
+              </div>
+            </div>
           </div>
         ))}
       </div>
     );
   }
 
-  const cards = [
-    {
-      title: t.adminDashboardTotalCtv,
-      value: formatNumber(dashboardData?.collaborators?.total || 0),
-      icon: Users,
-      iconColor: 'bg-purple-100',
-      iconBg: 'text-purple-600',
-      progressLabel: t.adminDashboardActive,
-      progressValue: calculateProgress(
-        dashboardData?.collaborators?.active || 0,
-        dashboardData?.collaborators?.total || 1
-      ),
-      progressColor: 'bg-purple-600',
-      progressTextColor: 'text-purple-600',
-      changePercent: 0,
-      changeValue: `${formatNumber(dashboardData?.collaborators?.active || 0)} ${t.adminDashboardSuffixActive}`,
-      changeColor: 'text-teal-600',
-    },
-    {
-      title: t.adminDashboardTotalJobs,
-      value: formatNumber(dashboardData?.jobs?.total || 0),
-      icon: Briefcase,
-      iconColor: 'bg-teal-100',
-      iconBg: 'text-teal-600',
-      progressLabel: t.adminDashboardPublished,
-      progressValue: calculateProgress(
-        dashboardData?.jobs?.published || 0,
-        dashboardData?.jobs?.total || 1
-      ),
-      progressColor: 'bg-teal-600',
-      progressTextColor: 'text-teal-600',
-      changePercent: 0,
-      changeValue: `${formatNumber(dashboardData?.jobs?.published || 0)} ${t.adminDashboardSuffixPublished}`,
-      changeColor: 'text-teal-600',
-    },
-    {
-      title: t.adminDashboardApplications,
-      value: formatNumber(dashboardData?.applications?.total || 0),
-      icon: ShoppingCart,
-      iconColor: 'bg-blue-100',
-      iconBg: 'text-blue-600',
-      progressLabel: t.adminDashboardApproved,
-      progressValue: calculateProgress(
-        dashboardData?.applications?.approved || 0,
-        dashboardData?.applications?.total || 1
-      ),
-      progressColor: 'bg-blue-600',
-      progressTextColor: 'text-blue-600',
-      changePercent: 0,
-      changeValue: `${formatNumber(dashboardData?.applications?.approved || 0)} ${t.adminDashboardSuffixApproved}`,
-      changeColor: 'text-teal-600',
-    },
-    {
-      title: t.adminDashboardPaymentRequests,
-      value: formatNumber(dashboardData?.paymentRequests?.total || 0),
-      icon: DollarSign,
-      iconColor: 'bg-orange-100',
-      iconBg: 'text-orange-600',
-      progressLabel: t.adminDashboardPaid,
-      progressValue: calculateProgress(
-        dashboardData?.paymentRequests?.paid || 0,
-        dashboardData?.paymentRequests?.total || 1
-      ),
-      progressColor: 'bg-orange-600',
-      progressTextColor: 'text-orange-600',
-      changePercent: 0,
-      changeValue: `${formatNumber(dashboardData?.paymentRequests?.paid || 0)} ${t.adminDashboardSuffixPaid}`,
-      changeColor: 'text-teal-600',
-    },
-  ];
-
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-      {cards.map((card, index) => {
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-0.5 sm:gap-1 md:gap-1.5 lg:gap-2">
+      {cards.map((card) => {
         const Icon = card.icon;
         return (
           <div
-            key={index}
-            className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm"
+            key={card.key}
+            className="bg-white rounded sm:rounded-md p-1.5 sm:p-2 md:p-2.5 lg:p-3 flex items-start gap-1 sm:gap-1.5 md:gap-2 min-h-[40px] sm:min-h-[44px] md:min-h-[50px] lg:min-h-[58px]"
+            style={{ boxShadow: 'none', border: 'none' }}
           >
-            {/* Header */}
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-medium text-gray-700">{card.title}</h3>
-              <div className={`${card.iconColor} p-2 rounded-lg`}>
-                <Icon className={`w-5 h-5 ${card.iconBg}`} />
-              </div>
+            <div
+              className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 lg:w-7 lg:h-7 rounded-full flex items-center justify-center shrink-0"
+              style={{ backgroundColor: '#f1f5f9' }}
+            >
+              <Icon className="w-2 h-2 sm:w-2.5 sm:h-2.5 md:w-3 md:h-3 lg:w-3.5 lg:h-3.5" style={{ color: ICON_COLOR }} />
             </div>
-
-            {/* Value */}
-            <div className="mb-4">
-              <p className="text-3xl font-bold text-gray-900">{card.value}</p>
-            </div>
-
-            {/* Progress Bar */}
-            <div className="mb-3">
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-xs font-medium text-gray-600">{card.progressLabel}</span>
-                <span className={`text-xs font-semibold ${card.progressTextColor}`}>
-                  {card.progressValue}%
-                </span>
-              </div>
-              <div className="w-full bg-gray-200 rounded-full h-2">
-                <div
-                  className={`${card.progressColor} h-2 rounded-full transition-all duration-300`}
-                  style={{ width: `${card.progressValue}%` }}
-                ></div>
-              </div>
-            </div>
-
-            {/* Change Indicator */}
-            <div className="flex items-center gap-2">
-              {card.changePercent > 0 && (
-                <span className={`text-sm font-semibold ${card.changeColor}`}>
-                  {card.changePercent}% ▲
-                </span>
-              )}
-              <span className="text-sm text-gray-500">{card.changeValue}</span>
+            <div className="flex-1 min-w-0 overflow-hidden">
+              <p className="text-[8px] sm:text-[9px] md:text-[10px] lg:text-[11px] truncate leading-tight" style={{ color: LABEL_COLOR }}>
+                {card.title}
+              </p>
+              <p className="text-[10px] sm:text-[11px] md:text-xs lg:text-sm font-bold mt-0.5 truncate leading-tight" style={{ color: VALUE_COLOR }}>
+                {card.value}
+              </p>
             </div>
           </div>
         );
@@ -188,4 +124,3 @@ const AdminDashboardSession1 = () => {
 };
 
 export default AdminDashboardSession1;
-

@@ -11,6 +11,14 @@ import { checkDuplicateCV, handleDuplicateCV, markOverdueCVsAndPromoteDuplicates
 import { CV_STATUS_NEW } from '../../constants/cvStatus.js';
 import { uploadBufferToS3, buildCvRirekishoPdfKey, buildCvShokumuPdfKey, buildCvOriginalKey, isS3Key, deleteFileFromS3, s3Enabled, getCvSnapshotDateTime, buildCvOriginalFolderKey, buildCvTemplateFolderKey, buildCvTemplateFileKey, uploadCvOriginalsToSnapshot, copyCvOriginalsToNewSnapshot, copySingleFileToCvOriginalSnapshot, isFolderPath } from '../../services/s3Service.js';
 import { generateCvRirekishoPdfBuffer, generateCvShokumuPdfBuffer } from '../../services/cvPdfService.js';
+import { saveCvOriginalsAndTemplatesForCv } from '../../services/cvSnapshotService.js';
+import {
+  parseBulkImportExcel,
+  buildCvFileMapFromZip,
+  buildCvDataFromImportRow,
+  resolveCvAttachments,
+  buildBulkImportPreview
+} from '../../services/cvBulkImportService.js';
 import { generateCvTemplateHtml } from '../../utils/cvTemplateHtml.js';
 
 // Helper function to map model field names to database column names
@@ -65,6 +73,76 @@ const upload = multer({
   limits: { fileSize: config.upload.maxFileSize },
   fileFilter
 }).fields([{ name: 'cvFile', maxCount: 10 }, { name: 'avatarPhoto', maxCount: 1 }]);
+
+const bulkImportMaxBytes = Math.max(config.upload.maxFileSize * 30, 80 * 1024 * 1024);
+const bulkImportUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: bulkImportMaxBytes },
+  fileFilter: (req, file, cb) => {
+    if (file.fieldname === 'excelFile') {
+      const ok = /\.xlsx$/i.test(file.originalname || '');
+      return ok ? cb(null, true) : cb(new Error('excelFile: chỉ chấp nhận .xlsx'));
+    }
+    if (file.fieldname === 'cvZip') {
+      const ok = /\.zip$/i.test(file.originalname || '') || !file.originalname;
+      return ok ? cb(null, true) : cb(new Error('cvZip: chỉ chấp nhận .zip'));
+    }
+    cb(new Error('Trường file không hợp lệ'));
+  }
+}).fields([
+  { name: 'excelFile', maxCount: 1 },
+  { name: 'cvZip', maxCount: 1 }
+]);
+
+/** Số dòng import chạy song song (I/O CV + snapshot; giới hạn tránh quá tải DB/mạng). */
+const BULK_IMPORT_CONCURRENCY = 5;
+const BULK_IMPORT_CODE_RETRIES = 12;
+
+function isUniqueConstraintError(err) {
+  return (
+    err?.name === 'SequelizeUniqueConstraintError' ||
+    err?.parent?.code === 'ER_DUP_ENTRY' ||
+    err?.original?.code === 'ER_DUP_ENTRY'
+  );
+}
+
+/** Chuỗi hóa create + duplicate theo ứng viên để tránh race khi nhiều dòng cùng email. */
+function bulkImportIdentityLockKey(cvData) {
+  const e = String(cvData?.email ?? '').trim().toLowerCase();
+  if (e) return `e:${e}`;
+  const ph = String(cvData?.phone ?? '').trim();
+  if (ph) return `p:${ph}`;
+  const n = String(cvData?.name ?? '').trim().toLowerCase();
+  return `n:${n}`;
+}
+
+function createBulkImportDedupeLock() {
+  const tails = new Map();
+  return async function runExclusive(key, fn) {
+    const k = key ?? '__row__';
+    const prev = tails.get(k) || Promise.resolve();
+    const task = prev.then(fn);
+    tails.set(k, task.catch(() => {}));
+    return task;
+  };
+}
+
+async function mapPool(items, limit, fn) {
+  const n = items.length;
+  const results = new Array(n);
+  if (n === 0) return results;
+  let nextIndex = 0;
+  const workerCount = Math.min(Math.max(limit, 1), n);
+  const workers = Array.from({ length: workerCount }, async () => {
+    while (true) {
+      const i = nextIndex++;
+      if (i >= n) break;
+      results[i] = await fn(items[i], i);
+    }
+  });
+  await Promise.all(workers);
+  return results;
+}
 
 /**
  * CV Management Controller (Admin)
@@ -504,90 +582,13 @@ export const cvController = {
             avatarDataUrl = rawData.avatarBase64;
           }
 
-          const dateTime = getCvSnapshotDateTime();
-
-          if (req.files?.cvFile?.length) {
-            try {
-              if (s3Enabled()) {
-                cv.cvOriginalPath = await uploadCvOriginalsToSnapshot(cv.id, dateTime, req.files.cvFile);
-              } else {
-                const snapshotDir = path.join(uploadDir, String(cv.id), dateTime);
-                const origDir = path.join(snapshotDir, 'CV_original');
-                await fs.mkdir(origDir, { recursive: true });
-                for (let i = 0; i < req.files.cvFile.length; i++) {
-                  const f = req.files.cvFile[i];
-                  const ext = (f.originalname && path.extname(f.originalname)) ? path.extname(f.originalname) : '.pdf';
-                  const dest = path.join(origDir, `cv-original-${i + 1}${ext}`);
-                  if (f.path) await fs.copyFile(f.path, dest);
-                  else if (f.buffer) await fs.writeFile(dest, f.buffer);
-                }
-                cv.cvOriginalPath = path.relative(backendRoot, origDir);
-              }
-              await cv.save();
-            } catch (e) {
-              console.warn('[Admin createCV] Lưu CV gốc thất bại:', e.message);
-            }
-            for (const f of req.files.cvFile) { if (f.path) await fs.unlink(f.path).catch(() => {}); }
-          } else {
-            if (s3Enabled()) {
-              cv.cvOriginalPath = buildCvOriginalFolderKey(cv.id, dateTime);
-            } else {
-              const snapshotDir = path.join(uploadDir, String(cv.id), dateTime);
-              const origDir = path.join(snapshotDir, 'CV_original');
-              await fs.mkdir(origDir, { recursive: true });
-              cv.cvOriginalPath = path.relative(backendRoot, origDir);
-            }
-            await cv.save();
-          }
-
-          const templateList = [
-            { cvTemplate: 'common', dir: 'Common' },
-            { cvTemplate: 'cv_it', dir: 'IT' },
-            { cvTemplate: 'cv_technical', dir: 'Technical' }
-          ];
-          try {
-            if (s3Enabled()) {
-              for (const { cvTemplate: tpl, dir: templateDir } of templateList) {
-                try {
-                  const rirekishoBuffer = await generateCvRirekishoPdfBuffer(cv, { avatarDataUrl, cvTemplate: tpl });
-                  if (rirekishoBuffer) {
-                    const key = buildCvTemplateFileKey(cv.id, dateTime, templateDir, 'cv-rirekisho.pdf');
-                    await uploadBufferToS3(rirekishoBuffer, key, 'application/pdf');
-                  }
-                  const shokumuBuffer = await generateCvShokumuPdfBuffer(cv, { avatarDataUrl, cvTemplate: tpl });
-                  if (shokumuBuffer) {
-                    const key = buildCvTemplateFileKey(cv.id, dateTime, templateDir, 'cv-shokumu.pdf');
-                    await uploadBufferToS3(shokumuBuffer, key, 'application/pdf');
-                  }
-                } catch (e) {
-                  console.warn(`[Admin createCV] PDF ${templateDir} thất bại:`, e.message);
-                }
-              }
-              cv.curriculumVitae = buildCvTemplateFolderKey(cv.id, dateTime);
-            } else {
-              const snapshotDir = path.join(uploadDir, String(cv.id), dateTime);
-              const tplDir = path.join(snapshotDir, 'CV_Template');
-              for (const { cvTemplate: tpl, dir: templateDir } of templateList) {
-                const subDir = path.join(tplDir, templateDir);
-                await fs.mkdir(subDir, { recursive: true });
-                try {
-                  const rirekishoBuffer = await generateCvRirekishoPdfBuffer(cv, { avatarDataUrl, cvTemplate: tpl });
-                  if (rirekishoBuffer) await fs.writeFile(path.join(subDir, 'cv-rirekisho.pdf'), rirekishoBuffer);
-                  const shokumuBuffer = await generateCvShokumuPdfBuffer(cv, { avatarDataUrl, cvTemplate: tpl });
-                  if (shokumuBuffer) await fs.writeFile(path.join(subDir, 'cv-shokumu.pdf'), shokumuBuffer);
-                } catch (e) {
-                  console.warn(`[Admin createCV] PDF ${templateDir} thất bại:`, e.message);
-                }
-              }
-              cv.curriculumVitae = path.relative(backendRoot, tplDir);
-            }
-            if (cv.curriculumVitae) {
-              await cv.save();
-              await cv.reload({ include: [{ model: Collaborator, as: 'collaborator', required: false }, { model: Admin, as: 'admin', required: false }] });
-            }
-          } catch (e) {
-            console.warn('[Admin createCV] Không thể tạo PDF template:', e.message);
-          }
+          await saveCvOriginalsAndTemplatesForCv(cv, {
+            cvFiles: req.files?.cvFile || [],
+            avatarDataUrl,
+            backendRoot,
+            uploadDir,
+            logPrefix: '[Admin createCV]'
+          });
 
           if (req.files?.cvFile) {
             for (const f of req.files.cvFile) { if (f.path) await fs.unlink(f.path).catch(() => {}); }
@@ -617,6 +618,242 @@ export const cvController = {
             for (const f of req.files.cvFile) { if (f.path) await fs.unlink(f.path).catch(() => {}); }
           }
           if (req.files?.avatarPhoto?.[0]?.path) await fs.unlink(req.files.avatarPhoto[0].path).catch(() => {});
+          next(error);
+        }
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  /**
+   * Xem trước import — chỉ parse Excel + khớp ZIP, không tạo bản ghi.
+   * POST /api/admin/cvs/bulk-import/preview
+   */
+  bulkImportPreview: async (req, res, next) => {
+    try {
+      bulkImportUpload(req, res, async (err) => {
+        if (err) {
+          return res.status(400).json({ success: false, message: err.message });
+        }
+        try {
+          const excelBuf = req.files?.excelFile?.[0]?.buffer;
+          if (!excelBuf?.length) {
+            return res.status(400).json({
+              success: false,
+              message: 'Thiếu file excelFile (.xlsx)'
+            });
+          }
+          const zipBuf = req.files?.cvZip?.[0]?.buffer;
+          const data = await buildBulkImportPreview(excelBuf, zipBuf);
+          return res.json({ success: true, data });
+        } catch (error) {
+          next(error);
+        }
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  /**
+   * Import hàng loạt từ Excel (.xlsx) — mọi sheet, dòng 1 = header.
+   * multipart: excelFile (bắt buộc), cvZip (khuyến nghị: ZIP chứa file CV, khớp basename cột "CV đính kèm").
+   * Body: collaboratorId (tùy chọn).
+   * POST /api/admin/cvs/bulk-import
+   */
+  bulkImportCVs: async (req, res, next) => {
+    try {
+      bulkImportUpload(req, res, async (err) => {
+        if (err) {
+          return res.status(400).json({ success: false, message: err.message });
+        }
+        try {
+          const excelBuf = req.files?.excelFile?.[0]?.buffer;
+          if (!excelBuf?.length) {
+            return res.status(400).json({
+              success: false,
+              message: 'Thiếu file excelFile (.xlsx)'
+            });
+          }
+          const zipBuf = req.files?.cvZip?.[0]?.buffer;
+
+          let collaboratorId = null;
+          if (req.body?.collaboratorId) {
+            const cid = parseInt(req.body.collaboratorId, 10);
+            if (!isNaN(cid) && cid > 0) {
+              const collaborator = await Collaborator.findByPk(cid);
+              if (collaborator) collaboratorId = cid;
+            }
+          }
+
+          const zipMap = buildCvFileMapFromZip(zipBuf);
+          const parsedRows = await parseBulkImportExcel(excelBuf);
+
+          const runExclusive = createBulkImportDedupeLock();
+          const clientIp = req.ip || req.connection.remoteAddress;
+
+          const rowOutcomes = await mapPool(parsedRows, BULK_IMPORT_CONCURRENCY, async ({ sheetName, rowNumber, canon }) => {
+            const rowCtx = buildCvDataFromImportRow(canon, sheetName, rowNumber);
+            const { cvData, cvRelPaths, warnings: rowWarnings } = rowCtx;
+            const warnings = [...rowWarnings];
+
+            if (!rowCtx.hasMinimalIdentity) {
+              return {
+                kind: 'skipped',
+                payload: {
+                  sheet: sheetName,
+                  row: rowNumber,
+                  reason: 'Thiếu Họ & tên và Email (cần ít nhất một trong hai)'
+                }
+              };
+            }
+
+            const { files: cvFiles, warnings: attachWarn } = await resolveCvAttachments(zipMap, cvRelPaths);
+            warnings.push(...attachWarn);
+
+            const lockKey = bulkImportIdentityLockKey(cvData);
+
+            const dbBlock = await runExclusive(lockKey, async () => {
+              let cv;
+              let lastErr;
+              for (let attempt = 0; attempt < BULK_IMPORT_CODE_RETRIES; attempt++) {
+                const cvCode = `CV-${uuidv4().substring(0, 8).toUpperCase()}`;
+                try {
+                  cv = await CVStorage.create({
+                    code: cvCode,
+                    collaboratorId,
+                    adminId: req.admin.id,
+                    curriculumVitae: null,
+                    ...cvData,
+                    status: CV_STATUS_NEW,
+                    isDuplicate: false,
+                    duplicateWithCvId: null
+                  });
+                  lastErr = null;
+                  break;
+                } catch (createErr) {
+                  lastErr = createErr;
+                  if (isUniqueConstraintError(createErr)) continue;
+                  return {
+                    ok: false,
+                    error: createErr.message || 'Không tạo được bản ghi CV'
+                  };
+                }
+              }
+              if (!cv) {
+                return {
+                  ok: false,
+                  error: lastErr?.message || 'Không gán được mã CV duy nhất'
+                };
+              }
+
+              let duplicateResult = null;
+              try {
+                const dup = await checkDuplicateCV(cvData.name, cvData.email, cvData.phone);
+                if (dup && dup.id !== cv.id) {
+                  duplicateResult = await handleDuplicateCV(dup, cv);
+                }
+              } catch (dupErr) {
+                console.warn('[bulkImportCVs] checkDuplicate:', dupErr.message);
+              }
+
+              await cv.reload({
+                include: [
+                  { model: Collaborator, as: 'collaborator', required: false },
+                  { model: Admin, as: 'admin', required: false }
+                ]
+              });
+
+              return { ok: true, cv, duplicateResult };
+            });
+
+            if (!dbBlock.ok) {
+              return {
+                kind: 'failed',
+                payload: {
+                  sheet: sheetName,
+                  row: rowNumber,
+                  error: dbBlock.error
+                }
+              };
+            }
+
+            const { cv, duplicateResult } = dbBlock;
+
+            try {
+              await saveCvOriginalsAndTemplatesForCv(cv, {
+                cvFiles,
+                avatarDataUrl: '',
+                backendRoot,
+                uploadDir,
+                logPrefix: `[bulkImport ${sheetName}#${rowNumber}]`
+              });
+            } catch (pipeErr) {
+              console.warn('[bulkImportCVs] Pipeline:', pipeErr.message);
+            }
+
+            const entry = {
+              id: cv.id,
+              code: cv.code,
+              name: cv.name,
+              sheet: sheetName,
+              row: rowNumber,
+              warnings
+            };
+            if (duplicateResult) {
+              entry.duplicateInfo = {
+                isDuplicate: duplicateResult.isDuplicate,
+                duplicateWithCvId: duplicateResult.duplicateWithCvId,
+                message: duplicateResult.message
+              };
+            }
+
+            return {
+              kind: 'created',
+              entry,
+              logRow: {
+                adminId: req.admin.id,
+                object: 'CVStorage',
+                action: 'create',
+                ip: clientIp,
+                after: cv.toJSON(),
+                description: `Import Excel — ${sheetName} dòng ${rowNumber}: ${cv.code} - ${cv.name || 'N/A'}`
+              }
+            };
+          });
+
+          const created = [];
+          const skipped = [];
+          const failed = [];
+          const logRows = [];
+          for (const o of rowOutcomes) {
+            if (o.kind === 'created') {
+              created.push(o.entry);
+              logRows.push(o.logRow);
+            } else if (o.kind === 'skipped') {
+              skipped.push(o.payload);
+            } else if (o.kind === 'failed') {
+              failed.push(o.payload);
+            }
+          }
+
+          if (logRows.length) {
+            await ActionLog.bulkCreate(logRows);
+          }
+
+          return res.status(200).json({
+            success: true,
+            message: `Đã xử lý ${parsedRows.length} dòng: ${created.length} tạo mới, ${skipped.length} bỏ qua, ${failed.length} lỗi tạo bản ghi`,
+            data: {
+              created,
+              skipped,
+              failed,
+              totalRows: parsedRows.length,
+              zipFileCount: zipMap.size
+            }
+          });
+        } catch (error) {
           next(error);
         }
       });

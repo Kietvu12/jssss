@@ -38,6 +38,72 @@ function getApiBaseUrl() {
 }
 const API_BASE_URL = getApiBaseUrl();
 
+/** Base URL for AI matching (vector compare / reranking). Mặc định gọi thẳng server AI, không qua localhost. */
+const AI_API_BASE_DEFAULT = 'http://13.229.250.2/api_ai';
+
+/** Số kết quả match tối đa (query `top_k`). */
+const DEFAULT_AI_MATCH_TOP_K = 20;
+
+function getAiApiBaseUrl() {
+  const fromEnv = import.meta.env.VITE_AI_API_BASE_URL;
+  if (fromEnv && typeof fromEnv === 'string' && fromEnv.trim()) {
+    return fromEnv.trim().replace(/\/+$/, '');
+  }
+  return AI_API_BASE_DEFAULT;
+}
+
+async function handleAiJsonResponse(response) {
+  const text = await response.text();
+  let data = null;
+  try {
+    data = text ? JSON.parse(text) : null;
+  } catch {
+    const error = new Error(response.status ? `HTTP ${response.status}: ${response.statusText}` : 'Phản hồi không hợp lệ');
+    error.status = response.status;
+    throw error;
+  }
+  if (!response.ok) {
+    const errorMessage = data?.message || data?.error || `HTTP ${response.status}: ${response.statusText}`;
+    const error = new Error(errorMessage);
+    error.status = response.status;
+    error.data = data;
+    throw error;
+  }
+  return data;
+}
+
+/** Base URL for assets (no /api). Use for post images etc. */
+export function getAssetBaseUrl() {
+  const fromEnv = import.meta.env.VITE_ASSET_BASE_URL;
+  if (fromEnv && typeof fromEnv === 'string' && fromEnv.trim()) {
+    return fromEnv.trim().replace(/\/+$/, '');
+  }
+  return API_BASE_URL.replace(/\/api\/?$/, '') || '';
+}
+
+/**
+ * Backend serve ảnh tại /uploads (express.static).
+ * DB có thể lưu "posts/xxx.jpg" hoặc "/uploads/posts/xxx.jpg" → cần trỏ đúng /uploads/...
+ */
+function toUploadsPath(imagePath) {
+  if (!imagePath || typeof imagePath !== 'string') return '';
+  const p = imagePath.replace(/^\/+/, '');
+  if (p.startsWith('uploads/') || p.startsWith('uploads\\')) return p.replace(/\\/g, '/');
+  if (p.startsWith('posts/')) return 'uploads/' + p;
+  if (p.startsWith('uploads')) return 'uploads/' + p.slice(7).replace(/^\/+/, '');
+  return 'uploads/' + p;
+}
+
+/** Normalize post image path to full URL (S3 or backend /uploads). */
+export function normalizePostImageUrl(imagePath) {
+  if (!imagePath || typeof imagePath !== 'string') return '';
+  if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) return imagePath;
+  const path = toUploadsPath(imagePath);
+  const base = getAssetBaseUrl();
+  const slashPath = path.startsWith('/') ? path : '/' + path;
+  return base ? `${base}${slashPath}` : slashPath;
+}
+
 /**
  * Get authorization header
  */
@@ -114,6 +180,13 @@ const apiService = {
     return handleResponse(response);
   },
 
+  verifyCTVEmail: async (token) => {
+    const response = await fetch(`${API_BASE_URL}/ctv/auth/verify-email?token=${encodeURIComponent(token || '')}`, {
+      method: 'GET'
+    });
+    return handleResponse(response);
+  },
+
   getCTVProfile: async () => {
     const response = await fetch(`${API_BASE_URL}/ctv/auth/me`, {
       method: 'GET',
@@ -170,6 +243,71 @@ const apiService = {
   },
 
   /**
+   * Outlook OAuth – đồng bộ tài khoản Outlook (Microsoft)
+   * Trả về URL để redirect: dùng khi user bấm "Kết nối Outlook" (token gửi qua query vì redirect không gửi header).
+   */
+  getOutlookConnectUrl: () => {
+    const token = localStorage.getItem('token');
+    if (!token) return null;
+    return `${API_BASE_URL}/oauth/outlook/connect?token=${encodeURIComponent(token)}`;
+  },
+
+  getOutlookConnection: async () => {
+    const response = await fetch(`${API_BASE_URL}/admin/outlook/connection`, {
+      method: 'GET',
+      headers: getAuthHeaders()
+    });
+    const data = await handleResponse(response);
+    return data?.data ?? { connection: null, connected: false };
+  },
+
+  /** Đăng xuất Outlook (ngắt kết nối, xóa connection và dữ liệu đã đồng bộ) */
+  disconnectOutlook: async () => {
+    const response = await fetch(`${API_BASE_URL}/admin/outlook/disconnect`, {
+      method: 'POST',
+      headers: getAuthHeaders()
+    });
+    return handleResponse(response);
+  },
+
+  syncOutlookEmails: async () => {
+    const response = await fetch(`${API_BASE_URL}/admin/outlook/sync`, {
+      method: 'POST',
+      headers: getAuthHeaders()
+    });
+    return handleResponse(response);
+  },
+
+  getOutlookEmails: async (params = {}) => {
+    const queryString = new URLSearchParams(params).toString();
+    const response = await fetch(`${API_BASE_URL}/admin/outlook/emails?${queryString}`, {
+      method: 'GET',
+      headers: getAuthHeaders()
+    });
+    const data = await handleResponse(response);
+    return data?.data ?? { emails: [], total: 0, page: 1, limit: 20 };
+  },
+
+  getOutlookEmailById: async (id) => {
+    const response = await fetch(`${API_BASE_URL}/admin/outlook/emails/${id}`, {
+      method: 'GET',
+      headers: getAuthHeaders()
+    });
+    const data = await handleResponse(response);
+    return data?.data?.email ?? null;
+  },
+
+  /** Gửi email qua Outlook. Payload: { to, cc?, subject, body, bodyContentType?: 'Text'|'HTML' } */
+  sendOutlookEmail: async (payload) => {
+    const response = await fetch(`${API_BASE_URL}/admin/outlook/send`, {
+      method: 'POST',
+      headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    return handleResponse(response);
+  },
+
+  /**
    * Admin Dashboard – thống kê tổng quan (CTV, Jobs, Ứng tuyển, Yêu cầu thanh toán)
    */
   getAdminDashboard: async () => {
@@ -193,7 +331,51 @@ const apiService = {
   /** Đơn tiến cử thành công/thất bại theo tháng (biểu đồ line) */
   getAdminDashboardNominationOverTime: async (params = {}) => {
     const queryString = new URLSearchParams(params).toString();
-    const response = await fetch(`${API_BASE_URL}/admin/dashboard/nomination-over-time?${queryString}`, {
+    const url = queryString
+      ? `${API_BASE_URL}/admin/dashboard/nomination-over-time?${queryString}`
+      : `${API_BASE_URL}/admin/dashboard/nomination-over-time`;
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: getAuthHeaders()
+    });
+    return handleResponse(response);
+  },
+
+  /** Số lượng job có đơn tiến cử / không có đơn tiến cử theo tháng trong năm */
+  getAdminDashboardJobNominationByMonth: async (params = {}) => {
+    const queryString = new URLSearchParams(params).toString();
+    const url = queryString
+      ? `${API_BASE_URL}/admin/dashboard/job-nomination-by-month?${queryString}`
+      : `${API_BASE_URL}/admin/dashboard/job-nomination-by-month`;
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: getAuthHeaders()
+    });
+    return handleResponse(response);
+  },
+
+  /** Số lượt đăng ký hệ thống theo ngày trong tháng (month = YYYY-MM, mặc định tháng hiện tại) */
+  getAdminDashboardRegistrationsOverTime: async (month) => {
+    const params = month ? { month } : {};
+    const queryString = new URLSearchParams(params).toString();
+    const url = queryString
+      ? `${API_BASE_URL}/admin/dashboard/registrations-over-time?${queryString}`
+      : `${API_BASE_URL}/admin/dashboard/registrations-over-time`;
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: getAuthHeaders()
+    });
+    return handleResponse(response);
+  },
+
+  /** Số lượt phê duyệt đăng ký (approved/pending/rejected) theo ngày trong tháng */
+  getAdminDashboardApprovalsByDay: async (month) => {
+    const params = month ? { month } : {};
+    const queryString = new URLSearchParams(params).toString();
+    const url = queryString
+      ? `${API_BASE_URL}/admin/dashboard/approvals-by-day?${queryString}`
+      : `${API_BASE_URL}/admin/dashboard/approvals-by-day`;
+    const response = await fetch(url, {
       method: 'GET',
       headers: getAuthHeaders()
     });
@@ -487,7 +669,40 @@ const apiService = {
         : getAuthHeaders(),
       body: isFormData ? formData : JSON.stringify(formData)
     });
-    return handleResponse(response);
+    const result = await handleResponse(response);
+
+    // Fallback: nếu backend chưa tạo được tin nhắn mặc định thì frontend tự tạo 1 tin nhắn hệ thống.
+    try {
+      const createdJobApp = result?.data?.jobApplication;
+      const jobApplicationId = createdJobApp?.id;
+      if (jobApplicationId) {
+        const messagesRes = await fetch(`${API_BASE_URL}/ctv/messages/job-application/${jobApplicationId}`, {
+          method: 'GET',
+          headers: getAuthHeaders()
+        });
+        const messagesData = await handleResponse(messagesRes);
+        const existingMessages = messagesData?.data?.messages || [];
+
+        if (Array.isArray(existingMessages) && existingMessages.length === 0) {
+          const candidateName = createdJobApp?.cv?.name || 'ứng viên';
+          const jobTitle = createdJobApp?.job?.title || createdJobApp?.title || '';
+          const introMessage = `Cảm ơn bạn đã tiến cử ${candidateName} tới job: ${jobTitle}`;
+          await fetch(`${API_BASE_URL}/ctv/messages`, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify({
+              jobApplicationId: parseInt(jobApplicationId, 10),
+              content: introMessage,
+              senderType: 3
+            })
+          }).then(handleResponse);
+        }
+      }
+    } catch (err) {
+      console.warn('[createJobApplication] Intro message fallback failed:', err?.message || err);
+    }
+
+    return result;
   },
 
   updateJobApplication: async (id, data) => {
@@ -590,6 +805,26 @@ const apiService = {
     const response = await fetch(`${API_BASE_URL}/ctv/campaigns?${queryString}`, {
       method: 'GET',
       headers: getAuthHeaders()
+    });
+    return handleResponse(response);
+  },
+
+  /**
+   * Public posts (no auth) - only published posts for landing/blog
+   */
+  getPublicPosts: async (params = {}) => {
+    const queryString = new URLSearchParams(params).toString();
+    const response = await fetch(`${API_BASE_URL}/public/posts?${queryString}`, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' }
+    });
+    return handleResponse(response);
+  },
+
+  getPublicPostById: async (id) => {
+    const response = await fetch(`${API_BASE_URL}/public/posts/${id}`, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' }
     });
     return handleResponse(response);
   },
@@ -996,6 +1231,142 @@ const apiService = {
   },
 
   /**
+   * Admin Post APIs (bài viết)
+   */
+  getAdminPosts: async (params = {}) => {
+    const queryString = new URLSearchParams(params).toString();
+    const response = await fetch(`${API_BASE_URL}/admin/posts?${queryString}`, {
+      method: 'GET',
+      headers: getAuthHeaders()
+    });
+    return handleResponse(response);
+  },
+
+  getAdminPostById: async (id) => {
+    const response = await fetch(`${API_BASE_URL}/admin/posts/${id}`, {
+      method: 'GET',
+      headers: getAuthHeaders()
+    });
+    return handleResponse(response);
+  },
+
+  createAdminPost: async (data) => {
+    const response = await fetch(`${API_BASE_URL}/admin/posts`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(data)
+    });
+    return handleResponse(response);
+  },
+
+  updateAdminPost: async (id, data) => {
+    const response = await fetch(`${API_BASE_URL}/admin/posts/${id}`, {
+      method: 'PUT',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(data)
+    });
+    return handleResponse(response);
+  },
+
+  deleteAdminPost: async (id) => {
+    const response = await fetch(`${API_BASE_URL}/admin/posts/${id}`, {
+      method: 'DELETE',
+      headers: getAuthHeaders()
+    });
+    return handleResponse(response);
+  },
+
+  updateAdminPostStatus: async (id, status) => {
+    const response = await fetch(`${API_BASE_URL}/admin/posts/${id}/status`, {
+      method: 'PATCH',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ status })
+    });
+    return handleResponse(response);
+  },
+
+  /**
+   * Admin Post Categories (danh mục bài viết - table categories)
+   */
+  getPostCategories: async (params = {}) => {
+    const queryString = new URLSearchParams(params).toString();
+    const response = await fetch(`${API_BASE_URL}/admin/categories?${queryString}`, {
+      method: 'GET',
+      headers: getAuthHeaders()
+    });
+    return handleResponse(response);
+  },
+
+  getPostCategoriesAll: async () => {
+    const response = await fetch(`${API_BASE_URL}/admin/categories/all`, {
+      method: 'GET',
+      headers: getAuthHeaders()
+    });
+    return handleResponse(response);
+  },
+
+  /**
+   * Upload post image (when post already exists). S3: posts/{id}/
+   */
+  uploadPostImage: async (postId, file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const token = localStorage.getItem('token');
+    const response = await fetch(`${API_BASE_URL}/admin/posts/${postId}/upload-image`, {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: formData
+    });
+    return handleResponse(response);
+  },
+
+  /**
+   * Upload post image temp (when creating new post, no id yet). S3: posts/temp/
+   */
+  uploadPostTempImage: async (file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const token = localStorage.getItem('token');
+    const response = await fetch(`${API_BASE_URL}/admin/posts/upload-temp`, {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: formData
+    });
+    return handleResponse(response);
+  },
+
+  /**
+   * Upload thumbnail cho bài viết (đã có id). S3: posts/{id}/thumb_*
+   * Trả về { url, key }: lưu key vào DB, url dùng để preview.
+   */
+  uploadPostThumbnail: async (postId, file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const token = localStorage.getItem('token');
+    const response = await fetch(`${API_BASE_URL}/admin/posts/${postId}/upload-thumbnail`, {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: formData
+    });
+    return handleResponse(response);
+  },
+
+  /**
+   * Upload thumbnail tạm (khi tạo bài viết mới chưa có id). S3: posts/temp/thumb_*
+   */
+  uploadPostTempThumbnail: async (file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const token = localStorage.getItem('token');
+    const response = await fetch(`${API_BASE_URL}/admin/posts/upload-thumbnail-temp`, {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: formData
+    });
+    return handleResponse(response);
+  },
+
+  /**
    * Admin Job Category APIs
    */
   getJobCategories: async (params = {}) => {
@@ -1173,6 +1544,30 @@ const apiService = {
     return handleResponse(response);
   },
 
+  /** FormData: excelFile (.xlsx), cvZip (.zip, tùy chọn), collaboratorId (string, tùy chọn) */
+  bulkImportAdminCVs: async (formData) => {
+    const response = await fetch(`${API_BASE_URL}/admin/cvs/bulk-import`, {
+      method: 'POST',
+      headers: {
+        ...(localStorage.getItem('token') && { Authorization: `Bearer ${localStorage.getItem('token')}` })
+      },
+      body: formData
+    });
+    return handleResponse(response);
+  },
+
+  /** Cùng FormData như bulkImportAdminCVs — trả về bySheet / sheetOrder (không tạo CV) */
+  bulkImportAdminCVsPreview: async (formData) => {
+    const response = await fetch(`${API_BASE_URL}/admin/cvs/bulk-import/preview`, {
+      method: 'POST',
+      headers: {
+        ...(localStorage.getItem('token') && { Authorization: `Bearer ${localStorage.getItem('token')}` })
+      },
+      body: formData
+    });
+    return handleResponse(response);
+  },
+
   previewAdminCVTemplate: async (payload) => {
     const response = await fetch(`${API_BASE_URL}/admin/cvs/preview`, {
       method: 'POST',
@@ -1220,6 +1615,24 @@ const apiService = {
   getAdminCVHistory: async (id) => {
     const response = await fetch(`${API_BASE_URL}/admin/cvs/${id}/history`, {
       method: 'GET',
+      headers: getAuthHeaders()
+    });
+    return handleResponse(response);
+  },
+
+  /**
+   * Auto-parse CVs (AI) - background worker start/stop
+   */
+  startAutoParseCVs: async () => {
+    const response = await fetch(`${API_BASE_URL}/admin/cv-auto-parse/start`, {
+      method: 'POST',
+      headers: getAuthHeaders()
+    });
+    return handleResponse(response);
+  },
+  stopAutoParseCVs: async () => {
+    const response = await fetch(`${API_BASE_URL}/admin/cv-auto-parse/stop`, {
+      method: 'POST',
       headers: getAuthHeaders()
     });
     return handleResponse(response);
@@ -1483,6 +1896,15 @@ const apiService = {
     return handleResponse(response);
   },
 
+  rejectCollaborator: async (id, reason) => {
+    const response = await fetch(`${API_BASE_URL}/admin/collaborators/${id}/reject`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(typeof reason === 'string' ? { reason } : {})
+    });
+    return handleResponse(response);
+  },
+
   /**
    * Admin Campaign APIs
    */
@@ -1539,6 +1961,81 @@ const apiService = {
   },
 
   /**
+   * Admin Event APIs
+   */
+  getAdminEvents: async (params = {}) => {
+    const queryString = new URLSearchParams(params).toString();
+    const response = await fetch(`${API_BASE_URL}/admin/events?${queryString}`, {
+      method: 'GET',
+      headers: getAuthHeaders()
+    });
+    return handleResponse(response);
+  },
+
+  getAdminEventById: async (id) => {
+    const response = await fetch(`${API_BASE_URL}/admin/events/${id}`, {
+      method: 'GET',
+      headers: getAuthHeaders()
+    });
+    return handleResponse(response);
+  },
+
+  createAdminEvent: async (data) => {
+    const response = await fetch(`${API_BASE_URL}/admin/events`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(data)
+    });
+    return handleResponse(response);
+  },
+
+  updateAdminEvent: async (id, data) => {
+    const response = await fetch(`${API_BASE_URL}/admin/events/${id}`, {
+      method: 'PUT',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(data)
+    });
+    return handleResponse(response);
+  },
+
+  deleteAdminEvent: async (id) => {
+    const response = await fetch(`${API_BASE_URL}/admin/events/${id}`, {
+      method: 'DELETE',
+      headers: getAuthHeaders()
+    });
+    return handleResponse(response);
+  },
+
+  /**
+   * CTV Event APIs
+   */
+  getCTVEvents: async (params = {}) => {
+    const queryString = new URLSearchParams(params).toString();
+    const response = await fetch(`${API_BASE_URL}/ctv/events?${queryString}`, {
+      method: 'GET',
+      headers: getAuthHeaders()
+    });
+    return handleResponse(response);
+  },
+
+  getCTVEventById: async (id) => {
+    const response = await fetch(`${API_BASE_URL}/ctv/events/${id}`, {
+      method: 'GET',
+      headers: getAuthHeaders()
+    });
+    return handleResponse(response);
+  },
+
+  registerCTVEvent: async (eventId, payload) => {
+    const response = await fetch(`${API_BASE_URL}/ctv/events/${eventId}/register`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(payload || {})
+    });
+    return handleResponse(response);
+  },
+
+  /**
    * Admin Message APIs
    */
   getAdminMessages: async (params = {}) => {
@@ -1577,10 +2074,13 @@ const apiService = {
   },
 
   createAdminMessage: async (messageData) => {
+    const isFormData = messageData instanceof FormData;
     const response = await fetch(`${API_BASE_URL}/admin/messages`, {
       method: 'POST',
-      headers: getAuthHeaders(),
-      body: JSON.stringify(messageData)
+      headers: isFormData
+        ? { ...(localStorage.getItem('token') && { Authorization: `Bearer ${localStorage.getItem('token')}` }) }
+        : getAuthHeaders(),
+      body: isFormData ? messageData : JSON.stringify(messageData)
     });
     return handleResponse(response);
   },
@@ -1699,10 +2199,13 @@ const apiService = {
   },
 
   createCTVMessage: async (messageData) => {
+    const isFormData = messageData instanceof FormData;
     const response = await fetch(`${API_BASE_URL}/ctv/messages`, {
       method: 'POST',
-      headers: getAuthHeaders(),
-      body: JSON.stringify(messageData)
+      headers: isFormData
+        ? { ...(localStorage.getItem('token') && { Authorization: `Bearer ${localStorage.getItem('token')}` }) }
+        : getAuthHeaders(),
+      body: isFormData ? messageData : JSON.stringify(messageData)
     });
     return handleResponse(response);
   },
@@ -1729,6 +2232,55 @@ const apiService = {
       headers: getAuthHeaders()
     });
     return handleResponse(response);
+  },
+
+  /**
+   * CTV Notifications APIs
+   */
+  getCTVNotifications: async (params = {}) => {
+    const queryString = new URLSearchParams(params).toString();
+    const suffix = queryString ? `?${queryString}` : '';
+    const response = await fetch(`${API_BASE_URL}/ctv/notifications${suffix}`, {
+      method: 'GET',
+      headers: getAuthHeaders()
+    });
+    return handleResponse(response);
+  },
+
+  getCTVNotificationUnreadCount: async () => {
+    const response = await fetch(`${API_BASE_URL}/ctv/notifications/unread-count`, {
+      method: 'GET',
+      headers: getAuthHeaders()
+    });
+    const res = await handleResponse(response);
+    return res?.data?.count ?? 0;
+  },
+
+  markCTVNotificationRead: async (id) => {
+    const response = await fetch(`${API_BASE_URL}/ctv/notifications/${id}/read`, {
+      method: 'PATCH',
+      headers: getAuthHeaders()
+    });
+    return handleResponse(response);
+  },
+
+  markAllCTVNotificationsRead: async () => {
+    const response = await fetch(`${API_BASE_URL}/ctv/notifications/read-all`, {
+      method: 'PATCH',
+      headers: getAuthHeaders()
+    });
+    return handleResponse(response);
+  },
+
+  /**
+   * Stream notifications (SSE-like)
+   * Lưu ý: không dùng handleResponse vì cần đọc response body dạng stream.
+   */
+  streamCTVNotifications: async () => {
+    return fetch(`${API_BASE_URL}/ctv/notifications/stream`, {
+      method: 'GET',
+      headers: getAuthHeaders()
+    });
   },
 
   /**
@@ -2100,83 +2652,85 @@ const apiService = {
     return handleResponse(response);
   },
 
-  /**
-   * Outlook Email API
-   */
-  getOutlookAuthorizationUrl: async () => {
-    const response = await fetch(`${API_BASE_URL}/admin/emails/outlook/authorize`, {
-      method: 'GET',
-      headers: getAuthHeaders()
-    });
-    return handleResponse(response);
-  },
-
-  getOutlookConnections: async () => {
-    const response = await fetch(`${API_BASE_URL}/admin/emails/outlook/connections`, {
-      method: 'GET',
-      headers: getAuthHeaders()
-    });
-    return handleResponse(response);
-  },
-
-  syncOutlookEmails: async (data) => {
-    const response = await fetch(`${API_BASE_URL}/admin/emails/outlook/sync`, {
-      method: 'POST',
-      headers: getAuthHeaders(),
-      body: JSON.stringify(data)
-    });
-    return handleResponse(response);
-  },
-
-  getSyncedEmails: async (params = {}) => {
+  getReportsOverview: async (params = {}) => {
     const queryString = new URLSearchParams(params).toString();
-    const response = await fetch(`${API_BASE_URL}/admin/emails/outlook/synced?${queryString}`, {
+    const response = await fetch(`${API_BASE_URL}/admin/reports/overview?${queryString}`, {
       method: 'GET',
       headers: getAuthHeaders()
     });
     return handleResponse(response);
   },
 
-  getSyncedEmailDetail: async (id) => {
-    const response = await fetch(`${API_BASE_URL}/admin/emails/outlook/synced/${id}`, {
+  getReportsTopCollaborators: async (params = {}) => {
+    const queryString = new URLSearchParams(params).toString();
+    const response = await fetch(`${API_BASE_URL}/admin/reports/top-collaborators?${queryString}`, {
       method: 'GET',
       headers: getAuthHeaders()
     });
     return handleResponse(response);
   },
 
-  sendOutlookEmail: async (data) => {
-    const response = await fetch(`${API_BASE_URL}/admin/emails/outlook/send`, {
+  /**
+   * Export monthly report as Excel. Returns raw Response; caller should use response.blob() then trigger download.
+   */
+  getReportsExportExcel: async (params = {}) => {
+    const queryString = new URLSearchParams(params).toString();
+    const response = await fetch(`${API_BASE_URL}/admin/reports/export-excel?${queryString}`, {
+      method: 'GET',
+      headers: { Authorization: getAuthHeaders().Authorization }
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({ message: response.statusText }));
+      throw new Error(err.message || 'Export failed');
+    }
+    return response;
+  },
+
+  /**
+   * AI matching — không dùng JWT backend; gọi trực tiếp service AI (CORS phải mở hoặc dùng proxy).
+   * GET …/compare/0/api/v1/match/cv/{cvId}/jobs?top_k=… → [{ id, similarity_score, metadata }]
+   * @param {string|number} cvId
+   * @param {{ top_k?: number }} [options] — mặc định top_k = 20
+   */
+  getAiMatchJobsForCv: async (cvId, options = {}) => {
+    const topK = options.top_k != null ? Math.max(1, Number(options.top_k)) : DEFAULT_AI_MATCH_TOP_K;
+    const base = getAiApiBaseUrl();
+    const qs = new URLSearchParams({ top_k: String(topK) });
+    const url = `${base}/compare/0/api/v1/match/cv/${encodeURIComponent(cvId)}/jobs?${qs.toString()}`;
+    const response = await fetch(url, { method: 'GET' });
+    return handleAiJsonResponse(response);
+  },
+
+  /**
+   * GET …/compare/0/api/v1/match/job/{jobId}/cvs?top_k=…
+   * @param {string|number} jobId
+   * @param {{ top_k?: number }} [options] — mặc định top_k = 20
+   */
+  getAiMatchCvsForJob: async (jobId, options = {}) => {
+    const topK = options.top_k != null ? Math.max(1, Number(options.top_k)) : DEFAULT_AI_MATCH_TOP_K;
+    const base = getAiApiBaseUrl();
+    const qs = new URLSearchParams({ top_k: String(topK) });
+    const url = `${base}/compare/0/api/v1/match/job/${encodeURIComponent(jobId)}/cvs?${qs.toString()}`;
+    const response = await fetch(url, { method: 'GET' });
+    return handleAiJsonResponse(response);
+  },
+
+  /**
+   * POST …/reranking/generate-reasons — body: { jd_id, candidate_id } (ID job + ID hồ sơ/CV trong hệ thống).
+   */
+  getAiMatchingReasons: async ({ jd_id, candidate_id }) => {
+    const base = getAiApiBaseUrl();
+    const response = await fetch(`${base}/reranking/generate-reasons`, {
       method: 'POST',
-      headers: getAuthHeaders(),
-      body: JSON.stringify(data)
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        jd_id: Number(jd_id),
+        candidate_id: Number(candidate_id),
+      }),
     });
-    return handleResponse(response);
+    return handleAiJsonResponse(response);
   },
 
-  markEmailAsRead: async (id) => {
-    const response = await fetch(`${API_BASE_URL}/admin/emails/outlook/synced/${id}/read`, {
-      method: 'PATCH',
-      headers: getAuthHeaders()
-    });
-    return handleResponse(response);
-  },
-
-  deleteOutlookConnection: async (id) => {
-    const response = await fetch(`${API_BASE_URL}/admin/emails/outlook/connections/${id}`, {
-      method: 'DELETE',
-      headers: getAuthHeaders()
-    });
-    return handleResponse(response);
-  },
-
-  toggleOutlookSync: async (id) => {
-    const response = await fetch(`${API_BASE_URL}/admin/emails/outlook/connections/${id}/toggle-sync`, {
-      method: 'PATCH',
-      headers: getAuthHeaders()
-    });
-    return handleResponse(response);
-  },
 };
 
 export default apiService;

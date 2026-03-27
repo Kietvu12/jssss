@@ -148,213 +148,152 @@ const AgentHomePageSession4 = () => {
   };
 
   return (
-    <div className="rounded-lg shadow-sm border h-full flex flex-col max-w-full" style={{ backgroundColor: 'white', borderColor: '#f3f4f6' }}>
+    <div className="bg-white rounded-sm sm:rounded-md border border-gray-100 shadow-[0_4px_18px_rgba(15,23,42,0.04)] h-full flex flex-col max-w-full">
       {/* Header */}
-      <div className="p-2.5 sm:p-3 border-b" style={{ borderColor: '#f3f4f6' }}>
-        <div className="flex items-center justify-between mb-3 sm:mb-4 gap-2">
-          <h3 className="text-base sm:text-lg font-bold" style={{ color: '#111827' }}>{t.schedule}</h3>
-          <div className="flex items-center gap-1 sm:gap-2">
+      <div className="p-1 sm:p-1.5 md:p-2 border-b border-gray-100">
+        <div className="mb-0.5 sm:mb-1 flex items-center justify-between gap-0.5">
+          <div>
+            <h3 className="text-[7px] sm:text-[8px] md:text-[9px] font-semibold text-gray-900">{t.schedule}</h3>
+            <p className="text-[6px] sm:text-[7px] md:text-[8px] text-gray-500">
+              {t.interview} / {t.naitei}
+            </p>
+          </div>
+          <div className="flex items-center gap-0.5">
             <button
               onClick={() => setViewMode(viewMode === 'line' ? 'calendar' : 'line')}
               onMouseEnter={() => setHoveredViewModeButton(true)}
               onMouseLeave={() => setHoveredViewModeButton(false)}
-              className="p-1.5 sm:p-2 rounded transition-colors"
+              className="p-0.5 sm:p-1 rounded hover:bg-slate-100 transition-colors text-slate-500"
               title={viewMode === 'line' ? t.agentHomeSwitchToCalendar : t.agentHomeSwitchToList}
-              style={{
-                backgroundColor: hoveredViewModeButton ? '#f3f4f6' : 'transparent'
-              }}
             >
-              {viewMode === 'line' ? (
-                <Grid3x3 className="w-4 h-4" style={{ color: '#4b5563' }} />
-              ) : (
-                <List className="w-4 h-4" style={{ color: '#4b5563' }} />
-              )}
+              {viewMode === 'line' ? <Grid3x3 className="w-2.5 h-2.5 sm:w-3 sm:h-3 md:w-3.5 md:h-3.5" /> : <List className="w-2.5 h-2.5 sm:w-3 sm:h-3 md:w-3.5 md:h-3.5" />}
             </button>
-            <button 
+            <button
               onMouseEnter={() => setHoveredSeeAllButton(true)}
               onMouseLeave={() => setHoveredSeeAllButton(false)}
-              className="text-xs sm:text-sm font-medium transition-colors hidden sm:block"
-              style={{
-                color: hoveredSeeAllButton ? '#111827' : '#4b5563'
-              }}
+              className="text-[7px] sm:text-[8px] md:text-[10px] font-medium text-gray-500 hover:text-gray-900 transition-colors hidden sm:block"
             >
               {t.seeAll}
             </button>
           </div>
         </div>
 
-        {/* Month Navigation - Always visible */}
-        <div className="flex items-center justify-between mb-3">
-          <button 
+        {/* Month Navigation - thanh tháng/năm */}
+        <div className="flex items-center justify-between mb-0.5 sm:mb-1">
+          <button
             onClick={() => handleMonthChange(-1)}
             onMouseEnter={() => setHoveredPrevMonthButton(true)}
             onMouseLeave={() => setHoveredPrevMonthButton(false)}
-            className="p-1 rounded transition-colors"
-            style={{
-              backgroundColor: hoveredPrevMonthButton ? '#f3f4f6' : 'transparent'
-            }}
+            className="p-0 rounded hover:bg-slate-100 text-slate-500 touch-manipulation"
           >
-            <ChevronLeft className="w-4 h-4" style={{ color: '#4b5563' }} />
+            <ChevronLeft className="w-2.5 h-2.5 sm:w-3 sm:h-3 md:w-3.5 md:h-3.5" />
           </button>
-          <span className="text-sm font-semibold" style={{ color: '#111827' }}>
+          <span className="text-[7px] sm:text-[8px] md:text-[9px] font-semibold text-slate-800 leading-tight">
             {monthNames[currentMonth.getMonth()]} {currentMonth.getFullYear()}
           </span>
-          <button 
+          <button
             onClick={() => handleMonthChange(1)}
             onMouseEnter={() => setHoveredNextMonthButton(true)}
             onMouseLeave={() => setHoveredNextMonthButton(false)}
-            className="p-1 rounded transition-colors"
-            style={{
-              backgroundColor: hoveredNextMonthButton ? '#f3f4f6' : 'transparent'
-            }}
+            className="p-0 rounded hover:bg-slate-100 text-slate-500 touch-manipulation"
           >
-            <ChevronRight className="w-4 h-4" style={{ color: '#4b5563' }} />
+            <ChevronRight className="w-2.5 h-2.5 sm:w-3 sm:h-3 md:w-3.5 md:h-3.5" />
           </button>
         </div>
 
-        {/* Date Picker - Only in line mode */}
+        {/* Date Picker - thanh 7 ngày */}
         {viewMode === 'line' && (
-          <div className="flex items-center justify-between mb-3 sm:mb-4 gap-1">
-            <button 
+          <div className="flex items-center justify-between mb-1 sm:mb-1.5 gap-0 flex-1 min-w-0">
+            <button
               onMouseEnter={() => setHoveredDatePickerPrevButton(true)}
               onMouseLeave={() => setHoveredDatePickerPrevButton(false)}
-              className="p-1 rounded transition-colors flex-shrink-0"
-              style={{
-                backgroundColor: hoveredDatePickerPrevButton ? '#f3f4f6' : 'transparent'
-              }}
+              className="p-0 flex-shrink-0 rounded hover:bg-slate-100 text-slate-500 touch-manipulation"
             >
-              <ChevronLeft className="w-4 h-4" style={{ color: '#4b5563' }} />
+              <ChevronLeft className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
             </button>
-            <div className="flex items-center gap-0.5 sm:gap-1 flex-1 justify-center overflow-x-auto schedule-date-scroll">
+            <div className="flex items-center gap-0.5 flex-1 justify-center overflow-x-auto schedule-date-scroll min-w-0 hide-scrollbar">
               {dates.map((item, index) => {
                 const isSelected = selectedDate === item.date;
                 return (
                   <button
                     key={index}
                     onClick={() => setSelectedDate(item.date)}
-                    className="flex flex-col items-center px-1.5 sm:px-2 py-1.5 rounded-lg transition-colors min-w-[44px] sm:min-w-[48px] flex-shrink-0"
-                    style={{
-                      backgroundColor: isSelected ? '#dc2626' : 'transparent',
-                      color: isSelected ? 'white' : '#6b7280'
-                    }}
-                    onMouseEnter={(e) => {
-                      if (!isSelected) {
-                        e.currentTarget.style.backgroundColor = '#f9fafb';
-                      }
-                    }}
-                    onMouseLeave={(e) => {
-                      if (!isSelected) {
-                        e.currentTarget.style.backgroundColor = 'transparent';
-                      }
-                    }}
+                    className={`flex flex-col items-center justify-center px-0.5 sm:px-1 py-0.5 sm:py-1 rounded transition-colors min-w-[28px] sm:min-w-[32px] md:min-w-[36px] flex-shrink-0 touch-manipulation ${
+                      isSelected ? 'bg-blue-500 text-white' : 'text-slate-600 hover:bg-slate-100'
+                    }`}
                   >
-                    <span className="text-xs font-medium">{item.day}</span>
-                    <span className="text-sm font-semibold" style={{ color: isSelected ? 'white' : '#111827' }}>
-                      {item.date}
-                    </span>
+                    <span className="text-[6px] sm:text-[7px] font-medium leading-none">{item.day}</span>
+                    <span className="text-[8px] sm:text-[9px] md:text-[10px] font-semibold leading-none mt-0.5">{item.date}</span>
                   </button>
                 );
               })}
             </div>
-            <button 
+            <button
               onMouseEnter={() => setHoveredDatePickerNextButton(true)}
               onMouseLeave={() => setHoveredDatePickerNextButton(false)}
-              className="p-1 rounded transition-colors flex-shrink-0"
-              style={{
-                backgroundColor: hoveredDatePickerNextButton ? '#f3f4f6' : 'transparent'
-              }}
+              className="p-0 flex-shrink-0 rounded hover:bg-slate-100 text-slate-500 touch-manipulation"
             >
-              <ChevronRight className="w-4 h-4" style={{ color: '#4b5563' }} />
+              <ChevronRight className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
             </button>
           </div>
         )}
 
         {/* Tabs */}
-        <div className="flex items-center gap-2 border-b" style={{ borderColor: '#e5e7eb' }}>
+        <div className="flex items-center gap-0.5 sm:gap-1 border-b border-slate-100">
           <button
             onClick={() => setActiveTab('interview')}
-            className="flex items-center gap-1.5 px-2 sm:px-3 py-2 border-b-2 transition-colors"
-            style={{
-              borderColor: activeTab === 'interview' ? '#dc2626' : 'transparent',
-              color: activeTab === 'interview' ? '#dc2626' : '#6b7280'
-            }}
-            onMouseEnter={(e) => {
-              if (activeTab !== 'interview') {
-                e.currentTarget.style.color = '#374151';
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (activeTab !== 'interview') {
-                e.currentTarget.style.color = '#6b7280';
-              }
-            }}
+            className={`flex items-center gap-0.5 sm:gap-1 px-1 sm:px-1.5 md:px-2 py-1 sm:py-1.5 border-b-2 transition-colors text-[7px] sm:text-[8px] md:text-[9px] font-medium whitespace-nowrap ${
+              activeTab === 'interview' ? 'border-red-600 text-red-600' : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
           >
-            <MessageCircle className="w-4 h-4 flex-shrink-0" style={{ color: activeTab === 'interview' ? '#dc2626' : '#9ca3af' }} />
-            <span className="text-xs font-medium whitespace-nowrap">{t.interview} {interviews.length}</span>
+            <MessageCircle className={`w-2.5 h-2.5 sm:w-3 sm:h-3 md:w-3.5 md:h-3.5 flex-shrink-0 ${activeTab === 'interview' ? 'text-red-600' : 'text-slate-400'}`} />
+            {t.interview} {interviews.length}
           </button>
           <button
             onClick={() => setActiveTab('naitei')}
-            className="flex items-center gap-1.5 px-2 sm:px-3 py-2 border-b-2 transition-colors"
-            style={{
-              borderColor: activeTab === 'naitei' ? '#dc2626' : 'transparent',
-              color: activeTab === 'naitei' ? '#dc2626' : '#6b7280'
-            }}
-            onMouseEnter={(e) => {
-              if (activeTab !== 'naitei') {
-                e.currentTarget.style.color = '#374151';
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (activeTab !== 'naitei') {
-                e.currentTarget.style.color = '#6b7280';
-              }
-            }}
+            className={`flex items-center gap-0.5 sm:gap-1 px-1 sm:px-1.5 md:px-2 py-1 sm:py-1.5 border-b-2 transition-colors text-[7px] sm:text-[8px] md:text-[9px] font-medium whitespace-nowrap ${
+              activeTab === 'naitei' ? 'border-red-600 text-red-600' : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
           >
-            <Calendar className="w-4 h-4 flex-shrink-0" style={{ color: activeTab === 'naitei' ? '#dc2626' : '#9ca3af' }} />
-            <span className="text-xs font-medium whitespace-nowrap">{t.naitei} {naitei.length}</span>
+            <Calendar className={`w-2.5 h-2.5 sm:w-3 sm:h-3 md:w-3.5 md:h-3.5 flex-shrink-0 ${activeTab === 'naitei' ? 'text-red-600' : 'text-slate-400'}`} />
+            {t.naitei} {naitei.length}
           </button>
         </div>
       </div>
 
       {/* Schedule Content */}
-      <div className="flex-1 overflow-y-auto p-2.5 sm:p-3">
-        <div className="space-y-2 sm:space-y-3">
-          {/* Calendar View - Only in calendar mode */}
+      <div className="flex-1 overflow-y-auto p-1 sm:p-1.5 md:p-2">
+        <div className="space-y-1 sm:space-y-1.5">
           {viewMode === 'calendar' && (
-            <div className="mb-3 pb-3 border-b" style={{ borderColor: '#e5e7eb' }}>
-              {/* Calendar Grid - thu gọn */}
-              <div className="grid grid-cols-7 gap-0.5 mb-1">
-                {/* Day headers */}
+            <div className="mb-1.5 pb-1.5 border-b border-slate-100">
+              <div className="grid grid-cols-7 gap-0.5 mb-0.5 text-[6px] sm:text-[7px] md:text-[8px] text-slate-500 font-medium">
                 {(t.calendarDayNames || ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']).map((day) => (
-                  <div key={day} className="text-center text-[10px] font-semibold py-0.5" style={{ color: '#4b5563' }}>
-                    {day}
-                  </div>
+                  <div key={day} className="text-center py-0">{day}</div>
                 ))}
               </div>
               <div className="grid grid-cols-7 gap-0.5">
                 {calendarDays.map((day, index) => {
                   if (day === null) {
-                    return <div key={`empty-${index}`} className="aspect-square"></div>;
+                    return <div key={`empty-${index}`} className="aspect-square min-w-0" />;
                   }
                   const hasEvent = daysWithEvents.has(day);
                   const isSelected = selectedDate === day;
+                  const today = new Date();
+                  const isToday = currentMonth.getMonth() === today.getMonth() && currentMonth.getFullYear() === today.getFullYear() && day === today.getDate();
+                  const ringClass = isToday ? 'border-blue-500 bg-blue-50' : hasEvent ? 'border-indigo-500/40 bg-indigo-50' : 'border-slate-100 bg-white';
                   return (
                     <button
                       key={day}
                       onClick={() => setSelectedDate(day)}
                       onMouseEnter={() => setHoveredCalendarDayIndex(day)}
                       onMouseLeave={() => setHoveredCalendarDayIndex(null)}
-                      className="aspect-square min-w-0 flex flex-col items-center justify-center rounded-md transition-colors relative"
-                      style={{
-                        backgroundColor: isSelected ? '#dc2626' : (hoveredCalendarDayIndex === day ? '#f3f4f6' : 'transparent'),
-                        color: isSelected ? 'white' : '#111827'
-                      }}
+                      className={`aspect-square min-w-0 flex flex-col items-center justify-center rounded border transition-colors relative hover:border-blue-400 hover:bg-blue-50/40 ${ringClass} ${
+                        hoveredCalendarDayIndex === day && !isSelected ? 'border-slate-200 bg-slate-50' : ''
+                      }`}
                     >
-                      <span className="text-xs font-medium" style={{ color: isSelected ? 'white' : '#111827' }}>
-                        {day}
-                      </span>
+                      <span className="text-[7px] sm:text-[8px] md:text-[9px] font-semibold text-slate-900">{day}</span>
                       {hasEvent && (
-                        <span className="absolute bottom-1 w-1 h-1 rounded-full" style={{ backgroundColor: isSelected ? 'white' : '#dc2626' }}></span>
+                        <span className={`absolute bottom-0 w-1 h-1 rounded-full ${isSelected ? 'bg-white' : 'bg-indigo-600'}`} />
                       )}
                     </button>
                   );
@@ -363,72 +302,41 @@ const AgentHomePageSession4 = () => {
             </div>
           )}
 
-          {/* Events List */}
-          <div className="space-y-4">
+          <div className="space-y-1.5 sm:space-y-2">
             {loading ? (
-              <div className="text-center py-8 text-sm" style={{ color: '#6b7280' }}>
-                {t.loading || 'Loading...'}
-              </div>
+              <div className="text-center py-3 sm:py-4 text-[7px] sm:text-[8px] md:text-[10px] text-gray-500">{t.loading || 'Loading...'}</div>
             ) : events.length > 0 ? (
               events.map((event) => (
-                <div key={event.id} className="flex gap-2">
-                  {/* Time */}
-                  <div className="text-xs font-medium pt-1 min-w-[42px]" style={{ color: '#6b7280' }}>
-                    {event.time}
-                  </div>
-
-                  {/* Event Card */}
-                  <div 
-                    className="flex-1 min-w-0 border rounded-lg p-2.5 transition-shadow relative"
+                <div key={event.id} className="flex gap-1 sm:gap-1.5">
+                  <div className="text-[7px] sm:text-[8px] md:text-[9px] font-medium pt-0.5 min-w-[28px] sm:min-w-[32px] text-slate-500 flex-shrink-0">{event.time}</div>
+                  <div
+                    className="flex-1 min-w-0 border border-slate-100 rounded p-1 sm:p-1.5 bg-white hover:border-blue-200 hover:shadow-sm transition-all relative"
                     onMouseEnter={() => setHoveredEventCardIndex(event.id)}
                     onMouseLeave={() => setHoveredEventCardIndex(null)}
-                    style={{
-                      backgroundColor: 'white',
-                      borderColor: '#e5e7eb',
-                      boxShadow: hoveredEventCardIndex === event.id ? '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)' : 'none'
-                    }}
                   >
-                    <button 
-                      className="absolute top-3 right-3 p-1 rounded transition-colors"
+                    <button
+                      className="absolute top-0.5 right-0.5 sm:top-1 sm:right-1 p-0.5 rounded hover:bg-slate-100 text-slate-400"
                       onMouseEnter={() => setHoveredMoreButtonIndex(event.id)}
                       onMouseLeave={() => setHoveredMoreButtonIndex(null)}
-                      style={{
-                        backgroundColor: hoveredMoreButtonIndex === event.id ? '#f3f4f6' : 'transparent'
-                      }}
                     >
-                      <MoreVertical className="w-4 h-4" style={{ color: '#9ca3af' }} />
+                      <MoreVertical className="w-2 h-2 sm:w-2.5 sm:h-2.5 md:w-3 md:h-3" />
                     </button>
-
-                    <div className="flex items-start gap-3 pr-8">
-                      {/* Avatar */}
-                      <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: '#fee2e2' }}>
-                        <User className="w-5 h-5" style={{ color: '#dc2626' }} />
+                    <div className="flex items-start gap-1 sm:gap-1.5 pr-4 sm:pr-5">
+                      <div className="w-5 h-5 sm:w-6 sm:h-6 rounded flex items-center justify-center flex-shrink-0 bg-slate-100 text-slate-600">
+                        <User className="w-2.5 h-2.5 sm:w-3 sm:h-3 md:w-3.5 md:h-3.5" />
                       </div>
-
-                      {/* Content */}
                       <div className="flex-1 min-w-0">
-                        <div className="mb-1">
-                          <h4 className="text-sm font-semibold" style={{ color: '#111827' }}>{event.name}</h4>
-                          <p className="text-xs" style={{ color: '#4b5563' }}>{event.role}</p>
-                        </div>
-                        <p className="text-xs mb-3 leading-relaxed line-clamp-2" style={{ color: '#6b7280' }}>
-                          {event.description}
-                        </p>
+                        <h4 className="text-[7px] sm:text-[8px] md:text-[9px] font-semibold text-slate-900 leading-tight">{event.name}</h4>
+                        <p className="text-[6px] sm:text-[7px] md:text-[8px] text-slate-500 leading-snug">{event.role}</p>
+                        <p className="text-[6px] sm:text-[7px] md:text-[8px] text-slate-500 leading-snug line-clamp-2 mt-0.5">{event.description}</p>
                         <button
-                          onMouseEnter={() => {
-                            if (event.isActive) {
-                              setHoveredGoToMeetingButtonIndex(event.id);
-                            }
-                          }}
+                          onMouseEnter={() => event.isActive && setHoveredGoToMeetingButtonIndex(event.id)}
                           onMouseLeave={() => setHoveredGoToMeetingButtonIndex(null)}
-                          className="px-3 py-1.5 rounded text-xs font-medium transition-colors"
-                          style={{
-                            backgroundColor: event.isActive 
-                              ? (hoveredGoToMeetingButtonIndex === event.id ? '#b91c1c' : '#dc2626')
-                              : '#f3f4f6',
-                            color: event.isActive ? 'white' : '#6b7280',
-                            cursor: event.isActive ? 'pointer' : 'not-allowed'
-                          }}
+                          className={`mt-1 sm:mt-1.5 px-1 sm:px-1.5 py-0.5 rounded text-[7px] sm:text-[8px] md:text-[9px] font-medium transition-colors ${
+                            event.isActive
+                              ? 'bg-red-600 text-white hover:bg-red-700'
+                              : 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                          }`}
                         >
                           {t.goToMeeting}
                         </button>
@@ -438,7 +346,7 @@ const AgentHomePageSession4 = () => {
                 </div>
               ))
             ) : (
-              <div className="text-center py-8 text-sm" style={{ color: '#6b7280' }}>
+              <div className="text-center py-3 sm:py-4 text-[7px] sm:text-[8px] md:text-[10px] text-gray-500">
                 {viewMode === 'calendar' ? t.noEventsForDate : t.noEvents}
               </div>
             )}

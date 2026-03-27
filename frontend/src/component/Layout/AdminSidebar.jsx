@@ -12,9 +12,8 @@ import {
   UserCog,
   Megaphone,
   Mail,
-  Check,
-  Settings,
   ChevronRight,
+  Calendar,
   ChevronLeft,
   List,
   UserPlus,
@@ -23,6 +22,7 @@ import {
   Handshake,
   Menu,
   CheckCircle,
+  Newspaper,
 } from 'lucide-react';
 import { useLanguage } from '../../context/LanguageContext';
 import { translations } from '../../translations/translations';
@@ -45,7 +45,7 @@ const AdminSidebar = () => {
   const [hoveredMenuItemIndex, setHoveredMenuItemIndex] = useState(null);
   const [hoveredSubmenuItemIndex, setHoveredSubmenuItemIndex] = useState(null);
   const [hoveredAccountsItem, setHoveredAccountsItem] = useState(false);
-  const [hoveredSettingsItem, setHoveredSettingsItem] = useState(false);
+  const [hoveredJobCategoryItem, setHoveredJobCategoryItem] = useState(false);
   const [hoveredExpandButton, setHoveredExpandButton] = useState(false);
   const [hoveredDropdownItemIndex, setHoveredDropdownItemIndex] = useState(null);
   const [unreadMessageCount, setUnreadMessageCount] = useState(0);
@@ -107,13 +107,6 @@ const AdminSidebar = () => {
       roles: [1, 2] // Super Admin and Admin Backoffice
     },
     { 
-      id: 'quan-ly-danh-muc-viec-lam', 
-      label: t.adminJobCategoryManagement, 
-      icon: FolderTree, 
-      path: '/admin/job-categories',
-      roles: [1] // Only Super Admin
-    },
-    { 
       id: 'quan-ly-cong-viec', 
       label: t.adminJobManagement, 
       icon: Briefcase, 
@@ -154,6 +147,20 @@ const AdminSidebar = () => {
       icon: Megaphone, 
       path: '/admin/campaigns',
       roles: [1] // Only Super Admin
+    },
+    { 
+      id: 'quan-ly-bai-viet', 
+      label: t.adminPostManagement, 
+      icon: Newspaper, 
+      path: '/admin/posts',
+      roles: [1, 2] // Super Admin and Admin Backoffice
+    },
+    { 
+      id: 'quan-ly-su-kien', 
+      label: t.adminEventManagement || 'Quản lý sự kiện', 
+      icon: Calendar, 
+      path: '/admin/events',
+      roles: [1, 2] // Super Admin and Admin Backoffice
     },
     { 
       id: 'email-he-thong', 
@@ -334,19 +341,28 @@ const AdminSidebar = () => {
 
   return (
     <>
-    <div className={`hidden lg:flex ${isExpanded ? 'w-64' : 'w-28'} h-screen flex flex-col shadow-sm border-r transition-all duration-300 relative`} style={{ backgroundColor: 'white', borderColor: '#e5e7eb', boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)' }}>
+    <div
+      className={`hidden lg:flex ${isExpanded ? 'w-52' : 'w-20'} h-screen flex flex-col shadow-sm border-r transition-all duration-300 relative`}
+      style={{ backgroundColor: 'white', borderColor: '#e5e7eb', boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)' }}
+    >
       {/* Logo Section */}
-      <div className={`${isExpanded ? 'p-6' : 'p-4'} border-b flex items-center ${isExpanded ? 'justify-start' : 'justify-center'}`} style={{ borderColor: '#f3f4f6' }}>
-        <Link to="/admin" className="flex items-center gap-2 cursor-pointer">
-          <div className="w-8 h-8 rounded flex items-center justify-center" style={{ backgroundColor: '#dc2626' }}>
-            <Check className="w-5 h-5" style={{ color: 'white' }} />
-          </div>
-          {isExpanded && <span className="text-xl font-bold" style={{ color: '#111827' }}>JobShare Admin</span>}
+      <div
+        className={`${isExpanded ? 'px-4 py-4' : 'p-3'} border-b flex items-center ${
+          isExpanded ? 'justify-start' : 'justify-center'
+        }`}
+        style={{ borderColor: '#f3f4f6' }}
+      >
+        <Link to="/admin" className="flex items-center cursor-pointer overflow-hidden">
+          <img
+            src="/landing/jobshare-logo.png"
+            alt="JobShare"
+            className={`object-contain ${isExpanded ? 'max-h-9 w-auto' : 'h-8 w-auto max-w-full'}`}
+          />
         </Link>
       </div>
 
       {/* Navigation Section */}
-      <div className="flex-1 overflow-y-auto overflow-x-visible px-4 py-4">
+      <div className="flex-1 overflow-y-auto overflow-x-visible px-2.5 py-3">
         <div className="space-y-1">
           {allMenuItems.map((item) => {
             const Icon = item.icon;
@@ -381,26 +397,25 @@ const AdminSidebar = () => {
                     }}
                     onMouseEnter={() => setHoveredMenuItemIndex(item.id)}
                     onMouseLeave={() => setHoveredMenuItemIndex(null)}
-                    className={`w-full flex ${isExpanded ? 'items-center gap-3' : 'flex-col items-center gap-1'} px-2 py-2.5 rounded-lg transition-colors relative`}
+                    className={`w-full flex ${
+                      isExpanded ? 'items-center gap-2' : 'items-center justify-center'
+                    } px-2 py-1.5 rounded-lg transition-colors relative`}
                     style={{
                       backgroundColor: active 
                         ? '#f3f4f6' 
                         : (hoveredMenuItemIndex === item.id ? '#f9fafb' : 'transparent'),
                       color: active ? '#dc2626' : '#374151'
                     }}
+                    title={!isExpanded ? item.label : undefined}
                   >
-                    <Icon className="w-5 h-5 flex-shrink-0" style={{ color: active ? '#dc2626' : '#4b5563' }} />
-                    {isExpanded ? (
+                    <Icon className="w-4 h-4 flex-shrink-0" style={{ color: active ? '#dc2626' : '#4b5563' }} />
+                    {isExpanded && (
                       <>
-                        <span className="text-sm font-medium flex-1 text-left" style={{ color: active ? '#dc2626' : '#374151' }}>
+                        <span className="text-[11px] sm:text-xs font-medium flex-1 text-left" style={{ color: active ? '#dc2626' : '#374151' }}>
                           {item.label}
                         </span>
-                        <ChevronRight className={`w-4 h-4 transition-transform ${showCollaboratorSubmenu ? 'rotate-90' : ''}`} style={{ color: '#9ca3af' }} />
+                        <ChevronRight className={`w-3.5 h-3.5 transition-transform ${showCollaboratorSubmenu ? 'rotate-90' : ''}`} style={{ color: '#9ca3af' }} />
                       </>
-                    ) : (
-                      <span className="text-[10px] font-medium text-center leading-tight break-words" style={{ color: active ? '#dc2626' : '#374151' }}>
-                        {item.label}
-                      </span>
                     )}
                   </button>
                   {showCollaboratorSubmenu && item.submenu && isExpanded && (
@@ -416,7 +431,7 @@ const AdminSidebar = () => {
                             to={subItem.path}
                             onMouseEnter={() => setHoveredSubmenuItemIndex(subItem.id)}
                             onMouseLeave={() => setHoveredSubmenuItemIndex(null)}
-                            className="w-full flex items-center gap-2 px-3 py-2 rounded-lg transition-colors"
+                            className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg transition-colors"
                             style={{
                               backgroundColor: subActive 
                                 ? '#fef2f2' 
@@ -424,8 +439,8 @@ const AdminSidebar = () => {
                               color: subActive ? '#dc2626' : '#374151'
                             }}
                           >
-                            <SubIcon className="w-4 h-4" style={{ color: subActive ? '#dc2626' : '#6b7280' }} />
-                            <span className={`text-sm flex-1 text-left ${subActive ? 'font-medium' : ''}`} style={{ color: subActive ? '#dc2626' : '#374151' }}>
+                            <SubIcon className="w-3.5 h-3.5" style={{ color: subActive ? '#dc2626' : '#6b7280' }} />
+                            <span className={`text-[11px] flex-1 text-left ${subActive ? 'font-medium' : ''}`} style={{ color: subActive ? '#dc2626' : '#374151' }}>
                               {subItem.label}
                             </span>
                           </Link>
@@ -443,19 +458,20 @@ const AdminSidebar = () => {
                 to={item.path}
                 onMouseEnter={() => setHoveredMenuItemIndex(item.id)}
                 onMouseLeave={() => setHoveredMenuItemIndex(null)}
-                className={`w-full flex ${isExpanded ? 'items-center gap-3' : 'flex-col items-center gap-1'} px-2 py-2.5 rounded-lg transition-colors relative`}
+                className={`w-full flex ${isExpanded ? 'items-center gap-2' : 'items-center justify-center'} px-2 py-1.5 rounded-lg transition-colors relative`}
                 style={{
                   backgroundColor: active 
                     ? '#f3f4f6' 
                     : (hoveredMenuItemIndex === item.id ? '#f9fafb' : 'transparent'),
                   color: active ? '#dc2626' : '#374151'
                 }}
+                title={!isExpanded ? item.label : undefined}
               >
                 <span className="relative inline-flex">
-                  <Icon className="w-5 h-5 flex-shrink-0" style={{ color: active ? '#dc2626' : '#4b5563' }} />
+                  <Icon className="w-4 h-4 flex-shrink-0" style={{ color: active ? '#dc2626' : '#4b5563' }} />
                   {item.id === 'quan-ly-don-tien-cu' && unreadMessageCount > 0 && (
                     <span
-                      className="absolute -top-0.5 -right-0.5 min-w-[8px] h-2 rounded-full flex items-center justify-center text-[10px] font-semibold"
+                      className="absolute -top-0.5 -right-0.5 min-w-[8px] h-2 rounded-full flex items-center justify-center text-[9px] font-semibold"
                       style={{ backgroundColor: '#dc2626', color: '#fff', padding: '0 4px' }}
                       title={
                         language === 'en'
@@ -469,12 +485,8 @@ const AdminSidebar = () => {
                     </span>
                   )}
                 </span>
-                {isExpanded ? (
-                  <span className="text-sm font-medium flex-1 text-left" style={{ color: active ? '#dc2626' : '#374151' }}>
-                    {item.label}
-                  </span>
-                ) : (
-                  <span className="text-[10px] font-medium text-center leading-tight break-words" style={{ color: active ? '#dc2626' : '#374151' }}>
+                {isExpanded && (
+                  <span className="text-[11px] sm:text-xs font-medium flex-1 text-left" style={{ color: active ? '#dc2626' : '#374151' }}>
                     {item.label}
                   </span>
                 )}
@@ -485,81 +497,75 @@ const AdminSidebar = () => {
       </div>
 
       {/* Account Management Section */}
-      <div className={`${isExpanded ? 'p-4' : 'p-2'} border-t`} style={{ borderColor: '#f3f4f6' }}>
+      <div className={`${isExpanded ? 'px-3 py-3' : 'px-2 py-2'} border-t`} style={{ borderColor: '#f3f4f6' }}>
         <Link
           to="/admin/accounts"
           onMouseEnter={() => setHoveredAccountsItem(true)}
           onMouseLeave={() => setHoveredAccountsItem(false)}
-          className={`w-full flex ${isExpanded ? 'items-center gap-3' : 'flex-col items-center gap-1'} px-2 py-2.5 rounded-lg transition-colors`}
+          className={`w-full flex ${isExpanded ? 'items-center gap-2' : 'items-center justify-center'} px-2 py-1.5 rounded-lg transition-colors`}
           style={{
             backgroundColor: isActive('/admin/accounts')
               ? '#f3f4f6'
               : (hoveredAccountsItem ? '#f9fafb' : 'transparent'),
             color: isActive('/admin/accounts') ? '#dc2626' : '#374151'
           }}
+          title={!isExpanded ? t.adminAccountManagement : undefined}
         >
-          <UserCog className="w-5 h-5 flex-shrink-0" style={{ color: isActive('/admin/accounts') ? '#dc2626' : '#4b5563' }} />
-          {isExpanded ? (
-            <span className="text-sm font-medium" style={{ color: isActive('/admin/accounts') ? '#dc2626' : '#374151' }}>
-              {t.adminAccountManagement}
-            </span>
-          ) : (
-            <span className="text-[10px] font-medium text-center leading-tight break-words" style={{ color: isActive('/admin/accounts') ? '#dc2626' : '#374151' }}>
+          <UserCog className="w-4 h-4 flex-shrink-0" style={{ color: isActive('/admin/accounts') ? '#dc2626' : '#4b5563' }} />
+          {isExpanded && (
+            <span className="text-[11px] font-medium" style={{ color: isActive('/admin/accounts') ? '#dc2626' : '#374151' }}>
               {t.adminAccountManagement}
             </span>
           )}
         </Link>
       </div>
 
-      {/* Settings Section */}
-      <div className={`${isExpanded ? 'px-4' : 'px-2'} pb-4`}>
-        <Link
-          to="/admin/settings"
-          onMouseEnter={() => setHoveredSettingsItem(true)}
-          onMouseLeave={() => setHoveredSettingsItem(false)}
-          className={`w-full flex ${isExpanded ? 'items-center gap-3' : 'flex-col items-center gap-1'} px-2 py-2.5 rounded-lg transition-colors`}
-          style={{
-            backgroundColor: isActive('/admin/settings')
-              ? '#f3f4f6'
-              : (hoveredSettingsItem ? '#f9fafb' : 'transparent'),
-            color: isActive('/admin/settings') ? '#dc2626' : '#374151'
-          }}
-        >
-          <Settings className="w-5 h-5 flex-shrink-0" style={{ color: isActive('/admin/settings') ? '#dc2626' : '#4b5563' }} />
-          {isExpanded ? (
-            <span className="text-sm font-medium" style={{ color: isActive('/admin/settings') ? '#dc2626' : '#374151' }}>
-              {t.adminSettings}
-            </span>
-          ) : (
-            <span className="text-[10px] font-medium text-center leading-tight break-words" style={{ color: isActive('/admin/settings') ? '#dc2626' : '#374151' }}>
-              {t.adminSettings}
-            </span>
-          )}
-        </Link>
+      {/* Job Category Section (replace Settings) */}
+      <div className={`${isExpanded ? 'px-3' : 'px-2'} pb-3`}>
+        {isSuperAdmin && (
+          <Link
+            to="/admin/job-categories"
+            onMouseEnter={() => setHoveredJobCategoryItem(true)}
+            onMouseLeave={() => setHoveredJobCategoryItem(false)}
+            className={`w-full flex ${isExpanded ? 'items-center gap-2' : 'items-center justify-center'} px-2 py-1.5 rounded-lg transition-colors`}
+            style={{
+              backgroundColor: isActive('/admin/job-categories')
+                ? '#f3f4f6'
+                : (hoveredJobCategoryItem ? '#f9fafb' : 'transparent'),
+              color: isActive('/admin/job-categories') ? '#dc2626' : '#374151'
+            }}
+            title={!isExpanded ? t.adminJobCategoryManagement : undefined}
+          >
+            <FolderTree className="w-4 h-4 flex-shrink-0" style={{ color: isActive('/admin/job-categories') ? '#dc2626' : '#4b5563' }} />
+            {isExpanded && (
+              <span className="text-[11px] font-medium" style={{ color: isActive('/admin/job-categories') ? '#dc2626' : '#374151' }}>
+                {t.adminJobCategoryManagement}
+              </span>
+            )}
+          </Link>
+        )}
       </div>
 
       {/* Expand/Collapse Button */}
-      <div className={`${isExpanded ? 'p-4' : 'p-2'} border-t`} style={{ borderColor: '#f3f4f6' }}>
+      <div className={`${isExpanded ? 'px-3 py-3' : 'px-2 py-2'} border-t`} style={{ borderColor: '#f3f4f6' }}>
         <button
           onClick={() => setIsExpanded(!isExpanded)}
           onMouseEnter={() => setHoveredExpandButton(true)}
           onMouseLeave={() => setHoveredExpandButton(false)}
-          className={`w-full rounded-lg ${isExpanded ? 'px-3 py-2.5 flex items-center gap-2' : 'px-2 py-2 flex flex-col items-center gap-1'} transition-colors`}
+          className={`w-full rounded-lg ${isExpanded ? 'px-2.5 py-2 flex items-center gap-1.5' : 'px-2 py-1.5 flex items-center justify-center'} transition-colors`}
           style={{
             backgroundColor: hoveredExpandButton ? '#b91c1c' : '#dc2626',
             color: 'white'
           }}
+          title={!isExpanded ? t.adminSidebarExpand : undefined}
         >
           {isExpanded ? (
             <>
               <ChevronLeft className="w-5 h-5 flex-shrink-0" />
-              <span className="text-sm font-medium">{t.adminSidebarCollapse}</span>
+              <span className="text-xs font-medium">{t.adminSidebarCollapse}</span>
             </>
           ) : (
-            <>
-              <Menu className="w-5 h-5 flex-shrink-0" />
-              <span className="text-[10px] font-medium text-center leading-tight break-words">{t.adminSidebarExpand}</span>
-            </>
+            <Menu className="w-5 h-5 flex-shrink-0" />
           )}
         </button>
       </div>

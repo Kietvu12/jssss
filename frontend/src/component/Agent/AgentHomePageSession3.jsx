@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
-import { Target, FileText, Star, ExternalLink, X, Briefcase, Building2, MapPin, DollarSign, Calendar, Users, CheckCircle } from 'lucide-react';
+import { Target, FileText, Star, ExternalLink, X, Briefcase, Building2, MapPin, DollarSign, Calendar, Users, CheckCircle, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useLanguage } from '../../context/LanguageContext';
 import { translations } from '../../translations/translations';
 import apiService from '../../services/api';
 import { fetchInformationList, startInformationListPolling, stopInformationListPolling } from '../../store/actions/informationListActions';
+import AgentJobsPageSession2 from './AgentJobsPageSession2';
 
 
 const AgentHomePageSession3 = () => {
@@ -50,6 +51,22 @@ const AgentHomePageSession3 = () => {
   const [hoveredModalLoadMoreButton, setHoveredModalLoadMoreButton] = useState(false);
   const [hoveredJobCardIndex, setHoveredJobCardIndex] = useState(null);
   const [hoveredCloseModalButton, setHoveredCloseModalButton] = useState(false);
+
+  const closeSlidePanel = () => {
+    setShowModal(false);
+    setTimeout(() => {
+      setSelectedItem(null);
+      setModalPage(1);
+      setModalJobs([]);
+    }, 320);
+  };
+
+  // Mở panel với slide-in: khi có selectedItem thì sau 1 frame bật showModal
+  useEffect(() => {
+    if (!selectedItem) return;
+    const id = requestAnimationFrame(() => setShowModal(true));
+    return () => cancelAnimationFrame(id);
+  }, [selectedItem]);
 
   // Fetch data on component mount and start polling
   useEffect(() => {
@@ -331,14 +348,13 @@ const AgentHomePageSession3 = () => {
   };
 
   const handleRowClick = async (item, page = 1) => {
-    setSelectedItem(item);
-    setShowModal(true);
-    setModalLoading(true);
-    setModalPage(page);
-    
     if (page === 1) {
+      setSelectedItem(item);
+      setShowModal(false);
       setModalJobs([]);
     }
+    setModalLoading(true);
+    setModalPage(page);
 
     try {
       let response;
@@ -374,12 +390,8 @@ const AgentHomePageSession3 = () => {
       }
       
       if (response.success && response.data?.jobs) {
-        if (page === 1) {
-          setModalJobs(response.data.jobs);
-        } else {
-          setModalJobs(prev => [...prev, ...response.data.jobs]);
-        }
-        
+        // Phân trang: mỗi trang chỉ hiển thị jobs của trang đó (thay thế, không append)
+        setModalJobs(response.data.jobs);
         if (response.data?.pagination) {
           setModalPagination(response.data.pagination);
         }
@@ -512,14 +524,14 @@ const AgentHomePageSession3 = () => {
 
   if (loading) {
     return (
-      <div className="w-full rounded-lg shadow-sm border overflow-hidden" style={{ backgroundColor: 'white', borderColor: '#f3f4f6' }}>
-        <div className="border-b px-4 py-3" style={{ backgroundColor: '#f9fafb', borderColor: '#e5e7eb' }}>
-          <div className="h-6 rounded w-1/4 animate-pulse" style={{ backgroundColor: '#e5e7eb' }}></div>
+      <div className="w-full bg-white rounded-sm sm:rounded-md border border-gray-100 shadow-[0_4px_18px_rgba(15,23,42,0.04)] overflow-hidden">
+        <div className="border-b border-gray-100 px-2 sm:px-2.5 md:px-3 py-2 sm:py-2.5 bg-slate-50">
+          <div className="h-4 sm:h-5 rounded w-1/4 animate-pulse bg-slate-100" />
         </div>
-        <div className="p-4">
-          <div className="space-y-3">
+        <div className="p-2 sm:p-2.5 md:p-3">
+          <div className="space-y-2">
             {[1, 2, 3].map((i) => (
-              <div key={i} className="h-16 rounded animate-pulse" style={{ backgroundColor: '#f3f4f6' }}></div>
+              <div key={i} className="h-12 sm:h-14 rounded animate-pulse bg-slate-50" />
             ))}
           </div>
         </div>
@@ -527,25 +539,20 @@ const AgentHomePageSession3 = () => {
     );
   }
 
-  // Show error if any
   if (error) {
     return (
-      <div className="w-full rounded-lg shadow-sm border overflow-hidden" style={{ backgroundColor: 'white', borderColor: '#f3f4f6' }}>
-        <div className="border-b px-4 py-3" style={{ backgroundColor: '#f9fafb', borderColor: '#e5e7eb' }}>
-          <h3 className="text-base font-bold" style={{ color: '#111827' }}>{t.informationList || 'Danh sách thông tin'}</h3>
+      <div className="w-full bg-white rounded-sm sm:rounded-md border border-gray-100 overflow-hidden">
+        <div className="border-b border-gray-100 px-2 sm:px-2.5 md:px-3 py-2 sm:py-2.5 bg-slate-50">
+          <h3 className="text-[10px] sm:text-xs font-semibold text-gray-900">{t.informationList || 'Danh sách thông tin'}</h3>
         </div>
-        <div className="p-8 text-center">
-          <p className="mb-2" style={{ color: '#dc2626' }}>{t.agentHomeErrorOccurred}</p>
-          <p className="text-sm" style={{ color: '#6b7280' }}>{error}</p>
+        <div className="p-6 text-center">
+          <p className="mb-2 text-sm text-red-600">{t.agentHomeErrorOccurred}</p>
+          <p className="text-[11px] sm:text-xs text-gray-500">{error}</p>
           <button
             onClick={() => dispatch(fetchInformationList(1, false))}
             onMouseEnter={() => setHoveredRetryButton(true)}
             onMouseLeave={() => setHoveredRetryButton(false)}
-            className="mt-4 px-4 py-2 rounded-lg transition-colors"
-            style={{
-              backgroundColor: hoveredRetryButton ? '#b91c1c' : '#dc2626',
-              color: 'white'
-            }}
+            className="mt-4 px-3 py-1.5 rounded-lg text-xs font-medium bg-red-600 text-white hover:bg-red-700 transition-colors"
           >
             {t.agentHomeRetry}
           </button>
@@ -554,13 +561,19 @@ const AgentHomePageSession3 = () => {
     );
   }
 
-  // Render block Campaign hoặc News (cột dạng list) - gọn, tone đỏ
+  // Màu gradient cho card (xoay vòng 3 kiểu: tím, xanh indigo, hồng)
+  const productCardThemes = [
+    { gradient: 'linear-gradient(135deg, #e9d5ff 0%, #ddd6fe 50%, #c4b5fd 100%)', accent: 'rgba(167,139,250,0.4)' },
+    { gradient: 'linear-gradient(135deg, #312e81 0%, #3730a3 50%, #4338ca 100%)', accent: 'rgba(199,210,254,0.5)' },
+    { gradient: 'linear-gradient(135deg, #f472b6 0%, #fb7185 50%, #fda4af 100%)', accent: 'rgba(251,207,232,0.5)' },
+  ];
+
   const renderBlock = (title, items, defaultIcon) => (
-    <div className="flex flex-col h-full min-h-0 rounded-lg border overflow-hidden" style={{ backgroundColor: '#fafafa', borderColor: '#e5e7eb' }}>
-      <div className="flex items-center justify-between px-2 py-1.5 border-b flex-shrink-0" style={{ borderColor: '#fecaca', backgroundColor: '#fef2f2' }}>
-        <h3 className="text-[11px] font-bold" style={{ color: '#b91c1c' }}>{title}</h3>
+    <div className="flex flex-col h-full min-h-0 rounded-lg border border-slate-100 overflow-hidden bg-slate-50/50">
+      <div className="flex items-center justify-between px-2 py-1.5 border-b border-slate-100 flex-shrink-0 bg-slate-50">
+        <h3 className="text-[8px] sm:text-[9px] md:text-[10px] font-semibold text-slate-700">{title}</h3>
         {items.length > 0 && (
-          <span className="text-[10px]" style={{ color: '#6b7280' }}>{items.length}{language === 'ja' ? '件' : ''}</span>
+          <span className="text-[9px] text-slate-500">{items.length}{language === 'ja' ? '件' : ''}</span>
         )}
       </div>
       {items.length > 0 ? (
@@ -575,25 +588,22 @@ const AgentHomePageSession3 = () => {
                   onClick={() => handleRowClick(item)}
                   onMouseEnter={() => setHoveredCardIndex(item.id)}
                   onMouseLeave={() => setHoveredCardIndex(null)}
-                  className="border rounded-md p-2 transition-all cursor-pointer"
-                  style={{
-                    backgroundColor: 'white',
-                    borderColor: hoveredCardIndex === item.id ? '#fecaca' : '#e5e7eb',
-                    boxShadow: hoveredCardIndex === item.id ? '0 1px 4px rgba(220,38,38,0.12)' : 'none'
-                  }}
+                  className={`border rounded-md p-2 transition-all cursor-pointer bg-white hover:border-blue-200 hover:shadow-sm ${
+                    hoveredCardIndex === item.id ? 'border-blue-200 shadow-sm' : 'border-slate-100'
+                  }`}
                 >
                   <div className="flex items-start gap-1.5">
                     <div className="p-1 rounded flex-shrink-0" style={getTagInlineStyle(item.tagColor)}>
                       <Icon className="w-3 h-3" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <h4 className={`text-[11px] ${item.isNew ? 'font-semibold' : 'font-medium'} leading-tight line-clamp-1`} style={{ color: '#111827' }}>{item.title}</h4>
-                      <span className="text-[10px] mt-0.5 block" style={{ color: '#6b7280' }}>{item.date}</span>
+                      <h4 className={`text-[9px] sm:text-[10px] ${item.isNew ? 'font-semibold' : 'font-medium'} leading-tight line-clamp-1 text-slate-900`}>{item.title}</h4>
+                      <span className="text-[8px] sm:text-[9px] mt-0.5 block text-slate-500">{item.date}</span>
                       {item.description && (
-                        <p className="text-[10px] leading-snug line-clamp-2 mt-0.5" style={{ color: '#6b7280' }}>{item.description}</p>
+                        <p className="text-[8px] sm:text-[9px] leading-snug line-clamp-2 mt-0.5 text-slate-500">{item.description}</p>
                       )}
                       {item.isNew && (
-                        <span className="inline-block mt-1 px-1 py-0.5 text-white text-[9px] font-semibold rounded" style={{ backgroundColor: '#dc2626' }}>{t.new || 'Mới'}</span>
+                        <span className="inline-block mt-1 px-1 py-0.5 text-white text-[8px] font-semibold rounded bg-red-500">{t.new || 'Mới'}</span>
                       )}
                     </div>
                   </div>
@@ -604,329 +614,228 @@ const AgentHomePageSession3 = () => {
         </div>
       ) : (
         <div className="flex-1 flex items-center justify-center p-2">
-          <p className="text-[10px]" style={{ color: '#9ca3af' }}>{t.noData || 'Không có dữ liệu'}</p>
+          <p className="text-[9px] sm:text-[10px] text-slate-400">{t.noData || 'Không có dữ liệu'}</p>
         </div>
       )}
     </div>
   );
 
   return (
-    <div className="w-full rounded-lg shadow-sm border overflow-hidden" style={{ backgroundColor: 'white', borderColor: '#f3f4f6' }}>
-      {/* Job pick up: flat cards gọn, tone đỏ */}
+    <div className="w-full rounded-sm sm:rounded-md overflow-hidden">
       {jobPickups.length > 0 && (
-        <div className="px-2 pt-2 pb-1.5 border-b" style={{ borderColor: '#f3f4f6', backgroundColor: 'white' }}>
-          <h3 className="text-[11px] font-bold mb-1.5 flex items-center gap-1" style={{ color: '#b91c1c' }}>
-            <Star className="w-3.5 h-3.5" />
+        <div className="px-2 sm:px-2.5 md:px-3 pt-2 pb-3 border-b border-slate-100">
+          <h3 className="text-sm sm:text-base font-bold text-slate-900 mb-3">
             {t.agentHomeJobPickup}
           </h3>
-          <div className="flex gap-2 overflow-x-auto pb-0.5 schedule-date-scroll">
-            {jobPickups.map((item) => (
-              <div
-                key={item.id}
-                onClick={() => handleRowClick(item)}
-                onMouseEnter={() => setHoveredCardIndex(item.id)}
-                onMouseLeave={() => setHoveredCardIndex(null)}
-                className="flex-shrink-0 w-[148px] sm:w-[168px] rounded-lg border p-2 transition-all cursor-pointer"
-                style={{
-                  backgroundColor: '#fef2f2',
-                  borderColor: hoveredCardIndex === item.id ? '#dc2626' : '#fecaca',
-                  boxShadow: hoveredCardIndex === item.id ? '0 2px 8px rgba(220, 38, 38, 0.2)' : '0 1px 2px rgba(0,0,0,0.05)'
-                }}
-              >
-                <div className="flex items-start gap-1.5">
-                  <div className="p-1 rounded flex-shrink-0" style={{ backgroundColor: '#fee2e2', color: '#dc2626' }}>
-                    <Star className="w-3 h-3" />
+          <div className="flex gap-3 sm:gap-4 overflow-x-auto pb-1 hide-scrollbar">
+            {jobPickups.map((item, index) => {
+              const theme = productCardThemes[index % productCardThemes.length];
+              return (
+                <div
+                  key={item.id}
+                  onClick={() => handleRowClick(item)}
+                  onMouseEnter={() => setHoveredCardIndex(item.id)}
+                  onMouseLeave={() => setHoveredCardIndex(null)}
+                  className={`flex-shrink-0 w-[160px] sm:w-[200px] rounded-xl border overflow-hidden transition-all cursor-pointer bg-white shadow-sm hover:shadow-md ${
+                    hoveredCardIndex === item.id ? 'border-blue-300 shadow-md ring-1 ring-blue-200' : 'border-slate-100'
+                  }`}
+                >
+                  {/* Phần graphic / thumbnail */}
+                  <div
+                    className="h-24 sm:h-28 relative overflow-hidden"
+                    style={{ background: theme.gradient }}
+                  >
+                    <div className="absolute inset-0 flex items-start justify-start p-2 sm:p-3 gap-1">
+                      <span className="w-2 h-2 rounded-full opacity-80" style={{ backgroundColor: theme.accent }} />
+                      <span className="w-2 h-2 rounded-full opacity-80" style={{ backgroundColor: theme.accent }} />
+                      <span className="w-2 h-2 rounded-full opacity-80" style={{ backgroundColor: theme.accent }} />
+                    </div>
+                    <div className="absolute bottom-2 left-2 right-2 flex gap-1">
+                      <div className="h-1.5 flex-1 rounded opacity-60" style={{ backgroundColor: theme.accent }} />
+                      <div className="h-3 w-8 rounded opacity-50" style={{ backgroundColor: theme.accent }} />
+                    </div>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <h4 className={`text-[11px] ${item.isNew ? 'font-semibold' : 'font-medium'} leading-tight line-clamp-2`} style={{ color: '#111827' }}>{item.title}</h4>
-                    <span className="text-[10px] mt-0.5 block" style={{ color: '#6b7280' }}>{item.date}</span>
-                    {item.description && (
-                      <p className="text-[10px] leading-snug line-clamp-2 mt-0.5" style={{ color: '#6b7280' }}>{item.description}</p>
-                    )}
+                  {/* Phần text trắng */}
+                  <div className="p-2.5 sm:p-3 bg-white">
+                    <p className="text-[10px] sm:text-xs text-slate-500 mb-0.5 flex items-center gap-0.5">
+                      {item.date}
+                      <ExternalLink className="w-3 h-3 opacity-60" />
+                    </p>
+                    <h4 className={`text-xs sm:text-sm font-bold text-slate-900 leading-tight line-clamp-2 ${item.isNew ? 'text-amber-700' : ''}`}>
+                      {item.title}
+                    </h4>
                     {item.isNew && (
-                      <span className="inline-block mt-1 px-1 py-0.5 text-white text-[9px] font-semibold rounded" style={{ backgroundColor: '#dc2626' }}>{t.new || 'Mới'}</span>
+                      <span className="inline-block mt-1.5 px-1.5 py-0.5 text-white text-[9px] font-semibold rounded bg-red-500">
+                        {t.new || 'Mới'}
+                      </span>
                     )}
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
 
-      {/* Campaign | News - 2 cột bên dưới */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-2 p-2 border-b" style={{ borderColor: '#e5e7eb', backgroundColor: '#fafafa' }}>
-        {renderBlock(t.campaign || 'Campaign', campaigns, Target)}
-        {renderBlock(t.news || 'News', newsItems, FileText)}
-      </div>
-
-      {/* Load More - gọn, tone đỏ */}
-      {hasMore && (
-        <div className="px-2 py-1.5" style={{ backgroundColor: '#fff' }}>
-          <button
-            onClick={loadMore}
-            disabled={loadingMore}
-            onMouseEnter={() => setHoveredLoadMoreButton(true)}
-            onMouseLeave={() => setHoveredLoadMoreButton(false)}
-            className="w-full px-2 py-1.5 text-[11px] font-medium border rounded-md transition-colors disabled:cursor-not-allowed"
-            style={{
-              color: '#dc2626',
-              backgroundColor: hoveredLoadMoreButton ? '#fef2f2' : 'white',
-              borderColor: '#fecaca',
-              opacity: loadingMore ? 0.5 : 1
-            }}
-          >
-            {loadingMore ? t.loading : t.agentHomeLoadMore}
-          </button>
+      {campaigns.length > 0 && (
+        <div className="px-2 sm:px-2.5 md:px-3 pt-2 pb-3 border-b border-slate-100">
+          <h3 className="text-sm sm:text-base font-bold text-slate-900 mb-3">
+            {t.campaign || 'Campaign'}
+          </h3>
+          <div className="flex gap-3 sm:gap-4 overflow-x-auto pb-1 hide-scrollbar">
+            {campaigns.map((item, index) => {
+              const theme = productCardThemes[index % productCardThemes.length];
+              return (
+                <div
+                  key={item.id}
+                  onClick={() => handleRowClick(item)}
+                  onMouseEnter={() => setHoveredCardIndex(item.id)}
+                  onMouseLeave={() => setHoveredCardIndex(null)}
+                  className={`flex-shrink-0 w-[160px] sm:w-[200px] rounded-xl border overflow-hidden transition-all cursor-pointer bg-white shadow-sm hover:shadow-md ${
+                    hoveredCardIndex === item.id ? 'border-blue-300 shadow-md ring-1 ring-blue-200' : 'border-slate-100'
+                  }`}
+                >
+                  <div
+                    className="h-24 sm:h-28 relative overflow-hidden"
+                    style={{ background: theme.gradient }}
+                  >
+                    <div className="absolute inset-0 flex items-start justify-start p-2 sm:p-3 gap-1">
+                      <span className="w-2 h-2 rounded-full opacity-80" style={{ backgroundColor: theme.accent }} />
+                      <span className="w-2 h-2 rounded-full opacity-80" style={{ backgroundColor: theme.accent }} />
+                      <span className="w-2 h-2 rounded-full opacity-80" style={{ backgroundColor: theme.accent }} />
+                    </div>
+                    <div className="absolute bottom-2 left-2 right-2 flex gap-1">
+                      <div className="h-1.5 flex-1 rounded opacity-60" style={{ backgroundColor: theme.accent }} />
+                      <div className="h-3 w-8 rounded opacity-50" style={{ backgroundColor: theme.accent }} />
+                    </div>
+                  </div>
+                  <div className="p-2.5 sm:p-3 bg-white">
+                    <p className="text-[10px] sm:text-xs text-slate-500 mb-0.5 flex items-center gap-0.5">
+                      {item.date}
+                      <ExternalLink className="w-3 h-3 opacity-60" />
+                    </p>
+                    <h4 className={`text-xs sm:text-sm font-bold text-slate-900 leading-tight line-clamp-2 ${item.isNew ? 'text-amber-700' : ''}`}>
+                      {item.title}
+                    </h4>
+                    {item.isNew && (
+                      <span className="inline-block mt-1.5 px-1.5 py-0.5 text-white text-[9px] font-semibold rounded bg-red-500">
+                        {t.new || 'Mới'}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
 
-      {/* Jobs Modal */}
-          {showModal && selectedItem && (
-            <div 
-              className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4"
-              style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}
-              onClick={() => setShowModal(false)}
-            >
-              <div 
-                className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[95vh] sm:max-h-[90vh] overflow-hidden flex flex-col"
-                onClick={(e) => e.stopPropagation()}
-              >
-            {/* Modal Header */}
-            <div className="flex items-start sm:items-center justify-between p-4 sm:p-6 border-b-2 gap-3" style={{ borderColor: '#e5e7eb', background: 'linear-gradient(to right, #f9fafb, white)' }}>
-              <div className="flex items-start gap-3 sm:gap-4 flex-1 min-w-0">
+      <div className="grid grid-cols-1 gap-2 p-2 sm:p-2.5 md:p-3 border-b border-slate-100 bg-slate-50/30">
+        {renderBlock(t.news || 'News', newsItems, FileText)}
+      </div>
+
+      {/* Slide-in panel từ bên trái (thay pop-up) */}
+      {selectedItem && (
+        <>
+          {/* Backdrop */}
+          <div
+            className={`fixed inset-0 z-40 bg-slate-900/50 transition-opacity duration-300 ${showModal ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+            onClick={closeSlidePanel}
+            aria-hidden="true"
+          />
+          {/* Panel */}
+          <div
+            className={`fixed inset-y-0 left-0 z-50 w-full max-w-[95vw] sm:max-w-2xl md:max-w-4xl bg-white shadow-xl flex flex-col transition-transform duration-300 ease-out ${
+              showModal ? 'translate-x-0' : '-translate-x-full'
+            }`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between gap-2 p-3 border-b border-slate-100 bg-slate-50 flex-shrink-0">
+              <div className="flex items-center gap-2 min-w-0 flex-1">
                 {selectedItem.tagIcon && (() => {
-                  const iconMap = {
-                    'Star': Star,
-                    'Target': Target,
-                    'FileText': FileText
-                  };
+                  const iconMap = { 'Star': Star, 'Target': Target, 'FileText': FileText };
                   const IconComponent = iconMap[selectedItem.tagIcon] || FileText;
                   return (
-                    <div className="p-2 sm:p-3 rounded-xl shadow-sm flex-shrink-0" style={getTagInlineStyle(selectedItem.tagColor)}>
-                      <IconComponent className="w-5 h-5 sm:w-6 sm:h-6" />
+                    <div className="p-1.5 rounded-lg flex-shrink-0 border border-slate-100" style={getTagInlineStyle(selectedItem.tagColor)}>
+                      <IconComponent className="w-4 h-4" />
                     </div>
                   );
                 })()}
-                <div className="flex-1 min-w-0">
-                  <h3 className="text-lg sm:text-xl font-bold mb-1 break-words" style={{ color: '#111827' }}>{selectedItem.title}</h3>
-                  <p className="text-xs sm:text-sm line-clamp-2" style={{ color: '#4b5563' }}>{selectedItem.description}</p>
+                <div className="min-w-0">
+                  <h3 className="text-sm font-bold truncate text-gray-900">{selectedItem.title}</h3>
                   {modalPagination.total > 0 && (
-                    <p className="text-xs mt-1" style={{ color: '#6b7280' }}>
+                    <p className="text-[10px] text-gray-500">
                       {t.agentHomeTotalJobs.replace('{count}', modalPagination.total)}
                     </p>
                   )}
                 </div>
               </div>
-              <button 
-                onClick={() => {
-                  setShowModal(false);
-                  setModalPage(1);
-                  setModalJobs([]);
-                }}
+              <button
+                type="button"
+                onClick={closeSlidePanel}
                 onMouseEnter={() => setHoveredCloseModalButton(true)}
                 onMouseLeave={() => setHoveredCloseModalButton(false)}
-                className="p-2 rounded-lg transition-colors flex-shrink-0"
-                style={{
-                  backgroundColor: hoveredCloseModalButton ? '#e5e7eb' : 'transparent'
-                }}
+                className="p-2 rounded-lg hover:bg-slate-200 text-slate-600 flex-shrink-0"
               >
-                <X className="w-5 h-5" style={{ color: '#4b5563' }} />
+                <X className="w-5 h-5" />
               </button>
             </div>
 
-                {/* Modal Content */}
-                <div className="flex-1 overflow-y-auto p-3 sm:p-6" style={{ backgroundColor: '#f9fafb' }}>
-                  {modalLoading && modalJobs.length === 0 ? (
-                    <div className="flex items-center justify-center py-12">
-                      <div style={{ color: '#6b7280' }}>
-                        {t.loading}
-                      </div>
-                    </div>
-                  ) : modalJobs.length === 0 ? (
-                    <div className="flex items-center justify-center py-12">
-                      <div className="text-center">
-                        <p className="text-base sm:text-lg mb-2" style={{ color: '#6b7280' }}>
-                          {t.agentHomeNoJobs}
-                        </p>
-                        <p className="text-xs sm:text-sm" style={{ color: '#9ca3af' }}>
-                          {t.agentHomeNoJobsRelated}
-                        </p>
-                      </div>
-                    </div>
-                  ) : (
-                    <>
-                      <div className="grid grid-cols-1 gap-3 sm:gap-4">
-                        {modalJobs.map((job) => {
-                          const formattedJob = formatJob(job);
-                          return (
-                            <div
-                              key={job.id}
-                              onClick={() => {
-                                setShowModal(false);
-                                setModalPage(1);
-                                setModalJobs([]);
-                                navigate(`/agent/jobs/${job.id}`);
-                              }}
-                              onMouseEnter={() => setHoveredJobCardIndex(job.id)}
-                              onMouseLeave={() => setHoveredJobCardIndex(null)}
-                              className="border-2 rounded-xl p-3 sm:p-5 shadow-sm transition-all cursor-pointer group"
-                              style={{
-                                backgroundColor: 'white',
-                                borderColor: hoveredJobCardIndex === job.id ? '#fca5a5' : '#e5e7eb',
-                                boxShadow: hoveredJobCardIndex === job.id ? '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)' : '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
-                              }}
-                            >
-                              <div className="flex flex-col sm:flex-row gap-3 sm:gap-5">
-                            {/* Main Content */}
-                            <div className="flex-1 space-y-3">
-                              {/* Header: Job Code + Tags */}
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-3">
-                                  <span className="text-xs font-mono px-2 py-1 rounded" style={{ color: '#6b7280', backgroundColor: '#f3f4f6' }}>
-                                    {formattedJob.jobCode}
-                                  </span>
-                                  {formattedJob.isHot && (
-                                    <span className="px-2.5 py-1 border rounded-full text-xs font-semibold" style={{ backgroundColor: '#fee2e2', color: '#b91c1c', borderColor: '#fca5a5' }}>
-                                      🔥 Hot
-                                    </span>
-                                  )}
-                                  {formattedJob.isPinned && (
-                                    <span className="px-2.5 py-1 border rounded-full text-xs font-semibold" style={{ backgroundColor: '#dbeafe', color: '#1e40af', borderColor: '#93c5fd' }}>
-                                      📌 Pinned
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
-
-                              {/* Job Title */}
-                              <h4 className="text-lg font-bold leading-tight transition-colors" style={{ color: hoveredJobCardIndex === job.id ? '#dc2626' : '#111827' }}>
-                                {formattedJob.title}
-                              </h4>
-
-                              {/* Info Grid */}
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                {/* Job Category */}
-                                {formattedJob.category && (
-                                  <div className="flex items-center gap-2">
-                                    <Briefcase className="w-4 h-4 flex-shrink-0" style={{ color: '#9ca3af' }} />
-                                    <div className="text-sm" style={{ color: '#374151' }}>
-                                      <span className="font-medium" style={{ color: '#6b7280' }}>{t.jobCategory || 'Ngành nghề'}:</span>{' '}
-                                      <span style={{ color: '#111827' }}>{formattedJob.category}</span>
-                                    </div>
-                                  </div>
-                                )}
-
-                                {/* Company */}
-                                {formattedJob.company && (
-                                  <div className="flex items-center gap-2">
-                                    <Building2 className="w-4 h-4 flex-shrink-0" style={{ color: '#9ca3af' }} />
-                                    <div className="text-sm" style={{ color: '#374151' }}>
-                                      <span className="font-medium" style={{ color: '#6b7280' }}>{t.hiringCompany || 'Công ty'}:</span>{' '}
-                                      <span style={{ color: '#111827' }}>{formattedJob.company}</span>
-                                    </div>
-                                  </div>
-                                )}
-                              </div>
-
-                              {/* Work Location */}
-                              {formattedJob.workLocation && (
-                                <div className="flex items-start gap-2 pt-2 border-t" style={{ borderColor: '#f3f4f6' }}>
-                                  <MapPin className="w-4 h-4 mt-0.5 flex-shrink-0" style={{ color: '#9ca3af' }} />
-                                  <div className="text-sm flex-1" style={{ color: '#374151' }}>
-                                    <span className="font-medium" style={{ color: '#6b7280' }}>{t.workLocation || 'Địa điểm'}:</span>
-                                    <div className="mt-1 whitespace-pre-line line-clamp-2" style={{ color: '#111827' }}>
-                                      {formattedJob.workLocation}
-                                    </div>
-                                  </div>
-                                </div>
-                              )}
-
-                              {/* Salary */}
-                              {formattedJob.estimatedSalary && (
-                                <div className="flex items-start gap-2 pt-2 border-t" style={{ borderColor: '#f3f4f6' }}>
-                                  <DollarSign className="w-4 h-4 mt-0.5 flex-shrink-0" style={{ color: '#9ca3af' }} />
-                                  <div className="text-sm flex-1" style={{ color: '#374151' }}>
-                                    <span className="font-medium" style={{ color: '#6b7280' }}>{t.salary || 'Lương'}:</span>
-                                    <div className="mt-1 whitespace-pre-line line-clamp-2" style={{ color: '#111827' }}>
-                                      {formattedJob.estimatedSalary}
-                                    </div>
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-
-                                {/* Commission Section */}
-                                <div className="w-full sm:w-48 flex-shrink-0">
-                                  <div className="border-2 rounded-xl p-3 sm:p-4 h-full flex flex-row sm:flex-col items-center sm:justify-center gap-3 sm:gap-0 shadow-sm" style={{ background: 'linear-gradient(to bottom right, #fef2f2, #fee2e2)', borderColor: '#fca5a5' }}>
-                                    <div className="text-xs font-semibold sm:mb-2 uppercase tracking-wide" style={{ color: '#991b1b' }}>
-                                      {t.companyCommission || 'Hoa hồng'}
-                                    </div>
-                                    <div className="text-xl sm:text-2xl font-bold" style={{ color: '#7f1d1d' }}>
-                                      {formattedJob.commission}
-                                    </div>
-                                  </div>
-                                </div>
-                          </div>
-                        </div>
-                      );
-                    })}
+            <div className="flex-1 overflow-y-auto flex flex-col min-h-0 p-2 sm:p-3">
+              {modalLoading && modalJobs.length === 0 ? (
+                <div className="flex items-center justify-center py-12 text-gray-500">
+                  {t.loading}
+                </div>
+              ) : modalJobs.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12 text-center">
+                  <p className="text-sm font-medium text-gray-600">{t.agentHomeNoJobs}</p>
+                  <p className="text-xs text-gray-400 mt-1">{t.agentHomeNoJobsRelated}</p>
+                </div>
+              ) : (
+                <>
+                  <div className="flex-1 min-h-0">
+                    <AgentJobsPageSession2
+                      jobs={modalJobs}
+                      showAllJobs
+                      hideViewMoreButton
+                      onJobClick={(job) => {
+                        closeSlidePanel();
+                        navigate(`/agent/jobs/${job.id}`, { state: { from: 'agent-jobs' } });
+                      }}
+                    />
                   </div>
-
-                  {/* Load More Button for Modal */}
-                  {modalPage < modalPagination.totalPages && (
-                    <div className="mt-6 flex justify-center">
-                      <button
-                        onClick={loadMoreModalJobs}
-                        disabled={modalLoading}
-                        onMouseEnter={() => setHoveredModalLoadMoreButton(true)}
-                        onMouseLeave={() => setHoveredModalLoadMoreButton(false)}
-                        className="px-6 py-3 text-sm font-medium text-white rounded-lg transition-colors disabled:cursor-not-allowed shadow-md"
-                        style={{
-                          backgroundColor: hoveredModalLoadMoreButton ? '#b91c1c' : '#dc2626',
-                          opacity: modalLoading ? 0.5 : 1,
-                          boxShadow: hoveredModalLoadMoreButton ? '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)' : '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
-                        }}
-                      >
-                        {modalLoading 
-                          ? (language === 'vi' ? 'Đang tải...' : language === 'en' ? 'Loading...' : '読み込み中...')
-                          : (language === 'vi' ? `Xem thêm (${modalPagination.total - modalJobs.length} còn lại)` : language === 'en' ? `Load More (${modalPagination.total - modalJobs.length} remaining)` : `もっと見る (残り${modalPagination.total - modalJobs.length}件)`)
-                        }
-                      </button>
-                    </div>
-                  )}
-
-                  {/* Pagination Info */}
                   {modalPagination.totalPages > 1 && (
-                    <div className="mt-4 text-center text-sm" style={{ color: '#6b7280' }}>
-                      {language === 'vi' 
-                        ? `Trang ${modalPage} / ${modalPagination.totalPages} (${modalJobs.length} / ${modalPagination.total} việc làm)`
-                        : language === 'en'
-                        ? `Page ${modalPage} / ${modalPagination.totalPages} (${modalJobs.length} / ${modalPagination.total} jobs)`
-                        : `ページ ${modalPage} / ${modalPagination.totalPages} (${modalJobs.length} / ${modalPagination.total} 件)`}
+                    <div className="pt-3 pb-2 flex items-center justify-center gap-2 border-t border-slate-100 mt-2 flex-shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => selectedItem && modalPage > 1 && handleRowClick(selectedItem, modalPage - 1)}
+                        disabled={modalLoading || modalPage <= 1}
+                        className="p-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      >
+                        <ChevronLeft className="w-4 h-4" />
+                      </button>
+                      <span className="text-xs text-slate-600 min-w-[120px] text-center">
+                        {language === 'vi'
+                          ? `Trang ${modalPage} / ${modalPagination.totalPages}`
+                          : language === 'en'
+                            ? `Page ${modalPage} / ${modalPagination.totalPages}`
+                            : `ページ ${modalPage} / ${modalPagination.totalPages}`}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => selectedItem && modalPage < modalPagination.totalPages && handleRowClick(selectedItem, modalPage + 1)}
+                        disabled={modalLoading || modalPage >= modalPagination.totalPages}
+                        className="p-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      >
+                        <ChevronRight className="w-4 h-4" />
+                      </button>
                     </div>
                   )}
                 </>
               )}
             </div>
-
-            {/* Modal Footer */}
-            <div className="p-4 border-t flex justify-end" style={{ borderColor: '#e5e7eb', backgroundColor: '#f9fafb' }}>
-              <button
-                onClick={() => setShowModal(false)}
-                onMouseEnter={() => setHoveredCloseButton(true)}
-                onMouseLeave={() => setHoveredCloseButton(false)}
-                className="px-6 py-2 rounded-lg transition-colors font-medium"
-                style={{
-                  backgroundColor: hoveredCloseButton ? '#d1d5db' : '#e5e7eb',
-                  color: '#374151'
-                }}
-              >
-                {language === 'vi' ? 'Đóng' : language === 'en' ? 'Close' : '閉じる'}
-              </button>
-            </div>
           </div>
-        </div>
+        </>
       )}
     </div>
   );

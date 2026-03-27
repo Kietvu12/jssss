@@ -10,7 +10,11 @@ const JPRESIDENCE_LABELS = {
   4: '永住者',
   5: '日本人の配偶者等',
   6: '定住者',
-  7: 'その他'
+  7: 'その他',
+  8: '高度専門職',
+  9: '技能実習',
+  10: '家族滞在',
+  11: '短期滞在'
 };
 
 /**
@@ -235,6 +239,8 @@ export function generateCvTemplateHtml(cv, options = {}) {
           out.push({
             period: w.period || next.period || '',
             company_name: companyName,
+            position_name: w.position_name || next.position_name || w.positionName || next.positionName || w.role || next.role || w.jobTitle || next.jobTitle || '',
+            location: w.location || next.location || w.workLocation || next.workLocation || w.work_location || next.work_location || '',
             business_purpose: w.business_purpose || next.business_purpose || '',
             scale_role: w.scale_role || next.scale_role || '',
             description: w.description || next.description || '',
@@ -247,10 +253,24 @@ export function generateCvTemplateHtml(cv, options = {}) {
         }
       }
       if (cn.endsWith(' 退社')) {
-        out.push({ ...w, company_name: cn.replace(/\s*退社\s*$/, '').trim(), roleCheckboxes: w.roleCheckboxes || [], processCheckboxes: w.processCheckboxes || [] });
+        out.push({
+          ...w,
+          company_name: cn.replace(/\s*退社\s*$/, '').trim(),
+          position_name: w.position_name || w.positionName || w.role || w.jobTitle || '',
+          location: w.location || w.workLocation || w.work_location || '',
+          roleCheckboxes: w.roleCheckboxes || [],
+          processCheckboxes: w.processCheckboxes || [],
+        });
         continue;
       }
-      out.push({ ...w, company_name: cn || w.company_name, roleCheckboxes: w.roleCheckboxes || [], processCheckboxes: w.processCheckboxes || [] });
+      out.push({
+        ...w,
+        company_name: cn || w.company_name,
+        position_name: w.position_name || w.positionName || w.role || w.jobTitle || '',
+        location: w.location || w.workLocation || w.work_location || '',
+        roleCheckboxes: w.roleCheckboxes || [],
+        processCheckboxes: w.processCheckboxes || [],
+      });
     }
     return out.length ? out : [{ period: '', company_name: '', business_purpose: '', scale_role: '', description: '', tools_tech: '' }];
   })();
@@ -306,36 +326,36 @@ export function generateCvTemplateHtml(cv, options = {}) {
     const employmentPlace = w.employmentPlace || '';
     return { period, company_name: companyName, description: w.description || '', employmentPlace };
   });
-  const learnedToolsStr = (d.learnedTools || []).filter(Boolean).join('、');
-  const expToolsStr = (d.experienceTools || []).filter(Boolean).join('、');
-  const learnedSet = new Set(((d.learnedTools || []).filter(Boolean).map(t => String(t).trim())));
-  const expSet = new Set(((d.experienceTools || []).filter(Boolean).map(t => String(t).trim())));
   const toolsNotes = d.toolsSoftwareNotes || {};
   const toolsNotesLearned = toolsNotes.learned || {};
   const toolsNotesExp = toolsNotes.experienced || {};
-  const TECHNICAL_TOOLS_ROWS = [['AutoCAD', 'CATIA'], ['I-DEAS', 'SolidWorks'], ['PLC', 'C++'], ['NX', 'Java']];
+  const learnedList = (d.learnedTools || []).filter(t => t != null);
+  const expList = (d.experienceTools || []).filter(t => t != null);
+  const toolsRowCount = Math.max(1, learnedList.length, expList.length);
   const toolsTableHtml = cvTemplate === 'cv_technical' ? `
-  <!-- 使用可能ツール・ソフトウェア等枠 (CV Technical) -->
+  <!-- 使用可能ツール・ソフトウェア等枠 (CV Technical): dữ liệu từ 24 & 25, không checkbox, mỗi ô = [tên | ghi chú] -->
   <table style="width:100%;border-collapse:collapse;font-size:10px;border:1px solid #1f2937;margin-top:8px">
     <tr>
-      <td rowspan="5" style="border:1px solid #1f2937;padding:6px;text-align:center;vertical-align:middle;background:#e2efd9;width:5rem">使用可能ツール・ソフトウェア等枠</td>
-      <td colspan="4" style="border:1px solid #1f2937;padding:4px;text-align:center;background:#e2efd9">学習したツール・ソフトウェア</td>
-      <td colspan="4" style="border:1px solid #1f2937;padding:4px;text-align:center;background:#e2efd9">業務で利用したツール・ソフトウェア</td>
+      <td rowspan="${toolsRowCount + 1}" style="border:1px solid #1f2937;padding:6px;text-align:center;vertical-align:middle;background:#e2efd9;width:5rem">使用可能ツール・ソフトウェア等枠</td>
+      <td colspan="2" style="border:1px solid #1f2937;padding:4px;text-align:center;background:#e2efd9">学習したツール・ソフトウェア</td>
+      <td colspan="2" style="border:1px solid #1f2937;padding:4px;text-align:center;background:#e2efd9">業務で利用したツール・ソフトウェア</td>
     </tr>
-    ${TECHNICAL_TOOLS_ROWS.map((row) => `
-    <tr>
-      ${row.map((tool) => {
-        const learnedChecked = learnedSet.has(tool);
-        const noteLearned = toolsNotesLearned[tool] || '';
-        return `<td style="border:1px solid #1f2937;padding:4px;text-align:left">${learnedChecked ? '■' : '□'} ${esc(tool)}</td><td style="border:1px solid #1f2937;padding:4px;text-align:center;min-width:2.5rem">${orBlank(noteLearned)}</td>`;
-      }).join('')}
-      ${row.map((tool) => {
-        const expChecked = expSet.has(tool);
-        const noteExp = toolsNotesExp[tool] || '';
-        return `<td style="border:1px solid #1f2937;padding:4px;text-align:left">${expChecked ? '■' : '□'} ${esc(tool)}</td><td style="border:1px solid #1f2937;padding:4px;text-align:center;min-width:2.5rem">${orBlank(noteExp)}</td>`;
-      }).join('')}
-    </tr>
-    `).join('')}
+    ${Array.from({ length: toolsRowCount }).map((_, ri) => {
+      const learnedName = learnedList[ri] ?? '';
+      const expName = expList[ri] ?? '';
+      const learnedDisplay = learnedName ? esc(learnedName) : '　';
+      const expDisplay = expName ? esc(expName) : '　';
+      const learnedKey = learnedName || `__learned_${ri}`;
+      const expKey = expName || `__experienced_${ri}`;
+      const noteLearned = toolsNotesLearned[learnedKey] ?? '';
+      const noteExp = toolsNotesExp[expKey] ?? '';
+      return `<tr>
+        <td style="border:1px solid #1f2937;padding:4px;text-align:left;border-right:2px dotted #1f2937">${learnedDisplay}</td>
+        <td style="border:1px solid #1f2937;padding:4px;text-align:center;min-width:2.5rem;border-left:2px dotted #1f2937">${orBlank(noteLearned)}</td>
+        <td style="border:1px solid #1f2937;padding:4px;text-align:left;border-right:2px dotted #1f2937">${expDisplay}</td>
+        <td style="border:1px solid #1f2937;padding:4px;text-align:center;min-width:2.5rem;border-left:2px dotted #1f2937">${orBlank(noteExp)}</td>
+      </tr>`;
+    }).join('')}
   </table>
 ` : '';
   const jlptDisplay = d.jlptLevel ? (String(d.jlptLevel).startsWith('N') ? String(d.jlptLevel) : 'N' + d.jlptLevel) : '';
@@ -616,37 +636,41 @@ ${shokumuItBlockRows}
   </div>
   <div style="margin-bottom:8px;font-size:10px"><strong>■ 職務要約</strong></div>
   <div style="border:1px solid #1f2937;border-radius:4px;min-height:80px;padding:8px;font-size:10px;background:#fafafa;white-space:pre-wrap;margin-bottom:16px">${orBlank(d.careerSummary)}</div>
+
+  <!-- 職務経歴 (match CvTemplateTechnical.jsx tab shokumu) -->
   <div style="border:1px solid #1f2937;padding:6px;text-align:center;font-weight:bold;background:#e2efd9;margin-bottom:0">職務経歴</div>
-  ${workExps.map((emp, idx) => `
-  <div style="border:1px solid #1f2937;border-top:none;margin-bottom:0;font-size:10px">
-    <table style="width:100%;border-collapse:collapse">
+  ${(() => {
+    const labels = ['【職歴１】', '【職歴２】', '【職歴３】'];
+    const defaultPeriods = ['2016年6月 ~ 2018年6月 (例)', '2018年6月 ~ 2022年6月 (例)', '2022年6月 ~ 現在 (例)'];
+    const list = workExpsPadded;
+    return list.map((emp, blockIndex) => {
+      const label = labels[blockIndex] || `【職歴${blockIndex + 1}】`;
+      const pd = defaultPeriods[blockIndex] || '';
+      return `
+  <table style="width:100%;border-collapse:collapse;font-size:10px;border:1px solid #1f2937;border-top:${blockIndex === 0 ? 'none' : '0'};margin-top:0">
+    <tbody>
       <tr>
-        <td style="width:20%;border:1px solid #1f2937;padding:6px;background:#e2efd9;font-weight:500;text-align:center">期間</td>
-        <td style="border:1px solid #1f2937;padding:6px">${orBlank(emp.period)}</td>
+        <td style="border:1px solid #1f2937;padding:4px;text-align:center;background:#e5e7eb;width:11%">${esc(label)}</td>
+        <td style="border:1px solid #1f2937;padding:4px;text-align:center;background:#e5e7eb;width:40%;min-width:38%">${orBlank(emp.company_name)}</td>
+        <td style="border:1px solid #1f2937;padding:4px;text-align:center;background:#e5e7eb">${orBlank(emp.position_name)}</td>
+        <td style="border:1px solid #1f2937;padding:4px;text-align:center;background:#e5e7eb;width:12%;max-width:12%">勤務地</td>
       </tr>
       <tr>
-        <td style="border:1px solid #1f2937;padding:6px;background:#e2efd9;font-weight:500;text-align:center">会社名</td>
-        <td style="border:1px solid #1f2937;padding:6px">${orBlank(emp.company_name)}</td>
+        <td style="border:1px solid #1f2937;padding:4px;text-align:center;background:#fff;width:11%">期間</td>
+        <td colspan="2" style="border:1px solid #1f2937;padding:4px;text-align:center;background:#fff">業務内容</td>
+        <td style="border:1px solid #1f2937;padding:4px;text-align:center;background:#fff;width:12%;max-width:12%">使用ツール</td>
       </tr>
       <tr>
-        <td style="border:1px solid #1f2937;padding:6px;background:#e2efd9;font-weight:500;text-align:center">事業内容</td>
-        <td style="border:1px solid #1f2937;padding:6px;white-space:pre-wrap">${orBlank(emp.business_purpose)}</td>
+        <td rowspan="4" style="border:1px solid #1f2937;padding:6px;text-align:center;vertical-align:middle;background:#fff;width:11%;white-space:pre-wrap">${orBlank(emp.period || pd)}</td>
+        <td rowspan="4" colspan="2" style="border:1px solid #1f2937;padding:8px;vertical-align:top;background:#fff;white-space:pre-wrap">${orBlank(emp.description)}</td>
+        <td rowspan="4" style="border:1px solid #1f2937;padding:6px;vertical-align:top;background:#fff;width:12%;max-width:12%;white-space:pre-wrap">${orBlank(emp.tools_tech)}</td>
       </tr>
-      <tr>
-        <td style="border:1px solid #1f2937;padding:6px;background:#e2efd9;font-weight:500;text-align:center">規模/役割</td>
-        <td style="border:1px solid #1f2937;padding:6px;white-space:pre-wrap">${orBlank(emp.scale_role)}</td>
-      </tr>
-      <tr>
-        <td style="border:1px solid #1f2937;padding:6px;background:#e2efd9;font-weight:500;text-align:center">業務内容</td>
-        <td style="border:1px solid #1f2937;padding:6px;white-space:pre-wrap;min-height:4em">${orBlank(emp.description)}</td>
-      </tr>
-      <tr>
-        <td style="border:1px solid #1f2937;padding:6px;background:#e2efd9;font-weight:500;text-align:center">開発環境</td>
-        <td style="border:1px solid #1f2937;padding:6px;white-space:pre-wrap">${orBlank(emp.tools_tech)}</td>
-      </tr>
-    </table>
-  </div>
-  `).join('')}
+      <tr></tr><tr></tr><tr></tr>
+    </tbody>
+  </table>`;
+    }).join('');
+  })()}
+
   <div style="margin-top:16px">
   ${showSkills ? `<div style="font-weight:bold;margin-bottom:6px;font-size:12px">■ 活かせる経験、知識、技術</div><div style="border:1px solid #1f2937;border-radius:4px;min-height:60px;padding:8px;font-size:10px;background:#fafafa;white-space:pre-wrap;margin-bottom:16px">${skillsHtml}</div>` : ''}
   <div style="font-weight:bold;margin-bottom:6px;font-size:12px">■ 資格</div>

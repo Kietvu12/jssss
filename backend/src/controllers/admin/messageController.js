@@ -8,6 +8,8 @@ import {
 } from '../../models/index.js';
 import { Op, col } from 'sequelize';
 import sequelize from '../../config/database.js';
+import { uploadBufferToS3, buildMessageAttachmentKey, getSignedUrlForFile, makeDownloadDisposition } from '../../services/s3Service.js';
+import { collaboratorNotificationService } from '../../services/collaboratorNotificationService.js';
 
 // Helper function to map model field names to database column names
 const mapOrderField = (fieldName) => {
@@ -152,7 +154,16 @@ export const messageController = {
       const { jobApplicationId } = req.params;
       const { limit = 50 } = req.query;
 
-      const jobApplication = await JobApplication.findByPk(jobApplicationId);
+      const jobApplication = await JobApplication.findByPk(jobApplicationId, {
+        include: [
+          {
+            model: Job,
+            as: 'job',
+            required: false,
+            attributes: ['id', 'jobCode', 'title']
+          }
+        ]
+      });
       if (!jobApplication) {
         return res.status(404).json({
           success: false,
@@ -180,9 +191,22 @@ export const messageController = {
         limit: parseInt(limit)
       });
 
+      const enrichedMessages = await Promise.all(
+        messages.map(async (message) => {
+          const item = message.toJSON();
+          if (item.attachmentKey) {
+            const disposition = makeDownloadDisposition(item.attachmentName || 'attachment');
+            item.attachmentUrl = await getSignedUrlForFile(item.attachmentKey, 'download', disposition);
+          } else {
+            item.attachmentUrl = null;
+          }
+          return item;
+        })
+      );
+
       res.json({
         success: true,
-        data: { messages }
+        data: { messages: enrichedMessages }
       });
     } catch (error) {
       next(error);
@@ -257,12 +281,15 @@ export const messageController = {
         content,
         senderType = 1 // Default: Admin
       } = req.body;
+      const senderTypeNum = parseInt(senderType, 10);
+      const trimmedContent = (content || '').trim();
+      const hasAttachment = !!req.file;
 
       // Validate required fields
-      if (!jobApplicationId || !content) {
+      if (!jobApplicationId || (!trimmedContent && !hasAttachment)) {
         return res.status(400).json({
           success: false,
-          message: 'ID đơn ứng tuyển và nội dung tin nhắn là bắt buộc'
+          message: 'ID đơn ứng tuyển và nội dung hoặc tệp đính kèm là bắt buộc'
         });
       }
 
@@ -287,21 +314,38 @@ export const messageController = {
       }
 
       // Validate sender type
-      if (![1, 2, 3].includes(senderType)) {
+      if (![1, 2, 3].includes(senderTypeNum)) {
         return res.status(400).json({
           success: false,
           message: 'Loại người gửi không hợp lệ (1: Admin, 2: Collaborator, 3: System)'
         });
       }
 
+      let attachmentKey = null;
+      let attachmentName = null;
+      let attachmentMimeType = null;
+      let attachmentSize = null;
+
+      if (hasAttachment) {
+        attachmentName = req.file.originalname || 'attachment';
+        attachmentMimeType = req.file.mimetype || 'application/octet-stream';
+        attachmentSize = req.file.size || 0;
+        attachmentKey = buildMessageAttachmentKey(jobApplicationId, attachmentName);
+        await uploadBufferToS3(req.file.buffer, attachmentKey, attachmentMimeType);
+      }
+
       const message = await Message.create({
         jobApplicationId,
         adminId: req.admin.id,
         collaboratorId: collaboratorId || null,
-        senderType,
-        content,
-        isReadByAdmin: senderType === 1 ? true : false, // Admin đọc ngay tin nhắn của mình
-        isReadByCollaborator: senderType === 2 ? true : false // CTV đọc ngay tin nhắn của mình
+        senderType: senderTypeNum,
+        content: trimmedContent || '[Attachment]',
+        attachmentName,
+        attachmentKey,
+        attachmentMimeType,
+        attachmentSize,
+        isReadByAdmin: senderTypeNum === 1 ? true : false, // Admin đọc ngay tin nhắn của mình
+        isReadByCollaborator: senderTypeNum === 2 ? true : false // CTV đọc ngay tin nhắn của mình
       });
 
       // Reload with relations
@@ -324,6 +368,13 @@ export const messageController = {
           }
         ]
       });
+      const messageData = message.toJSON();
+      if (messageData.attachmentKey) {
+        const disposition = makeDownloadDisposition(messageData.attachmentName || 'attachment');
+        messageData.attachmentUrl = await getSignedUrlForFile(messageData.attachmentKey, 'download', disposition);
+      } else {
+        messageData.attachmentUrl = null;
+      }
 
       // Log action
       await ActionLog.create({
@@ -335,10 +386,24 @@ export const messageController = {
         description: `Gửi tin nhắn cho đơn ứng tuyển #${jobApplicationId}`
       });
 
+      const recipientCollaboratorId = message.collaboratorId || jobApplication.collaboratorId;
+      if (recipientCollaboratorId && message.senderType !== 2) {
+        try {
+          await collaboratorNotificationService.notifyIncomingMessage({
+            collaboratorId: recipientCollaboratorId,
+            jobCode: jobApplication.job?.jobCode || String(jobApplication.id),
+            jobId: jobApplication.jobId || null,
+            jobApplicationId: jobApplication.id
+          });
+        } catch (notificationError) {
+          console.error('[Admin createMessage] Error creating notification:', notificationError);
+        }
+      }
+
       res.status(201).json({
         success: true,
         message: 'Gửi tin nhắn thành công',
-        data: { message }
+        data: { message: messageData }
       });
     } catch (error) {
       next(error);

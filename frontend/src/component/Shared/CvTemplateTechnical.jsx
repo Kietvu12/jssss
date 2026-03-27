@@ -9,7 +9,6 @@ import { ChevronDown, Plus } from 'lucide-react';
  *   activeTab (= cvTechnicalTab), setActiveTab (= setCvTechnicalTab)
  *   cvEditable, cvEditableArray, cvEditableWithDefault
  *   getDefaultCvDate
- *   isToolChecked, toggleToolCheckbox
  *   updateEmployment, updateEmploymentPair
  *   handleAddWorkExperience, handleInsertWorkExperienceAt, handleInsertWorkExperienceBlockAt (bảng 職歴 Rirekisho)
  *   handleBackendPreviewWithOptions
@@ -24,8 +23,6 @@ const CvTemplateTechnical = ({
   cvEditableArray,
   cvEditableWithDefault,
   getDefaultCvDate,
-  isToolChecked,
-  toggleToolCheckbox,
   updateEmployment,
   updateEmploymentPair,
   toggleShokumuCheckbox,
@@ -296,74 +293,83 @@ const CvTemplateTechnical = ({
               </tbody>
             </table>
 
-            {/* 使用可能ツール・ソフトウェア等枠: 2 cột (学習した / 業務で利用した), mỗi cột có cặp [tên kĩ năng | ô nhập], ô bên phải nét đứt cho phép nhập */}
+            {/* 使用可能ツール・ソフトウェア等枠: 2 cột (学習した / 業務で利用した), dữ liệu từ 24 & 25, mỗi ô = [tên | ô nhập], không checkbox */}
             <table className="w-full border-collapse mt-3 font-bold" style={{ fontSize: '11px', color: '#1f2937', borderColor: '#1f2937' }}>
               <tbody>
-                <tr>
-                  <td rowSpan={5} className="border p-2 text-center align-middle" style={{ borderColor: '#1f2937', backgroundColor: '#e2efd9', width: '5rem' }}>使用可能ツール・ソフトウェア等枠</td>
-                  <td colSpan={4} className="border p-1.5 text-center font-medium" style={{ borderColor: '#1f2937', backgroundColor: '#e2efd9' }}>学習したツール・ソフトウェア</td>
-                  <td colSpan={4} className="border p-1.5 text-center font-medium" style={{ borderColor: '#1f2937', backgroundColor: '#e2efd9' }}>業務で利用したツール・ソフトウェア</td>
-                </tr>
-                {[['AutoCAD', 'CATIA'], ['I-DEAS', 'SolidWorks'], ['PLC', 'C++'], ['NX', 'Java']].map((row, ri) => (
-                  <tr key={ri}>
-                    {row.map(tool => (
-                      <React.Fragment key={`learned-${tool}`}>
-                        <td className="border p-1.5 bg-white text-left" style={{ borderColor: '#1f2937', borderRight: '2px dotted #1f2937' }}>
-                          <label className="flex items-center justify-start gap-1 text-xs cursor-pointer pl-1">
-                            <input type="checkbox" className="rounded" checked={isToolChecked('learned', tool)} onChange={() => toggleToolCheckbox('learned', tool)} /> {tool}
-                          </label>
-                        </td>
-                        <td className="border p-1 bg-white text-center align-middle" style={{ borderColor: '#1f2937', borderLeft: '2px dotted #1f2937', minWidth: '2.5rem' }}>
-                          <span
-                            contentEditable
-                            suppressContentEditableWarning
-                            className="outline-none min-h-[1.2em] block text-center text-xs w-full"
-                            onBlur={(e) => {
-                              const v = (e.currentTarget.textContent || '').trim();
-                              setFormData(prev => ({
-                                ...prev,
-                                toolsSoftwareNotes: {
-                                  ...(prev.toolsSoftwareNotes || {}),
-                                  learned: { ...(prev.toolsSoftwareNotes?.learned || {}), [tool]: v },
-                                  experienced: prev.toolsSoftwareNotes?.experienced || {},
-                                  experiencedOther: prev.toolsSoftwareNotes?.experiencedOther ?? '',
-                                },
-                              }));
-                            }}
-                          >
-                            {(formData.toolsSoftwareNotes?.learned || {})[tool] || '　'}
-                          </span>
-                        </td>
-                        <td className="border p-1.5 bg-white text-left" style={{ borderColor: '#1f2937', borderRight: '2px dotted #1f2937' }}>
-                          <label className="flex items-center justify-start gap-1 text-xs cursor-pointer pl-1">
-                            <input type="checkbox" className="rounded" checked={isToolChecked('experienced', tool)} onChange={() => toggleToolCheckbox('experienced', tool)} /> {tool}
-                          </label>
-                        </td>
-                        <td className="border p-1 bg-white text-center align-middle" style={{ borderColor: '#1f2937', borderLeft: '2px dotted #1f2937', minWidth: '2.5rem' }}>
-                          <span
-                            contentEditable
-                            suppressContentEditableWarning
-                            className="outline-none min-h-[1.2em] block text-center text-xs w-full"
-                            onBlur={(e) => {
-                              const v = (e.currentTarget.textContent || '').trim();
-                              setFormData(prev => ({
-                                ...prev,
-                                toolsSoftwareNotes: {
-                                  ...(prev.toolsSoftwareNotes || {}),
-                                  learned: prev.toolsSoftwareNotes?.learned || {},
-                                  experienced: { ...(prev.toolsSoftwareNotes?.experienced || {}), [tool]: v },
-                                  experiencedOther: prev.toolsSoftwareNotes?.experiencedOther ?? '',
-                                },
-                              }));
-                            }}
-                          >
-                            {(formData.toolsSoftwareNotes?.experienced || {})[tool] || '　'}
-                          </span>
-                        </td>
-                      </React.Fragment>
-                    ))}
-                  </tr>
-                ))}
+                {(() => {
+                  const learned = formData.learnedTools || [];
+                  const experienced = formData.experienceTools || [];
+                  const rowCount = Math.max(1, learned.length, experienced.length);
+                  return (
+                    <>
+                      <tr>
+                        <td rowSpan={rowCount + 1} className="border p-2 text-center align-middle" style={{ borderColor: '#1f2937', backgroundColor: '#e2efd9', width: '5rem' }}>使用可能ツール・ソフトウェア等枠</td>
+                        <td colSpan={2} className="border p-1.5 text-center font-medium" style={{ borderColor: '#1f2937', backgroundColor: '#e2efd9' }}>学習したツール・ソフトウェア</td>
+                        <td colSpan={2} className="border p-1.5 text-center font-medium" style={{ borderColor: '#1f2937', backgroundColor: '#e2efd9' }}>業務で利用したツール・ソフトウェア</td>
+                      </tr>
+                      {Array.from({ length: rowCount }).map((_, ri) => {
+                        const learnedName = learned[ri] ?? '';
+                        const expName = experienced[ri] ?? '';
+                        const learnedDisplay = learnedName || '　';
+                        const expDisplay = expName || '　';
+                        return (
+                          <tr key={ri}>
+                            <td className="border p-1.5 bg-white text-left" style={{ borderColor: '#1f2937', borderRight: '2px dotted #1f2937' }}>
+                              <span className="text-xs pl-1">{learnedDisplay}</span>
+                            </td>
+                            <td className="border p-1 bg-white text-center align-middle" style={{ borderColor: '#1f2937', borderLeft: '2px dotted #1f2937', minWidth: '2.5rem' }}>
+                              <span
+                                contentEditable
+                                suppressContentEditableWarning
+                                className="outline-none min-h-[1.2em] block text-center text-xs w-full"
+                                onBlur={(e) => {
+                                  const v = (e.currentTarget.textContent || '').trim();
+                                  const key = learnedName || `__learned_${ri}`;
+                                  setFormData(prev => ({
+                                    ...prev,
+                                    toolsSoftwareNotes: {
+                                      ...(prev.toolsSoftwareNotes || {}),
+                                      learned: { ...(prev.toolsSoftwareNotes?.learned || {}), [key]: v },
+                                      experienced: prev.toolsSoftwareNotes?.experienced || {},
+                                      experiencedOther: prev.toolsSoftwareNotes?.experiencedOther ?? '',
+                                    },
+                                  }));
+                                }}
+                              >
+                                {(formData.toolsSoftwareNotes?.learned || {})[learnedName || `__learned_${ri}`] || '　'}
+                              </span>
+                            </td>
+                            <td className="border p-1.5 bg-white text-left" style={{ borderColor: '#1f2937', borderRight: '2px dotted #1f2937' }}>
+                              <span className="text-xs pl-1">{expDisplay}</span>
+                            </td>
+                            <td className="border p-1 bg-white text-center align-middle" style={{ borderColor: '#1f2937', borderLeft: '2px dotted #1f2937', minWidth: '2.5rem' }}>
+                              <span
+                                contentEditable
+                                suppressContentEditableWarning
+                                className="outline-none min-h-[1.2em] block text-center text-xs w-full"
+                                onBlur={(e) => {
+                                  const v = (e.currentTarget.textContent || '').trim();
+                                  const key = expName || `__experienced_${ri}`;
+                                  setFormData(prev => ({
+                                    ...prev,
+                                    toolsSoftwareNotes: {
+                                      ...(prev.toolsSoftwareNotes || {}),
+                                      learned: prev.toolsSoftwareNotes?.learned || {},
+                                      experienced: { ...(prev.toolsSoftwareNotes?.experienced || {}), [key]: v },
+                                      experiencedOther: prev.toolsSoftwareNotes?.experiencedOther ?? '',
+                                    },
+                                  }));
+                                }}
+                              >
+                                {(formData.toolsSoftwareNotes?.experienced || {})[expName || `__experienced_${ri}`] || '　'}
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </>
+                  );
+                })()}
               </tbody>
             </table>
 
@@ -502,13 +508,23 @@ const CvTemplateTechnical = ({
                   const emp = list[baseIdx] || {};
                   const label = labels[blockIndex] || `【職歴${blockIndex + 1}】`;
                   const pd = defaultPeriods[blockIndex] || '';
+                  const companyFallback =
+                    emp.company_name || emp.companyName || emp.company || emp.companyKanji || emp.companyJa || '';
+                  const positionFallback =
+                    emp.position_name || emp.positionName || emp.position || emp.role || emp.jobTitle || '';
+                  const locationFallback =
+                    emp.location || emp.workLocation || emp.work_location || '';
                   return (
                     <table key={label} className="w-full border-collapse font-bold mt-0" style={{ fontSize: '11px', color: '#1f2937', borderColor: '#1f2937', borderTopWidth: blockIndex === 0 ? undefined : 0 }}>
                       <tbody>
                         <tr>
                           <td className="border py-0.5 px-1.5 text-center align-middle" style={{ borderColor: '#1f2937', backgroundColor: '#e5e7eb', width: '11%' }}>{label}</td>
-                          <td className="border py-0.5 px-1.5 text-center font-medium" style={{ borderColor: '#1f2937', backgroundColor: '#e5e7eb', width: '40%', minWidth: '38%' }}>企業名</td>
-                          <td className="border py-0.5 px-1.5 text-center font-medium" style={{ borderColor: '#1f2937', backgroundColor: '#e5e7eb' }}>ポジション名</td>
+                          <td className="border py-0.5 px-1.5 text-center font-medium" style={{ borderColor: '#1f2937', backgroundColor: '#e5e7eb', width: '40%', minWidth: '38%' }}>
+                            <span {...cvEditableArray('workExperiences', baseIdx, 'company_name', 'block w-full', { display: 'block' }, companyFallback)} />
+                          </td>
+                          <td className="border py-0.5 px-1.5 text-center font-medium" style={{ borderColor: '#1f2937', backgroundColor: '#e5e7eb' }}>
+                            <span {...cvEditableArray('workExperiences', baseIdx, 'position_name', 'block w-full', { display: 'block' }, positionFallback)} />
+                          </td>
                           <td className="border py-0.5 px-1.5 text-center font-medium" style={{ borderColor: '#1f2937', backgroundColor: '#e5e7eb', width: '12%', maxWidth: '12%' }}>勤務地</td>
                         </tr>
                         <tr>

@@ -118,6 +118,7 @@ import typeRoutes from './routes/typeRoutes.js';
 import valueRoutes from './routes/valueRoutes.js';
 import jobApplicationRoutes from './routes/jobApplicationRoutes.js';
 import campaignRoutes from './routes/campaignRoutes.js';
+import eventRoutes from './routes/eventRoutes.js';
 import categoryRoutes from './routes/categoryRoutes.js';
 import postRoutes from './routes/postRoutes.js';
 import calendarRoutes from './routes/calendarRoutes.js';
@@ -125,7 +126,6 @@ import messageRoutes from './routes/messageRoutes.js';
 import emailToCompanyRoutes from './routes/emailToCompanyRoutes.js';
 import emailToCollaboratorRoutes from './routes/emailToCollaboratorRoutes.js';
 import emailToGroupRoutes from './routes/emailToGroupRoutes.js';
-import outlookEmailRoutes from './routes/outlookEmailRoutes.js';
 import paymentRequestRoutes from './routes/paymentRequestRoutes.js';
 import ctvAuthRoutes from './routes/ctvAuthRoutes.js';
 import ctvCvRoutes from './routes/ctvCvRoutes.js';
@@ -142,7 +142,13 @@ import ctvJobPickupRoutes from './routes/ctvJobPickupRoutes.js';
 import ctvScheduleRoutes from './routes/ctvScheduleRoutes.js';
 import ctvJobCategoryRoutes from './routes/ctvJobCategoryRoutes.js';
 import ctvMessageRoutes from './routes/ctvMessageRoutes.js';
+import ctvNotificationRoutes from './routes/ctvNotificationRoutes.js';
+import ctvEventRoutes from './routes/ctvEventRoutes.js';
+import publicPostRoutes from './routes/publicPostRoutes.js';
 import reportsRoutes from './routes/reportsRoutes.js';
+import oauthRoutes from './routes/oauthRoutes.js';
+import adminOutlookRoutes from './routes/adminOutlookRoutes.js';
+import cvAutoParseRoutes from './routes/cvAutoParseRoutes.js';
 
 // Admin routes
 app.use('/api/admin', adminRoutes);
@@ -159,6 +165,7 @@ app.use('/api/admin/types', typeRoutes);
 app.use('/api/admin/values', valueRoutes);
 app.use('/api/admin/job-applications', jobApplicationRoutes);
 app.use('/api/admin/campaigns', campaignRoutes);
+app.use('/api/admin/events', eventRoutes);
 app.use('/api/admin/categories', categoryRoutes);
 app.use('/api/admin/posts', postRoutes);
 app.use('/api/admin/calendars', calendarRoutes);
@@ -166,8 +173,12 @@ app.use('/api/admin/messages', messageRoutes);
 app.use('/api/admin/emails/companies', emailToCompanyRoutes);
 app.use('/api/admin/emails/collaborators', emailToCollaboratorRoutes);
 app.use('/api/admin/emails/groups', emailToGroupRoutes);
-app.use('/api/admin/emails/outlook', outlookEmailRoutes);
 app.use('/api/admin/payment-requests', paymentRequestRoutes);
+app.use('/api/admin/outlook', adminOutlookRoutes);
+app.use('/api/admin/cv-auto-parse', cvAutoParseRoutes);
+
+// OAuth (Outlook connect/callback)
+app.use('/api/oauth', oauthRoutes);
 
 // CTV routes
 app.use('/api/ctv/auth', ctvAuthRoutes);
@@ -185,6 +196,11 @@ app.use('/api/ctv/job-pickups', ctvJobPickupRoutes);
 app.use('/api/ctv/calendars', ctvScheduleRoutes);
 app.use('/api/ctv/job-categories', ctvJobCategoryRoutes);
 app.use('/api/ctv/messages', ctvMessageRoutes);
+app.use('/api/ctv/notifications', ctvNotificationRoutes);
+app.use('/api/ctv/events', ctvEventRoutes);
+
+// Public routes (no auth)
+app.use('/api/public/posts', publicPostRoutes);
 
 // 404 handler
 app.use((req, res) => {

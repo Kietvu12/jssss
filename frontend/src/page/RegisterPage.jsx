@@ -827,7 +827,7 @@ const RegisterPage = () => {
             </div>
             <h2 style={{ fontSize: 22, color: C.gray, marginBottom: 10 }}>Đăng ký thành công!</h2>
             <p style={{ fontSize: 14, color: '#999', lineHeight: 1.6 }}>
-              Cảm ơn bạn đã đăng ký. Chúng tôi sẽ liên hệ với bạn trong thời gian sớm nhất qua email hoặc số điện thoại đã đăng ký.
+              Cảm ơn bạn đã đăng ký. Vui lòng mở email để bấm link xác thực, hệ thống sẽ tự động kích hoạt tài khoản cho bạn.
             </p>
             <button
               type="button"

@@ -1,0 +1,130 @@
+Cho các API sau:
+POST http://13.229.250.2/api_ai/add/vector/sync/{job_id} 
+Để lưu vector database 
+POST http://13.229.250.2/api_ai/add/vector/sync/cv/{cv_id}
+Để lưu vector database
+2 API này đã được chạy từ trước để quét hết tất cả dữ liệu trong hệ thống.
+
+GET  http://13.229.250.2/api_ai/compare/0/api/v1/match/cv/{cv_id}/jobs
+Response:
+[
+  {
+    "id": "3414",
+    "similarity_score": 36.89,
+    "metadata": {
+      "visa_expire_timestamp": 0,
+      "current_visa_type": "none",
+      "core_skills_raw": "[\"Java\", \"Visual Studio Code\", \"IntelliJ IDEA\", \"Postman\", \"MySQL\"]",
+      "desired_position": "システム開発(Java)"
+    }
+  },
+  {
+    "id": "3413",
+    "similarity_score": 36.87,
+    "metadata": {
+      "visa_expire_timestamp": 0,
+      "current_visa_type": "none",
+      "core_skills_raw": "[\"Java\", \"Web Development\", \"Team Collaboration\"]",
+      "desired_position": "システム開発(Java)"
+    }
+  },
+  {
+    "id": "3392",
+    "similarity_score": 35.87,
+    "metadata": {
+      "current_visa_type": "none",
+      "desired_position": "機械組立",
+      "core_skills_raw": "[\"修理エンジニア\", \"組立エンジニア\", \"AutoCAD\", \"CATIA\"]",
+      "visa_expire_timestamp": 1785542400
+    }
+  },
+  {
+    "id": "3405",
+    "similarity_score": 32.63,
+    "metadata": {
+      "visa_expire_timestamp": 1780272000,
+      "core_skills_raw": "[\"Java (Spring Boot)\", \"React.js\", \"HTML5\", \"CSS3\", \"JavaScript (ES6+)\", \"Docker\", \"RESTful API\", \"Agile\", \"Git\"]",
+      "desired_position": "IT業界",
+      "current_visa_type": "none"
+    }
+  },
+  {
+    "id": "3411",
+    "similarity_score": 32.24,
+    "metadata": {
+      "core_skills_raw": "[\"Java\", \"Web Application Development\", \"Team Development\", \"MySQL\", \"Visual Studio Code\", \"IntelliJ IDEA\", \"Postman\"]",
+      "visa_expire_timestamp": 0,
+      "desired_position": "システム開発(Java)",
+      "current_visa_type": "none"
+    }
+  }
+]
+Để lấy ra các job có tỉ lệ matching cao với ứng viên đó
+GET   http://13.229.250.2/api_ai/compare/0/api/v1/match/job/{job_id}/cvs
+[
+  {
+    "id": "3414",
+    "similarity_score": 36.89,
+    "metadata": {
+      "visa_expire_timestamp": 0,
+      "current_visa_type": "none",
+      "core_skills_raw": "[\"Java\", \"Visual Studio Code\", \"IntelliJ IDEA\", \"Postman\", \"MySQL\"]",
+      "desired_position": "システム開発(Java)"
+    }
+  },
+  {
+    "id": "3413",
+    "similarity_score": 36.87,
+    "metadata": {
+      "visa_expire_timestamp": 0,
+      "current_visa_type": "none",
+      "core_skills_raw": "[\"Java\", \"Web Development\", \"Team Collaboration\"]",
+      "desired_position": "システム開発(Java)"
+    }
+  },
+  {
+    "id": "3392",
+    "similarity_score": 35.87,
+    "metadata": {
+      "current_visa_type": "none",
+      "desired_position": "機械組立",
+      "core_skills_raw": "[\"修理エンジニア\", \"組立エンジニア\", \"AutoCAD\", \"CATIA\"]",
+      "visa_expire_timestamp": 1785542400
+    }
+  },
+  {
+    "id": "3405",
+    "similarity_score": 32.63,
+    "metadata": {
+      "visa_expire_timestamp": 1780272000,
+      "core_skills_raw": "[\"Java (Spring Boot)\", \"React.js\", \"HTML5\", \"CSS3\", \"JavaScript (ES6+)\", \"Docker\", \"RESTful API\", \"Agile\", \"Git\"]",
+      "desired_position": "IT業界",
+      "current_visa_type": "none"
+    }
+  },
+  {
+    "id": "3411",
+    "similarity_score": 32.24,
+    "metadata": {
+      "core_skills_raw": "[\"Java\", \"Web Application Development\", \"Team Development\", \"MySQL\", \"Visual Studio Code\", \"IntelliJ IDEA\", \"Postman\"]",
+      "visa_expire_timestamp": 0,
+      "desired_position": "システム開発(Java)",
+      "current_visa_type": "none"
+    }
+  }
+]
+Để lấy ra tỉ lệ phần trăm những ứng viên có tỉ lệ matching cao với job đó
+
+POST http://13.229.250.2/api_ai/reranking/generate-reasons
+Body
+{
+  "jd_id": 0,
+  "candidate_id": 0
+}
+
+Để lấy ra lý do phù hợp/không phù hợp của 1 ứng viên với 1 job:
+{
+  "matching_reasons": {
+    "reason": "Ứng viên DAU MANH HUNG không phù hợp với yêu cầu công việc vì chưa có thông tin đáng tin cậy nào về trình độ học vấn, chứng chỉ tiếng Nhật hoặc kinh nghiệm làm việc. Trong khi đó, mô tả công việc yêu cầu ứng viên phải tốt nghiệp đại học trở lên và có trình độ tiếng Nhật từ N1 trở lên. Ứng viên chỉ có thông tin là trình độ jlpt level 8, điều này không đáp ứng yêu cầu tối thiểu của công việc. Bên cạnh đó, ứng viên cũng không có kinh nghiệm làm việc trong lĩnh vực liên quan đến hệ thống điều khiển, điện – điện tử như đã nêu trong yêu cầu công việc."
+  }
+}

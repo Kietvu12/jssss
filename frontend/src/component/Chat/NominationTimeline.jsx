@@ -8,9 +8,49 @@ const NominationTimeline = ({ nomination, messages = [] }) => {
   const { language } = useLanguage();
   const t = translations[language] || translations.vi;
   const [timelineEvents, setTimelineEvents] = useState([]);
+  const STATUS_TAG_STYLES = {
+    1: { backgroundColor: '#eff6ff', color: '#1d4ed8', borderColor: '#bfdbfe' },
+    2: { backgroundColor: '#ecfeff', color: '#0e7490', borderColor: '#a5f3fc' },
+    3: { backgroundColor: '#f0fdf4', color: '#15803d', borderColor: '#bbf7d0' },
+    4: { backgroundColor: '#fef2f2', color: '#b91c1c', borderColor: '#fecaca' },
+    5: { backgroundColor: '#fdf4ff', color: '#a21caf', borderColor: '#f5d0fe' },
+    6: { backgroundColor: '#fff1f2', color: '#be123c', borderColor: '#fecdd3' },
+    7: { backgroundColor: '#fff7ed', color: '#c2410c', borderColor: '#fed7aa' },
+    8: { backgroundColor: '#ecfdf5', color: '#047857', borderColor: '#a7f3d0' },
+    9: { backgroundColor: '#fef2f2', color: '#dc2626', borderColor: '#fecaca' },
+    10: { backgroundColor: '#f0fdf4', color: '#16a34a', borderColor: '#bbf7d0' },
+    11: { backgroundColor: '#fff7ed', color: '#ea580c', borderColor: '#fdba74' },
+    12: { backgroundColor: '#ecfeff', color: '#0891b2', borderColor: '#a5f3fc' },
+    13: { backgroundColor: '#eef2ff', color: '#4338ca', borderColor: '#c7d2fe' },
+    14: { backgroundColor: '#fff1f2', color: '#e11d48', borderColor: '#fecdd3' },
+    15: { backgroundColor: '#ecfdf5', color: '#166534', borderColor: '#86efac' },
+    16: { backgroundColor: '#fff7ed', color: '#9a3412', borderColor: '#fdba74' },
+  };
+
+  const EVENT_TAG_STYLES = {
+    created: { backgroundColor: '#eff6ff', color: '#1d4ed8', borderColor: '#bfdbfe' },
+    interview: { backgroundColor: '#fefce8', color: '#a16207', borderColor: '#fde68a' },
+    nyusha: { backgroundColor: '#ecfdf5', color: '#047857', borderColor: '#a7f3d0' },
+    status: { backgroundColor: '#f3f4f6', color: '#374151', borderColor: '#d1d5db' },
+  };
+
+  const getEventTagStyle = (event) => {
+    if (event.type === 'status') {
+      return STATUS_TAG_STYLES[event.status] || EVENT_TAG_STYLES.status;
+    }
+    return EVENT_TAG_STYLES[event.type] || EVENT_TAG_STYLES.status;
+  };
+
+  const getIconColor = (event) => {
+    if (event.type !== 'status') return '#6b7280';
+    if (event.color === 'green') return '#16a34a';
+    if (event.color === 'red') return '#dc2626';
+    return '#d97706';
+  };
 
   useEffect(() => {
     if (!nomination) return;
+    const currentStatus = Number(nomination.status);
 
     const events = [];
 
@@ -22,6 +62,7 @@ const NominationTimeline = ({ nomination, messages = [] }) => {
         date: nomination.appliedAt || nomination.applied_at,
         icon: FileText,
         color: 'blue',
+        tagLabel: t.nominationCreated,
       });
     }
 
@@ -34,6 +75,7 @@ const NominationTimeline = ({ nomination, messages = [] }) => {
         icon: Calendar,
         color: 'yellow',
         status: nomination.status,
+        tagLabel: t.interviewRound1,
       });
     }
 
@@ -46,6 +88,7 @@ const NominationTimeline = ({ nomination, messages = [] }) => {
         icon: Calendar,
         color: 'orange',
         status: nomination.status,
+        tagLabel: t.interviewRound2,
       });
     }
 
@@ -58,27 +101,25 @@ const NominationTimeline = ({ nomination, messages = [] }) => {
         icon: CheckCircle,
         color: 'green',
         status: nomination.status,
+        tagLabel: t.nyushaDate,
       });
     }
 
-    const statusLabel = getJobApplicationStatusLabelByLanguage(nomination.status, language);
+    const currentStatusInfo = getJobApplicationStatus(currentStatus);
+    const statusCategory = currentStatusInfo?.category;
+    const statusLabel = getJobApplicationStatusLabelByLanguage(currentStatus, language);
+    const statusIsSuccess = statusCategory === 'success';
+    const statusIsRejectedOrCancelled = statusCategory === 'rejected' || statusCategory === 'cancelled';
     events.push({
       id: 'current_status',
       type: 'status',
       title: `${t.statusLabel}: ${statusLabel}`,
       date: nomination.updatedAt || nomination.updated_at || nomination.appliedAt || nomination.applied_at,
-      icon: nomination.status === 8 || nomination.status === 10 || nomination.status === 12 || nomination.status === 13 
-        ? CheckCircle 
-        : nomination.status === 15 || nomination.status === 16 || nomination.status === 7 || nomination.status === 9 || nomination.status === 14
-        ? XCircle
-        : AlertCircle,
-      color: nomination.status === 8 || nomination.status === 10 || nomination.status === 12 || nomination.status === 13 
-        ? 'green'
-        : nomination.status === 15 || nomination.status === 16 || nomination.status === 7 || nomination.status === 9 || nomination.status === 14
-        ? 'red'
-        : 'yellow',
-      status: nomination.status,
+      icon: statusIsSuccess ? CheckCircle : statusIsRejectedOrCancelled ? XCircle : AlertCircle,
+      color: statusIsSuccess ? 'green' : statusIsRejectedOrCancelled ? 'red' : 'yellow',
+      status: currentStatus,
       isCurrent: true,
+      tagLabel: statusLabel,
     });
 
     // Sắp xếp theo thời gian
@@ -102,34 +143,20 @@ const NominationTimeline = ({ nomination, messages = [] }) => {
     }
   };
 
-  const getColorClasses = (color) => {
-    const colors = {
-      blue: 'bg-blue-100 text-blue-700 border-blue-300',
-      yellow: 'bg-yellow-100 text-yellow-700 border-yellow-300',
-      orange: 'bg-orange-100 text-orange-700 border-orange-300',
-      green: 'bg-green-100 text-green-700 border-green-300',
-      red: 'bg-red-100 text-red-700 border-red-300',
-    };
-    return colors[color] || colors.blue;
-  };
-
-  const getColorInlineStyle = (color) => {
-    const colorMap = {
-      blue: { backgroundColor: '#dbeafe', color: '#1d4ed8', borderColor: '#93c5fd' },
-      yellow: { backgroundColor: '#fef9c3', color: '#854d0e', borderColor: '#fde047' },
-      orange: { backgroundColor: '#fed7aa', color: '#9a3412', borderColor: '#fdba74' },
-      green: { backgroundColor: '#dcfce7', color: '#166534', borderColor: '#86efac' },
-      red: { backgroundColor: '#fee2e2', color: '#991b1b', borderColor: '#fca5a5' },
-    };
-    return colorMap[color] || colorMap.blue;
-  };
+  const iconWrapperStyle = { backgroundColor: '#f3f4f6', color: '#6b7280', borderColor: '#e5e7eb' };
+  const cardStyle = (isCurrent) => ({
+    backgroundColor: 'white',
+    borderColor: '#f3f4f6',
+    boxShadow: '0 1px 3px 0 rgb(0 0 0 / 0.05)',
+    ...(isCurrent ? { borderLeftWidth: '3px', borderLeftColor: '#6b7280' } : {}),
+  });
 
   return (
-    <div className="h-full rounded-lg border flex flex-col" style={{ backgroundColor: 'white', borderColor: '#e5e7eb' }}>
+    <div className="h-full rounded-lg border flex flex-col shadow-sm" style={{ backgroundColor: 'white', borderColor: '#f3f4f6' }}>
       {/* Header */}
-      <div className="p-4 border-b" style={{ borderColor: '#e5e7eb', backgroundColor: '#f9fafb' }}>
+      <div className="p-4 border-b" style={{ borderColor: '#f3f4f6' }}>
         <h3 className="text-sm font-bold flex items-center gap-2" style={{ color: '#111827' }}>
-          <Clock className="w-4 h-4" />
+          <Clock className="w-4 h-4 flex-shrink-0" style={{ color: '#6b7280' }} />
           Timeline
         </h3>
       </div>
@@ -144,36 +171,38 @@ const NominationTimeline = ({ nomination, messages = [] }) => {
           <div className="relative">
             {/* Timeline line */}
             <div className="absolute left-4 top-0 bottom-0 w-0.5" style={{ backgroundColor: '#e5e7eb' }}></div>
-            
-            <div className="space-y-4">
-              {timelineEvents.map((event, index) => {
+
+            <div className="space-y-3">
+              {timelineEvents.map((event) => {
                 const Icon = event.icon;
-                const isLast = index === timelineEvents.length - 1;
-                const colorStyle = getColorInlineStyle(event.color);
-                
                 return (
                   <div key={event.id} className="relative flex items-start gap-3">
                     {/* Icon */}
-                    <div 
-                      className="relative z-10 flex-shrink-0 w-8 h-8 rounded-full border-2 flex items-center justify-center"
-                      style={colorStyle}
+                    <div
+                      className="relative z-10 flex-shrink-0 w-8 h-8 rounded-full border flex items-center justify-center"
+                      style={iconWrapperStyle}
                     >
-                      <Icon className="w-4 h-4" />
+                      <Icon className="w-4 h-4" style={{ color: getIconColor(event) }} />
                     </div>
-                    
-                    {/* Content */}
-                    <div className="flex-1 min-w-0 pb-4">
-                      <div 
-                        className="p-3 rounded-lg border"
-                        style={{
-                          ...colorStyle,
-                          ...(event.isCurrent ? {
-                            boxShadow: '0 0 0 2px rgba(96, 165, 250, 0.5), 0 0 0 4px rgba(96, 165, 250, 0.2)'
-                          } : {})
-                        }}
+
+                    {/* Content - white card */}
+                    <div className="flex-1 min-w-0">
+                      <div
+                        className="rounded-lg border overflow-hidden"
+                        style={cardStyle(event.isCurrent)}
                       >
-                        <h4 className="text-xs font-semibold mb-1" style={{ color: '#111827' }}>{event.title}</h4>
-                        <p className="text-xs" style={{ color: '#4b5563' }}>{formatDate(event.date)}</p>
+                        <div
+                          className="px-3 py-1 border-b"
+                          style={getEventTagStyle(event)}
+                        >
+                          <span className="text-[10px] font-semibold uppercase tracking-wide">
+                            {event.tagLabel || event.type}
+                          </span>
+                        </div>
+                        <div className="p-3">
+                          <h4 className="text-xs font-semibold mb-1" style={{ color: '#111827' }}>{event.title}</h4>
+                          <p className="text-xs" style={{ color: '#6b7280' }}>{formatDate(event.date)}</p>
+                        </div>
                       </div>
                     </div>
                   </div>

@@ -4,13 +4,40 @@ import { useLanguage } from '../../context/LanguageContext';
 import { translations } from '../../translations/translations';
 import apiService from '../../services/api';
 
+const chartHeight = 200;
+const chartWidth = 520;
+const padding = { left: 28, right: 28, top: 20, bottom: 36 };
+
+const COLORS = {
+  lineOffer: '#DC2626',
+  lineRejection: '#374151',
+  lineStroke: '#FFFFFF',
+  cardBg: '#171717',
+  cardText: '#FFFFFF',
+  axisLabel: '#374151',
+};
+
+const DONUT_PALETTE = ['#DC2626', '#171717', '#2563EB', '#10B981', '#8B5CF6', '#F59E0B', '#EC4899', '#14B8A6'];
+
+function buildSmoothPath(points) {
+  if (points.length === 0) return '';
+  if (points.length === 1) return `M ${points[0][0]} ${points[0][1]}`;
+  let d = `M ${points[0][0]} ${points[0][1]}`;
+  for (let i = 0; i < points.length - 1; i++) {
+    const [x0, y0] = points[i];
+    const [x1, y1] = points[i + 1];
+    const cx = (x0 + x1) / 2;
+    d += ` C ${cx} ${y0} ${cx} ${y1} ${x1} ${y1}`;
+  }
+  return d;
+}
+
 const AgentHomePageSession2 = () => {
   const { language } = useLanguage();
   const t = translations[language] || translations.vi;
   const [hoveredIndex, setHoveredIndex] = useState(null);
   const [hoveredPointIndex, setHoveredPointIndex] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [isFilterButtonHovered, setIsFilterButtonHovered] = useState(false);
   const [showFilterPanel, setShowFilterPanel] = useState(false);
   const [filterStartDate, setFilterStartDate] = useState('');
   const [filterEndDate, setFilterEndDate] = useState('');
@@ -38,7 +65,6 @@ const AgentHomePageSession2 = () => {
         apiService.getOfferRejectionStats({ type: 'month', ...dateParams })
       ]);
 
-      // Donut: phân bố theo job category (nhóm ngành nghề) – backend trả về categories: [{ id, name, slug, count }]
       let categories = categoryRes?.success && categoryRes?.data?.categories
         ? categoryRes.data.categories
         : [];
@@ -49,52 +75,39 @@ const AgentHomePageSession2 = () => {
           categories = [];
         }
       }
-      
-      // Đảm bảo categories là array
+
       if (Array.isArray(categories) && categories.length > 0) {
-        const colors = ['#EF4444', '#F97316', '#F59E0B', '#10B981', '#3B82F6', '#8B5CF6', '#EC4899', '#14B8A6'];
-        
-        // Tạo dữ liệu cho biểu đồ phân bố theo nhóm ngành nghề
         const donutItems = categories.map((category, index) => ({
           label: category.name || '',
           value: parseInt(category.count || 0),
-          color: colors[index % colors.length],
+          color: DONUT_PALETTE[index % DONUT_PALETTE.length],
         })).filter(item => item.value > 0 && item.label);
 
         setDonutData(donutItems);
-        
-        // Tính tổng số đơn ứng tuyển
-        const total = donutItems.reduce((sum, item) => sum + item.value, 0);
-        setTotalApplications(total);
+        setTotalApplications(donutItems.reduce((sum, item) => sum + item.value, 0));
       } else {
         setDonutData([]);
         setTotalApplications(0);
       }
 
-      // Load line chart data (offer và rejection)
       if (offerRejectionRes?.success && offerRejectionRes?.data) {
         const rawOffers = offerRejectionRes.data.offers;
         const rawRejections = offerRejectionRes.data.rejections;
         const offers = Array.isArray(rawOffers) ? rawOffers : (rawOffers ? [rawOffers] : []);
         const rejections = Array.isArray(rawRejections) ? rawRejections : (rawRejections ? [rawRejections] : []);
 
-        // Luôn lấy đúng 6 tháng gần nhất để biểu đồ line có 6 điểm nối liền
         const now = new Date();
         const sortedPeriods = [];
         for (let i = 5; i >= 0; i--) {
           const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-          const y = d.getFullYear();
-          const m = String(d.getMonth() + 1).padStart(2, '0');
-          sortedPeriods.push(`${y}-${m}`);
+          sortedPeriods.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
         }
 
         const months = sortedPeriods.map(period => {
           if (period && period.includes('-')) {
-            const parts = period.split('-');
-            if (parts.length === 2) {
-              const date = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, 1);
-              return date.toLocaleDateString(language === 'vi' ? 'vi-VN' : language === 'en' ? 'en-US' : 'ja-JP', { month: 'short' });
-            }
+            const [y, m] = period.split('-').map(Number);
+            const date = new Date(y, m - 1, 1);
+            return date.toLocaleDateString(language === 'vi' ? 'vi-VN' : language === 'en' ? 'en-US' : 'ja-JP', { month: 'short' });
           }
           return period || '';
         });
@@ -108,444 +121,339 @@ const AgentHomePageSession2 = () => {
           return rejection ? (parseInt(rejection.count, 10) || 0) : 0;
         });
 
-        setChartData({
-          months,
-          offerData,
-          rejectionData,
-        });
+        setChartData({ months, offerData, rejectionData });
       } else {
-        console.warn('Offer/Rejection response is invalid:', offerRejectionRes);
-        // Set empty data if response is invalid
-        setChartData({
-          months: [],
-          offerData: [],
-          rejectionData: [],
-        });
+        setChartData({ months: [], offerData: [], rejectionData: [] });
       }
     } catch (error) {
       console.error('Error loading chart data:', error);
-      // Set empty data on error
       setDonutData([]);
       setTotalApplications(0);
-      setChartData({
-        months: [],
-        offerData: [],
-        rejectionData: [],
-      });
+      setChartData({ months: [], offerData: [], rejectionData: [] });
     } finally {
       setLoading(false);
     }
   };
 
-  // Calculate arc segments with gaps
   const calculateArcSegments = (data, gapDegrees = 24) => {
     if (!data || data.length === 0) return [];
-    
     const radius = 70;
     const centerX = 100;
     const centerY = 100;
     const strokeWidth = 20;
     const total = data.reduce((sum, item) => sum + item.value, 0);
-    
     if (total === 0) return [];
-    
     const totalGaps = gapDegrees * data.length;
     const availableDegrees = 360 - totalGaps;
-    
     let currentAngle = -90;
     const arcs = [];
-    
     data.forEach((item) => {
-      const percentage = item.value / total;
-      const sweepAngle = (percentage * availableDegrees);
-      
+      const sweepAngle = (item.value / total) * availableDegrees;
       const startAngleRad = (currentAngle * Math.PI) / 180;
       const endAngleRad = ((currentAngle + sweepAngle) * Math.PI) / 180;
-      
       const largeArcFlag = sweepAngle > 180 ? 1 : 0;
-      
       const x1 = centerX + radius * Math.cos(startAngleRad);
       const y1 = centerY + radius * Math.sin(startAngleRad);
-      
       const x2 = centerX + radius * Math.cos(endAngleRad);
       const y2 = centerY + radius * Math.sin(endAngleRad);
-      
       arcs.push({
         path: `M ${x1} ${y1} A ${radius} ${radius} 0 ${largeArcFlag} 1 ${x2} ${y2}`,
         color: item.color,
         label: item.label,
         value: item.value,
-        strokeWidth: strokeWidth,
+        strokeWidth,
       });
-      
       currentAngle += sweepAngle + gapDegrees;
     });
-    
     return arcs;
   };
 
   const arcSegments = calculateArcSegments(donutData, 30);
-
-  const chartHeight = 160;
-  const chartWidth = 600;
-  const padding = { left: 24, right: 24, top: 20, bottom: 36 };
   const innerWidth = chartWidth - padding.left - padding.right;
   const innerHeight = chartHeight - padding.top - padding.bottom;
 
   if (loading) {
     return (
-      <div className="w-full">
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_2fr] gap-4 sm:gap-6">
-          <div className="rounded-lg shadow-sm p-3 border" style={{ backgroundColor: 'white', borderColor: '#f3f4f6' }}>
-            <div className="animate-pulse h-64"></div>
-          </div>
-          <div className="rounded-lg shadow-sm p-3 border" style={{ backgroundColor: 'white', borderColor: '#f3f4f6' }}>
-            <div className="animate-pulse h-64"></div>
-          </div>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-1 sm:gap-1.5 md:gap-2 lg:gap-3 mt-2 sm:mt-3 md:mt-4">
+        <div className="bg-white rounded sm:rounded-lg p-2 sm:p-2.5 md:p-3 lg:p-4 border border-gray-100">
+          <div className="animate-pulse rounded-lg bg-gray-50 min-h-[200px]" />
+        </div>
+        <div className="bg-white rounded sm:rounded-lg p-2 sm:p-2.5 md:p-3 lg:p-4 border border-gray-100">
+          <div className="animate-pulse rounded-lg bg-gray-50 min-h-[200px]" />
         </div>
       </div>
     );
   }
 
   return (
-    <div className="w-full">
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_2fr] gap-4 sm:gap-6">
-        {/* Card 1: Phân bố theo nhóm ngành nghề (jobCategory) – số đơn ứng tuyển theo từng nhóm */}
-        <div className="rounded-lg shadow-sm p-3 sm:p-4 border flex flex-col" style={{ backgroundColor: 'white', borderColor: '#f3f4f6' }}>
-          <h3 className="text-sm sm:text-base font-semibold mb-0.5" style={{ color: '#111827' }}>
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-1 sm:gap-1.5 md:gap-2 lg:gap-3 mt-2 sm:mt-3 md:mt-4">
+      {/* Card 1: Phân bố theo nhóm ngành nghề */}
+      <div className="bg-white rounded sm:rounded-lg p-2 sm:p-2.5 md:p-3 lg:p-4 flex flex-col border border-gray-100 overflow-visible">
+        <div className="mb-2 sm:mb-2.5">
+          <h3 className="text-[9px] sm:text-[10px] md:text-xs font-semibold text-gray-900">
             {t.agentHomeDistributionByCategory}
           </h3>
-          <p className="text-xs mb-2" style={{ color: '#6b7280' }}>
+          <p className="text-[8px] sm:text-[9px] md:text-[10px] text-gray-500">
             {t.agentHomeDistributionByCategoryDesc}
           </p>
-          
-          {donutData.length > 0 ? (
-            <div className="flex flex-col items-center flex-1">
-              {/* Arc Segmented Ring Chart */}
-              <div className="relative mb-3 flex-shrink-0" style={{ padding: '8px', overflow: 'visible' }}>
-                <svg width="200" height="200" viewBox="-20 -20 240 240" className="drop-shadow-sm" style={{ overflow: 'visible' }}>
-                  <defs>
-                    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
-                      <feGaussianBlur stdDeviation="4" result="coloredBlur"/>
-                      <feMerge>
-                        <feMergeNode in="coloredBlur"/>
-                        <feMergeNode in="SourceGraphic"/>
-                      </feMerge>
-                    </filter>
-                  </defs>
-                  {arcSegments.map((arc, index) => {
-                    const isHovered = hoveredIndex === index;
-                    return (
-                      <g 
-                        key={index}
-                        style={{
-                          transform: isHovered ? 'scale(1.08)' : 'scale(1)',
-                          transformOrigin: '100px 100px',
-                          transition: 'transform 0.3s ease',
-                          cursor: 'pointer',
-                        }}
-                        onMouseEnter={() => setHoveredIndex(index)}
-                        onMouseLeave={() => setHoveredIndex(null)}
-                      >
-                        <path
-                          d={arc.path}
-                          fill="none"
-                          stroke={arc.color}
-                          strokeWidth={isHovered ? arc.strokeWidth + 4 : arc.strokeWidth}
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          style={{
-                            filter: isHovered ? 'url(#glow) drop-shadow(0 6px 12px rgba(0,0,0,0.25))' : 'none',
-                            transition: 'stroke-width 0.3s ease, filter 0.3s ease',
-                          }}
-                        />
-                      </g>
-                    );
-                  })}
-                </svg>
-                
-                {/* Center text – thu nhỏ */}
-                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none scale-90">
-                  <p className="text-xl font-bold leading-tight" style={{ color: '#111827' }}>{totalApplications}</p>
-                  <p className="text-[10px] leading-tight" style={{ color: '#6b7280' }}>
-                    {t.agentHomeApplications}
-                  </p>
-                </div>
-                
-                {/* Tooltip Card */}
-                {hoveredIndex !== null && hoveredIndex < donutData.length && (
-                  <div 
-                    className="absolute rounded-lg shadow-xl border p-2.5 z-10 pointer-events-none animate-fadeIn"
-                    style={{
-                      top: '50%',
-                      left: '50%',
-                      transform: 'translate(-50%, -130%)',
-                      minWidth: '110px',
-                      backgroundColor: 'white',
-                      borderColor: '#e5e7eb'
-                    }}
-                  >
-                    <div className="flex flex-col items-center gap-1">
-                      <div className="flex items-center gap-1.5">
-                        <div
-                          className="w-2.5 h-2.5 rounded-full flex-shrink-0"
-                          style={{ backgroundColor: donutData[hoveredIndex].color }}
-                        />
-                        <span className="text-xs font-medium" style={{ color: '#374151' }}>
-                          {donutData[hoveredIndex].label}
-                        </span>
-                      </div>
-                      <div className="flex items-baseline gap-2">
-                        <p className="text-xl font-bold" style={{ color: '#111827' }}>
-                          {donutData[hoveredIndex].value}
-                        </p>
-                        <p className="text-xs" style={{ color: '#6b7280' }}>
-                          {totalApplications > 0 ? ((donutData[hoveredIndex].value / totalApplications) * 100).toFixed(1) : 0}%
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-              
-              {/* Legend */}
-              <div className="grid grid-cols-3 gap-2 w-full mt-auto">
-                {donutData.slice(0, 3).map((item, index) => (
-                  <div key={index} className="flex flex-col items-center gap-1">
-                    <div className="flex items-center gap-1.5">
-                      <div
-                        className="w-2.5 h-2.5 rounded-full flex-shrink-0"
-                        style={{ backgroundColor: item.color }}
-                      />
-                      <span className="text-xs font-medium" style={{ color: '#111827' }}>{item.value}</span>
-                    </div>
-                    <span className="text-xs text-center leading-tight" style={{ color: '#4b5563' }}>
-                      {item.label}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ) : (
-            <div className="flex items-center justify-center h-64" style={{ color: '#6b7280' }}>
-              {t.noData}
-            </div>
-          )}
         </div>
 
-        {/* Card 2: Đơn được Offer và Bị Từ chối (theo trạng thái) */}
-        <div className="rounded-lg shadow-sm p-3 sm:p-4 border" style={{ overflow: 'visible', backgroundColor: 'white', borderColor: '#f3f4f6' }}>
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-2 gap-2">
-            <h3 className="text-sm sm:text-base font-semibold" style={{ color: '#111827' }}>
-              {t.agentHomeOffersRejections}
-            </h3>
-            <div className="relative">
-              <button 
-                type="button"
-                onClick={() => setShowFilterPanel((v) => !v)}
-                onMouseEnter={() => setIsFilterButtonHovered(true)}
-                onMouseLeave={() => setIsFilterButtonHovered(false)}
-                className="flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors"
-                style={{
-                  color: '#374151',
-                  backgroundColor: isFilterButtonHovered || showFilterPanel ? '#e5e7eb' : '#f3f4f6'
-                }}
-              >
-                <Filter className="w-3.5 h-3.5" />
-                {t.filters || 'Bộ lọc'}
-              </button>
-              {showFilterPanel && (
-                <div 
-                  className="absolute right-0 top-full mt-1 z-20 rounded-lg border shadow-lg p-3 min-w-[220px]"
-                  style={{ backgroundColor: 'white', borderColor: '#e5e7eb' }}
+        {donutData.length > 0 ? (
+          <div className="flex flex-col items-center flex-1">
+            <div className="relative mb-3 flex-shrink-0" style={{ padding: '8px', overflow: 'visible' }}>
+              <svg width="200" height="200" viewBox="-20 -20 240 240" className="overflow-visible">
+                {arcSegments.map((arc, index) => {
+                  const isHovered = hoveredIndex === index;
+                  return (
+                    <g
+                      key={index}
+                      style={{
+                        transform: isHovered ? 'scale(1.05)' : 'scale(1)',
+                        transformOrigin: '100px 100px',
+                        transition: 'transform 0.2s ease',
+                        cursor: 'pointer',
+                      }}
+                      onMouseEnter={() => setHoveredIndex(index)}
+                      onMouseLeave={() => setHoveredIndex(null)}
+                    >
+                      <path
+                        d={arc.path}
+                        fill="none"
+                        stroke={arc.color}
+                        strokeWidth={isHovered ? arc.strokeWidth + 2 : arc.strokeWidth}
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </g>
+                  );
+                })}
+              </svg>
+              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                <p className="text-base sm:text-lg font-bold text-gray-900">{totalApplications}</p>
+                <p className="text-[8px] sm:text-[9px] text-gray-500">{t.agentHomeApplications}</p>
+              </div>
+              {hoveredIndex !== null && hoveredIndex < donutData.length && (
+                <div
+                  className="absolute rounded-md shadow-lg z-10 pointer-events-none px-2.5 py-1.5"
+                  style={{
+                    top: '50%',
+                    left: '50%',
+                    transform: 'translate(-50%, -130%)',
+                    minWidth: '100px',
+                    backgroundColor: COLORS.cardBg,
+                    color: COLORS.cardText,
+                  }}
                 >
-                  <p className="text-xs font-semibold mb-2" style={{ color: '#374151' }}>
-                    {t.agentHomeFilterByDate}
-                  </p>
-                  <div className="space-y-2">
-                    <div>
-                      <label className="block text-xs mb-0.5" style={{ color: '#6b7280' }}>{t.agentHomeStartDate}</label>
-                      <input
-                        type="date"
-                        value={filterStartDate}
-                        onChange={(e) => setFilterStartDate(e.target.value)}
-                        className="w-full px-2 py-1.5 text-xs border rounded"
-                        style={{ borderColor: '#d1d5db' }}
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs mb-0.5" style={{ color: '#6b7280' }}>{t.agentHomeEndDate}</label>
-                      <input
-                        type="date"
-                        value={filterEndDate}
-                        onChange={(e) => setFilterEndDate(e.target.value)}
-                        className="w-full px-2 py-1.5 text-xs border rounded"
-                        style={{ borderColor: '#d1d5db' }}
-                      />
-                    </div>
-                    <div className="flex gap-2 pt-1">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setFilterStartDate('');
-                          setFilterEndDate('');
-                          setShowFilterPanel(false);
-                          loadChartData();
-                        }}
-                        className="flex-1 px-2 py-1.5 text-xs font-medium rounded border"
-                        style={{ borderColor: '#d1d5db', color: '#6b7280' }}
-                      >
-                        {t.agentHomeClear}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setShowFilterPanel(false);
-                          loadChartData();
-                        }}
-                        className="flex-1 px-2 py-1.5 text-xs font-medium rounded"
-                        style={{ backgroundColor: '#2563eb', color: 'white' }}
-                      >
-                        {t.agentHomeApply}
-                      </button>
-                    </div>
+                  <div className="flex items-center gap-1.5">
+                    <div
+                      className="w-2 h-2 rounded-full flex-shrink-0"
+                      style={{ backgroundColor: donutData[hoveredIndex].color }}
+                    />
+                    <span className="text-[9px] sm:text-[10px] font-medium">{donutData[hoveredIndex].label}</span>
+                  </div>
+                  <div className="flex items-baseline gap-2 mt-0.5">
+                    <span className="text-xs font-bold">{donutData[hoveredIndex].value}</span>
+                    <span className="text-[9px] text-gray-300">
+                      {totalApplications > 0 ? ((donutData[hoveredIndex].value / totalApplications) * 100).toFixed(1) : 0}%
+                    </span>
                   </div>
                 </div>
               )}
             </div>
-          </div>
-          
-          {/* Legend */}
-          <div className="flex items-center gap-4 mb-2">
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-0.5" style={{ backgroundColor: '#10B981' }}></div>
-              <span className="text-xs" style={{ color: '#4b5563' }}>
-                {t.agentHomeOffered}
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-0.5" style={{ backgroundColor: '#EF4444' }}></div>
-              <span className="text-xs" style={{ color: '#4b5563' }}>
-                {t.agentHomeRejected}
-              </span>
+            <div className="grid grid-cols-3 gap-2 w-full mt-auto">
+              {donutData.slice(0, 3).map((item, index) => (
+                <div key={index} className="flex flex-col items-center gap-0.5">
+                  <div className="flex items-center gap-1">
+                    <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: item.color }} />
+                    <span className="text-[9px] font-medium text-gray-900">{item.value}</span>
+                  </div>
+                  <span className="text-[8px] text-center leading-tight text-gray-500 truncate w-full">{item.label}</span>
+                </div>
+              ))}
             </div>
           </div>
-          
-          {/* Line Chart – fit trong card, scale theo width */}
-          {chartData.months.length > 0 ? (
-            <div className="w-full" style={{ maxWidth: '100%' }}>
-              <svg
-                width="100%"
-                height={chartHeight}
-                viewBox={`0 0 ${chartWidth} ${chartHeight}`}
-                preserveAspectRatio="xMidYMid meet"
-                className="block"
-              >
-                {(() => {
-                  const maxValue = Math.max(...chartData.offerData, ...chartData.rejectionData, 1);
-                  const n = chartData.months.length;
-                  const step = n > 1 ? innerWidth / (n - 1) : innerWidth;
+        ) : (
+          <div className="flex items-center justify-center flex-1 min-h-[200px] text-gray-500 text-[11px] sm:text-xs">
+            {t.noData}
+          </div>
+        )}
+      </div>
 
-                  const getX = (index) => padding.left + index * step;
-                  const getY = (value) => padding.top + innerHeight - (maxValue > 0 ? (value / maxValue) * innerHeight : 0);
-
-                  return (
-                    <>
-                      {/* Offer line */}
-                      <polyline
-                        points={chartData.months.map((_, i) => `${getX(i)},${getY(chartData.offerData[i] || 0)}`).join(' ')}
-                        fill="none"
-                        stroke="#10B981"
-                        strokeWidth="2.5"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                      {/* Rejection line */}
-                      <polyline
-                        points={chartData.months.map((_, i) => `${getX(i)},${getY(chartData.rejectionData[i] || 0)}`).join(' ')}
-                        fill="none"
-                        stroke="#EF4444"
-                        strokeWidth="2.5"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                      {/* Offer points */}
-                      {chartData.months.map((_, index) => {
-                        const x = getX(index);
-                        const y = getY(chartData.offerData[index] || 0);
-                        const isHovered = hoveredPointIndex === index;
-                        return (
-                          <g key={`offer-${index}`}>
-                            <circle
-                              cx={x}
-                              cy={y}
-                              r={isHovered ? 7 : 5}
-                              fill="#10B981"
-                              stroke="white"
-                              strokeWidth={isHovered ? 2.5 : 2}
-                              style={{ cursor: 'pointer', transition: 'r 0.2s ease' }}
-                              onMouseEnter={() => setHoveredPointIndex(index)}
-                              onMouseLeave={() => setHoveredPointIndex(null)}
-                            />
-                            {isHovered && (
-                              <g>
-                                <rect x={x - 52} y={y - 52} width="104" height="42" fill="#1F2937" rx="4" />
-                                <text x={x} y={y - 34} fill="white" fontSize="10" fontWeight="500" textAnchor="middle">
-                                  {t.agentHomeOfferLabel} {chartData.offerData[index]}
-                                </text>
-                                <text x={x} y={y - 21} fill="white" fontSize="10" fontWeight="500" textAnchor="middle">
-                                  {t.agentHomeRejectLabel} {chartData.rejectionData[index]}
-                                </text>
-                              </g>
-                            )}
-                          </g>
-                        );
-                      })}
-                      {/* Rejection points */}
-                      {chartData.months.map((_, index) => {
-                        const x = getX(index);
-                        const y = getY(chartData.rejectionData[index] || 0);
-                        const isHovered = hoveredPointIndex === index;
-                        return (
-                          <g key={`reject-${index}`}>
-                            <circle
-                              cx={x}
-                              cy={y}
-                              r={isHovered ? 7 : 5}
-                              fill="#EF4444"
-                              stroke="white"
-                              strokeWidth={isHovered ? 2.5 : 2}
-                              style={{ cursor: 'pointer', transition: 'r 0.2s ease' }}
-                              onMouseEnter={() => setHoveredPointIndex(index)}
-                              onMouseLeave={() => setHoveredPointIndex(null)}
-                            />
-                          </g>
-                        );
-                      })}
-                      {/* X-axis labels */}
-                      {chartData.months.map((month, index) => (
-                        <text
-                          key={`label-${index}`}
-                          x={getX(index)}
-                          y={chartHeight - 10}
-                          textAnchor="middle"
-                          fill="#6B7280"
-                          fontSize="10"
-                        >
-                          {month}
-                        </text>
-                      ))}
-                    </>
-                  );
-                })()}
-              </svg>
-            </div>
-          ) : (
-            <div className="flex items-center justify-center h-64" style={{ color: '#6b7280' }}>
-              {t.noData || 'No data'}
-            </div>
-          )}
+      {/* Card 2: Offer & Rejection */}
+      <div className="bg-white rounded sm:rounded-lg p-2 sm:p-2.5 md:p-3 lg:p-4 flex flex-col border border-gray-100 overflow-visible">
+        <div className="mb-2 sm:mb-2.5 flex flex-wrap items-center justify-between gap-1 sm:gap-1.5">
+          <div className="min-w-0">
+            <h3 className="text-[9px] sm:text-[10px] md:text-xs font-semibold text-gray-900">
+              {t.agentHomeOffersRejections}
+            </h3>
+            <p className="text-[8px] sm:text-[9px] md:text-[10px] text-gray-500">
+              {t.agentHomeOffered} / {t.agentHomeRejected}
+            </p>
+          </div>
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setShowFilterPanel((v) => !v)}
+              className="flex items-center gap-2 px-2.5 py-1.5 text-[10px] font-medium rounded-2xl border border-red-200 bg-white hover:border-red-400 hover:bg-red-50 transition-colors"
+            >
+              <Filter className="w-3 h-3 text-red-500" />
+              {t.filters || 'Bộ lọc'}
+            </button>
+            {showFilterPanel && (
+              <div className="absolute right-0 top-full mt-1 z-20 rounded-lg border border-gray-200 shadow-lg p-3 min-w-[220px] bg-white">
+                <p className="text-[9px] font-semibold text-gray-700 mb-2">{t.agentHomeFilterByDate}</p>
+                <div className="space-y-2">
+                  <div>
+                    <label className="block text-[8px] mb-0.5 text-gray-500">{t.agentHomeStartDate}</label>
+                    <input
+                      type="date"
+                      value={filterStartDate}
+                      onChange={(e) => setFilterStartDate(e.target.value)}
+                      className="w-full px-2 py-1.5 text-[10px] border border-gray-200 rounded"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[8px] mb-0.5 text-gray-500">{t.agentHomeEndDate}</label>
+                    <input
+                      type="date"
+                      value={filterEndDate}
+                      onChange={(e) => setFilterEndDate(e.target.value)}
+                      className="w-full px-2 py-1.5 text-[10px] border border-gray-200 rounded"
+                    />
+                  </div>
+                  <div className="flex gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFilterStartDate('');
+                        setFilterEndDate('');
+                        setShowFilterPanel(false);
+                        loadChartData();
+                      }}
+                      className="flex-1 px-2 py-1.5 text-[10px] font-medium rounded border border-gray-200 text-gray-600"
+                    >
+                      {t.agentHomeClear}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowFilterPanel(false);
+                        loadChartData();
+                      }}
+                      className="flex-1 px-2 py-1.5 text-[10px] font-medium rounded bg-red-600 text-white hover:bg-red-700"
+                    >
+                      {t.agentHomeApply}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
+
+        <div className="flex items-center gap-4 mb-1.5">
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-0.5 rounded" style={{ backgroundColor: COLORS.lineOffer }} />
+            <span className="text-[9px] text-gray-500">{t.agentHomeOffered}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-0.5 rounded" style={{ backgroundColor: COLORS.lineRejection }} />
+            <span className="text-[9px] text-gray-500">{t.agentHomeRejected}</span>
+          </div>
+        </div>
+
+        {chartData.months.length > 0 ? (
+          <div className="flex-1 flex flex-col min-h-[120px] sm:min-h-[160px] lg:min-h-[200px]">
+            <div className="w-full overflow-visible pt-6 sm:pt-8 md:pt-10 -mt-6 sm:-mt-8 md:-mt-10 flex-1">
+              <div className="h-[120px] sm:h-[160px] lg:h-[180px] min-h-[120px]">
+                <svg
+                  width="100%"
+                  height="100%"
+                  viewBox={`0 0 ${chartWidth} ${chartHeight}`}
+                  preserveAspectRatio="xMidYMid meet"
+                  className="block overflow-visible"
+                  style={{ minHeight: 120 }}
+                >
+                  {(() => {
+                    const maxValue = Math.max(...chartData.offerData, ...chartData.rejectionData, 1);
+                    const n = chartData.months.length;
+                    const step = n > 1 ? innerWidth / (n - 1) : innerWidth;
+                    const getX = (index) => padding.left + index * step;
+                    const getY = (value) => padding.top + innerHeight - (maxValue > 0 ? (value / maxValue) * innerHeight : 0);
+
+                    const offerPoints = chartData.months.map((_, i) => [getX(i), getY(chartData.offerData[i] || 0)]);
+                    const rejectionPoints = chartData.months.map((_, i) => [getX(i), getY(chartData.rejectionData[i] || 0)]);
+                    const offerPath = buildSmoothPath(offerPoints);
+                    const rejectionPath = buildSmoothPath(rejectionPoints);
+
+                    return (
+                      <>
+                        <path d={offerPath} fill="none" stroke={COLORS.lineOffer} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                        <path d={rejectionPath} fill="none" stroke={COLORS.lineRejection} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                        {chartData.months.map((_, index) => {
+                          const x = getX(index);
+                          const offerY = getY(chartData.offerData[index] || 0);
+                          const isHovered = hoveredPointIndex === index;
+                          const cardW = 120;
+                          const cardH = 44;
+                          const showAbove = offerY > padding.top + innerHeight / 2;
+                          const tooltipY = showAbove ? offerY - cardH - 8 : offerY + 12;
+                          return (
+                            <g key={`point-${index}`}>
+                              <circle
+                                cx={x}
+                                cy={offerY}
+                                r={10}
+                                fill="transparent"
+                                style={{ cursor: 'pointer' }}
+                                onMouseEnter={() => setHoveredPointIndex(index)}
+                                onMouseLeave={() => setHoveredPointIndex(null)}
+                              />
+                              {isHovered && (
+                                <>
+                                  <circle cx={x} cy={offerY} r={4} fill={COLORS.lineOffer} stroke={COLORS.lineStroke} strokeWidth={1.5} />
+                                  <circle cx={x} cy={getY(chartData.rejectionData[index] || 0)} r={4} fill={COLORS.lineRejection} stroke={COLORS.lineStroke} strokeWidth={1.5} />
+                                  <g>
+                                    <rect x={x - cardW / 2} y={tooltipY} width={cardW} height={cardH} fill={COLORS.cardBg} rx="6" ry="6" />
+                                    <text x={x} y={tooltipY + 14} fill={COLORS.cardText} fontSize="10" fontWeight="600" textAnchor="middle">
+                                      {chartData.months[index]}
+                                    </text>
+                                    <text x={x} y={tooltipY + 26} fill={COLORS.cardText} fontSize="9" textAnchor="middle">
+                                      {t.agentHomeOfferLabel} {chartData.offerData[index]}
+                                    </text>
+                                    <text x={x} y={tooltipY + 36} fill={COLORS.cardText} fontSize="9" textAnchor="middle">
+                                      {t.agentHomeRejectLabel} {chartData.rejectionData[index]}
+                                    </text>
+                                  </g>
+                                </>
+                              )}
+                            </g>
+                          );
+                        })}
+                        {chartData.months.map((month, index) => (
+                          <text
+                            key={`label-${index}`}
+                            x={getX(index)}
+                            y={chartHeight - 12}
+                            textAnchor="middle"
+                            fill={COLORS.axisLabel}
+                            fontSize="10"
+                          >
+                            {month}
+                          </text>
+                        ))}
+                      </>
+                    );
+                  })()}
+                </svg>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="flex-1 flex items-center justify-center min-h-[160px] text-gray-500 text-[11px] sm:text-xs rounded-lg bg-gray-50">
+            {t.noData}
+          </div>
+        )}
       </div>
     </div>
   );

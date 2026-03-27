@@ -15,6 +15,8 @@ import {
   ChevronRight,
   ChevronsLeft,
   ChevronsRight,
+  ChevronDown,
+  ChevronsUpDown,
   Mail,
   Phone,
   User,
@@ -30,8 +32,7 @@ const CollaboratorsPage = () => {
   const [selectedStatus, setSelectedStatus] = useState('');
   const [joinDateFrom, setJoinDateFrom] = useState('');
   const [joinDateTo, setJoinDateTo] = useState('');
-  const [onlyActive, setOnlyActive] = useState(false);
-  const [showInactiveOnly, setShowInactiveOnly] = useState(false);
+  const [sortOption, setSortOption] = useState('joinDateDesc');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(20);
   const [selectedRows, setSelectedRows] = useState(new Set());
@@ -45,21 +46,20 @@ const CollaboratorsPage = () => {
   });
   
   // Hover states
-  const [hoveredSearchButton, setHoveredSearchButton] = useState(false);
-  const [hoveredResetButton, setHoveredResetButton] = useState(false);
-  const [hoveredInfoButton, setHoveredInfoButton] = useState(false);
   const [hoveredAddCollaboratorButton, setHoveredAddCollaboratorButton] = useState(false);
-  const [hoveredSettingsButton, setHoveredSettingsButton] = useState(false);
   const [hoveredPaginationNavButton, setHoveredPaginationNavButton] = useState(null);
   const [hoveredPaginationButtonIndex, setHoveredPaginationButtonIndex] = useState(null);
   const [hoveredRowIndex, setHoveredRowIndex] = useState(null);
   const [hoveredCollaboratorIdLinkIndex, setHoveredCollaboratorIdLinkIndex] = useState(null);
   const [hoveredEditButtonIndex, setHoveredEditButtonIndex] = useState(null);
   const [hoveredDeleteButtonIndex, setHoveredDeleteButtonIndex] = useState(null);
+  const [isDateFilterOpen, setIsDateFilterOpen] = useState(false);
+  const [isStatusFilterOpen, setIsStatusFilterOpen] = useState(false);
+  const [isSortFilterOpen, setIsSortFilterOpen] = useState(false);
 
   useEffect(() => {
     loadCollaborators();
-  }, [currentPage, itemsPerPage, selectedStatus, onlyActive, showInactiveOnly]);
+  }, [currentPage, itemsPerPage, selectedStatus, sortOption, searchQuery, joinDateFrom, joinDateTo]);
 
   const loadCollaborators = async () => {
     try {
@@ -67,20 +67,34 @@ const CollaboratorsPage = () => {
       const params = {
         page: currentPage,
         limit: itemsPerPage,
-        sortBy: 'created_at',
-        sortOrder: 'DESC'
       };
+
+      // Sort options: tên, ngày tham gia, số hồ sơ (2 chiều)
+      if (sortOption.startsWith('alphabet')) {
+        params.sortBy = 'name';
+        params.sortOrder = sortOption === 'alphabetDesc' ? 'DESC' : 'ASC';
+      } else if (sortOption.startsWith('applications')) {
+        params.sortBy = 'applicationsCount';
+        params.sortOrder = sortOption === 'applicationsAsc' ? 'ASC' : 'DESC';
+      } else {
+        // Ngày tham gia
+        params.sortBy = 'created_at';
+        params.sortOrder = sortOption === 'joinDateAsc' ? 'ASC' : 'DESC';
+      }
 
       if (searchQuery) {
         params.search = searchQuery;
       }
 
-      if (onlyActive) {
-        params.status = 1;
-      } else if (showInactiveOnly) {
-        params.status = 0;
-      } else if (selectedStatus) {
+      if (selectedStatus) {
         params.status = selectedStatus === 'active' ? 1 : 0;
+      }
+
+      if (joinDateFrom) {
+        params.joinDateFrom = joinDateFrom;
+      }
+      if (joinDateTo) {
+        params.joinDateTo = joinDateTo;
       }
 
       const response = await apiService.getCollaborators(params);
@@ -357,11 +371,6 @@ const CollaboratorsPage = () => {
     loadCollaborators();
   };
 
-  const handleSearch = () => {
-    setCurrentPage(1);
-    loadCollaborators();
-  };
-
   const formatCurrency = (amount) => {
     const locale =
       language === 'en' ? 'en-US' :
@@ -397,198 +406,274 @@ const CollaboratorsPage = () => {
   return (
     <div className="h-full flex flex-col overflow-hidden">
       {/* Filter Section */}
-      <div className="rounded-lg p-3 border mb-3 flex-shrink-0" style={{ backgroundColor: 'white', borderColor: '#e5e7eb' }}>
-        {/* Search Bar */}
-        <div className="flex items-center gap-2 flex-wrap mb-3">
-          <div className="flex-1 min-w-[250px]">
-            <input
-              type="text"
-              placeholder={t.collaboratorsSearchPlaceholder}
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full px-3 py-1.5 border rounded text-xs"
-              style={{
-                borderColor: '#d1d5db',
-                outline: 'none'
-              }}
-              onFocus={(e) => {
-                e.target.style.borderColor = '#2563eb';
-                e.target.style.boxShadow = '0 0 0 2px rgba(37, 99, 235, 0.5)';
-              }}
-              onBlur={(e) => {
-                e.target.style.borderColor = '#d1d5db';
-                e.target.style.boxShadow = 'none';
-              }}
-            />
+      <div className="px-2 sm:px-3 py-1.5 mb-1.5 flex-shrink-0">
+        <div className="flex items-center gap-2.5 flex-wrap justify-between">
+          {/* 1. Search box: input + nút Tìm kiếm trong một khung viền đỏ */}
+          <div className="flex items-stretch rounded-lg border border-red-500 bg-white text-[12px] sm:text-[13px] w-full max-w-[500px] overflow-hidden shadow-sm">
+            <div className="flex flex-1 items-center gap-2 pl-3 pr-2 py-1.5 min-w-0">
+              <Search className="w-3.5 h-3.5 flex-shrink-0 text-red-500" />
+              <input
+                type="text"
+                placeholder={t.collaboratorsSearchPlaceholder}
+                value={searchQuery}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setCurrentPage(1);
+                }}
+                className="flex-1 min-w-0 bg-transparent outline-none text-[12px] sm:text-[13px] text-gray-700 placeholder:text-gray-400"
+              />
+            </div>
+            <button
+              type="button"
+              onClick={() => setCurrentPage(1)}
+              className="px-4 py-1.5 rounded-r-lg bg-red-500 text-white font-semibold text-[12px] sm:text-[13px] hover:bg-red-600 transition-colors flex-shrink-0"
+            >
+              Tìm kiếm
+            </button>
           </div>
-          <button
-            onClick={handleSearch}
-            onMouseEnter={() => setHoveredSearchButton(true)}
-            onMouseLeave={() => setHoveredSearchButton(false)}
-            className="px-4 py-1.5 rounded text-xs font-semibold transition-colors flex items-center gap-1.5"
-            style={{
-              backgroundColor: hoveredSearchButton ? '#1d4ed8' : '#2563eb',
-              color: 'white'
-            }}
-          >
-            <Search className="w-3.5 h-3.5" />
-            {t.search}
-          </button>
-          <button
-            onClick={handleReset}
-            onMouseEnter={() => setHoveredResetButton(true)}
-            onMouseLeave={() => setHoveredResetButton(false)}
-            className="px-3 py-1.5 rounded text-xs font-semibold transition-colors"
-            style={{
-              backgroundColor: hoveredResetButton ? '#e5e7eb' : '#f3f4f6',
-              color: '#374151'
-            }}
-          >
-            {t.reset}
-          </button>
-          <button
-            onMouseEnter={() => setHoveredInfoButton(true)}
-            onMouseLeave={() => setHoveredInfoButton(false)}
-            className="p-1.5"
-            style={{
-              color: hoveredInfoButton ? '#1f2937' : '#4b5563'
-            }}
-          >
-            <Info className="w-4 h-4" />
-          </button>
-          <button
-            onClick={() => navigate('/admin/collaborators/new')}
-            onMouseEnter={() => setHoveredAddCollaboratorButton(true)}
-            onMouseLeave={() => setHoveredAddCollaboratorButton(false)}
-            className="px-3 py-1.5 rounded text-xs font-semibold transition-colors flex items-center gap-1.5"
-            style={{
-              backgroundColor: hoveredAddCollaboratorButton ? '#eab308' : '#facc15',
-              color: '#111827'
-            }}
-          >
-            <Plus className="w-3.5 h-3.5" />
-            + Thêm CTV
-          </button>
-          <button
-            onMouseEnter={() => setHoveredSettingsButton(true)}
-            onMouseLeave={() => setHoveredSettingsButton(false)}
-            className="px-3 py-1.5 rounded text-xs font-semibold transition-colors flex items-center gap-1.5"
-            style={{
-              backgroundColor: hoveredSettingsButton ? '#111827' : '#1f2937',
-              color: 'white'
-            }}
-          >
-            <Settings className="w-3.5 h-3.5" />
-            {t.settings}
-          </button>
-        </div>
 
-        {/* Additional Filters */}
-        <div className="flex items-center gap-3 flex-wrap">
-          <div className="flex items-center gap-1.5">
-            <label className="text-xs font-semibold" style={{ color: '#111827' }}>{t.collaboratorsStatusLabel}</label>
-            <select
-              value={selectedStatus}
-              onChange={(e) => setSelectedStatus(e.target.value)}
-              className="px-2 py-1 border rounded text-xs"
+          {/* Các filter dạng pill + nút thêm CTV bên phải */}
+          <div className="flex items-center gap-2.5 flex-wrap justify-end">
+            {/* Date range pill */}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsDateFilterOpen(!isDateFilterOpen);
+                  setIsStatusFilterOpen(false);
+                  setIsSortFilterOpen(false);
+                }}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white text-[11px] sm:text-xs font-semibold border border-red-500"
+                style={{ color: '#374151' }}
+              >
+                Ngày tham gia
+                <ChevronDown className="w-3 h-3" />
+              </button>
+              {isDateFilterOpen && (
+                <div className="absolute right-0 mt-2 w-64 rounded-xl border bg-white p-3 z-20 text-[11px] sm:text-xs" style={{ borderColor: '#e5e7eb' }}>
+                  <div className="flex flex-col gap-2">
+                    <label className="flex flex-col gap-1">
+                      <span className="font-semibold text-gray-700">Từ ngày</span>
+                      <input
+                        type="date"
+                        value={joinDateFrom}
+                        onChange={(e) => setJoinDateFrom(e.target.value)}
+                        className="px-2 py-1 border rounded"
+                        style={{ borderColor: '#d1d5db', outline: 'none' }}
+                      />
+                    </label>
+                    <label className="flex flex-col gap-1">
+                      <span className="font-semibold text-gray-700">Đến ngày</span>
+                      <input
+                        type="date"
+                        value={joinDateTo}
+                        onChange={(e) => setJoinDateTo(e.target.value)}
+                        className="px-2 py-1 border rounded"
+                        style={{ borderColor: '#d1d5db', outline: 'none' }}
+                      />
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setJoinDateFrom('');
+                        setJoinDateTo('');
+                      }}
+                      className="self-end mt-1 text-[10px] font-semibold px-2 py-0.5 rounded-full"
+                      style={{ backgroundColor: '#f3f4f6', color: '#4b5563' }}
+                      >
+                      Xóa lọc
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Status pill */}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsStatusFilterOpen(!isStatusFilterOpen);
+                  setIsDateFilterOpen(false);
+                  setIsSortFilterOpen(false);
+                }}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white text-[11px] sm:text-xs font-semibold border border-red-500"
+                style={{ color: '#374151' }}
+              >
+                Trạng thái
+                <ChevronDown className="w-3 h-3" />
+              </button>
+              {isStatusFilterOpen && (
+                <div className="absolute right-0 mt-2 w-52 rounded-xl border bg-white p-3 z-20 text-[11px] sm:text-xs" style={{ borderColor: '#e5e7eb' }}>
+                  <div className="flex flex-col gap-2">
+                    <label className="flex items-center gap-1.5 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="collab-status-filter"
+                        value=""
+                        checked={selectedStatus === ''}
+                        onChange={(e) => {
+                          setSelectedStatus(e.target.value);
+                          setCurrentPage(1);
+                        }}
+                        className="w-3.5 h-3.5"
+                      />
+                      <span>Tất cả</span>
+                    </label>
+                    <label className="flex items-center gap-1.5 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="collab-status-filter"
+                        value="active"
+                        checked={selectedStatus === 'active'}
+                        onChange={(e) => {
+                          setSelectedStatus(e.target.value);
+                          setCurrentPage(1);
+                        }}
+                        className="w-3.5 h-3.5"
+                      />
+                      <span>{t.collaboratorsStatusActive}</span>
+                    </label>
+                    <label className="flex items-center gap-1.5 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="collab-status-filter"
+                        value="inactive"
+                        checked={selectedStatus === 'inactive'}
+                        onChange={(e) => {
+                          setSelectedStatus(e.target.value);
+                          setCurrentPage(1);
+                        }}
+                        className="w-3.5 h-3.5"
+                      />
+                      <span>{t.collaboratorsStatusInactive}</span>
+                    </label>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Sort by pill */}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsSortFilterOpen(!isSortFilterOpen);
+                  setIsDateFilterOpen(false);
+                  setIsStatusFilterOpen(false);
+                }}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white text-[11px] sm:text-xs font-semibold border border-red-500"
+                style={{ color: '#374151' }}
+              >
+                Sắp xếp
+                <ChevronDown className="w-3 h-3" />
+              </button>
+              {isSortFilterOpen && (
+                <div className="absolute right-0 mt-2 w-60 rounded-xl border bg-white p-3 z-20 text-[11px] sm:text-xs" style={{ borderColor: '#e5e7eb' }}>
+                  <div className="flex flex-col gap-3">
+                    {/* Tên */}
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-[11px] font-semibold text-gray-700">Tên</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSortOption((prev) => {
+                            if (prev === 'alphabetAsc') return 'alphabetDesc';
+                            return 'alphabetAsc';
+                          });
+                          setCurrentPage(1);
+                        }}
+                        className="px-2.5 py-0.5 rounded-full border flex items-center gap-1 text-[10px]"
+                        style={{
+                          borderColor: sortOption.startsWith('alphabet') ? '#2563eb' : '#e5e7eb',
+                          backgroundColor: sortOption.startsWith('alphabet') ? '#eff6ff' : 'white',
+                          color: sortOption.startsWith('alphabet') ? '#1d4ed8' : '#4b5563',
+                        }}
+                      >
+                        <ChevronsUpDown className="w-3 h-3" />
+                        <span>{sortOption === 'alphabetDesc' ? 'Z–A' : 'A–Z'}</span>
+                      </button>
+                    </div>
+
+                    {/* Ngày tham gia */}
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-[11px] font-semibold text-gray-700">Ngày tham gia</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSortOption((prev) => {
+                            if (prev === 'joinDateAsc') return 'joinDateDesc';
+                            return 'joinDateAsc';
+                          });
+                          setCurrentPage(1);
+                        }}
+                        className="px-2.5 py-0.5 rounded-full border flex items-center gap-1 text-[10px]"
+                        style={{
+                          borderColor: sortOption.startsWith('joinDate') ? '#2563eb' : '#e5e7eb',
+                          backgroundColor: sortOption.startsWith('joinDate') ? '#eff6ff' : 'white',
+                          color: sortOption.startsWith('joinDate') ? '#1d4ed8' : '#4b5563',
+                        }}
+                      >
+                        <ChevronsUpDown className="w-3 h-3" />
+                        <span>{sortOption === 'joinDateAsc' ? 'Cũ → Mới' : 'Mới → Cũ'}</span>
+                      </button>
+                    </div>
+
+                    {/* Số hồ sơ ứng viên */}
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-[11px] font-semibold text-gray-700">Số hồ sơ ứng viên</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSortOption((prev) => {
+                            if (prev === 'applicationsAsc') return 'applicationsDesc';
+                            return 'applicationsAsc';
+                          });
+                          setCurrentPage(1);
+                        }}
+                        className="px-2.5 py-0.5 rounded-full border flex items-center gap-1 text-[10px]"
+                        style={{
+                          borderColor: sortOption.startsWith('applications') ? '#2563eb' : '#e5e7eb',
+                          backgroundColor: sortOption.startsWith('applications') ? '#eff6ff' : 'white',
+                          color: sortOption.startsWith('applications') ? '#1d4ed8' : '#4b5563',
+                        }}
+                      >
+                        <ChevronsUpDown className="w-3 h-3" />
+                        <span>{sortOption === 'applicationsAsc' ? 'Ít → Nhiều' : 'Nhiều → Ít'}</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Nút thêm CTV */}
+            <button
+              onClick={() => navigate('/admin/collaborators/new')}
+              onMouseEnter={() => setHoveredAddCollaboratorButton(true)}
+              onMouseLeave={() => setHoveredAddCollaboratorButton(false)}
+              className="px-3 sm:px-4 py-1.5 rounded-full text-[11px] sm:text-xs font-semibold flex items-center gap-1.5"
               style={{
-                borderColor: '#d1d5db',
-                outline: 'none'
-              }}
-              onFocus={(e) => {
-                e.target.style.borderColor = '#2563eb';
-                e.target.style.boxShadow = '0 0 0 2px rgba(37, 99, 235, 0.5)';
-              }}
-              onBlur={(e) => {
-                e.target.style.borderColor = '#d1d5db';
-                e.target.style.boxShadow = 'none';
+                backgroundColor: hoveredAddCollaboratorButton ? '#b91c1c' : '#dc2626',
+                color: 'white'
               }}
             >
-              <option value="">{t.collaboratorsStatusAll}</option>
-              <option value="active">{t.collaboratorsStatusActive}</option>
-              <option value="inactive">{t.collaboratorsStatusInactive}</option>
-            </select>
+              <Plus className="w-3 h-3" />
+              <span className="hidden sm:inline">Thêm CTV</span>
+            </button>
           </div>
-          <div className="flex items-center gap-1.5">
-            <label className="text-xs font-semibold" style={{ color: '#111827' }}>{t.collaboratorsJoinDateFrom}</label>
-            <input
-              type="date"
-              value={joinDateFrom}
-              onChange={(e) => setJoinDateFrom(e.target.value)}
-              className="px-2 py-1 border rounded text-xs"
-              style={{
-                borderColor: '#d1d5db',
-                outline: 'none'
-              }}
-              onFocus={(e) => {
-                e.target.style.borderColor = '#2563eb';
-                e.target.style.boxShadow = '0 0 0 2px rgba(37, 99, 235, 0.5)';
-              }}
-              onBlur={(e) => {
-                e.target.style.borderColor = '#d1d5db';
-                e.target.style.boxShadow = 'none';
-              }}
-            />
-          </div>
-          <div className="flex items-center gap-1.5">
-            <label className="text-xs font-semibold" style={{ color: '#111827' }}>{t.collaboratorsJoinDateTo}</label>
-            <input
-              type="date"
-              value={joinDateTo}
-              onChange={(e) => setJoinDateTo(e.target.value)}
-              className="px-2 py-1 border rounded text-xs"
-              style={{
-                borderColor: '#d1d5db',
-                outline: 'none'
-              }}
-              onFocus={(e) => {
-                e.target.style.borderColor = '#2563eb';
-                e.target.style.boxShadow = '0 0 0 2px rgba(37, 99, 235, 0.5)';
-              }}
-              onBlur={(e) => {
-                e.target.style.borderColor = '#d1d5db';
-                e.target.style.boxShadow = 'none';
-              }}
-            />
-          </div>
-          <label className="flex items-center gap-1.5 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={onlyActive}
-              onChange={(e) => setOnlyActive(e.target.checked)}
-              className="w-3.5 h-3.5 rounded"
-              style={{
-                accentColor: '#2563eb',
-                borderColor: '#d1d5db'
-              }}
-            />
-            <span className="text-xs font-semibold" style={{ color: '#374151' }}>{t.collaboratorsOnlyActive}</span>
-          </label>
-          <label className="flex items-center gap-1.5 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={showInactiveOnly}
-              onChange={(e) => setShowInactiveOnly(e.target.checked)}
-              className="w-3.5 h-3.5 rounded"
-              style={{
-                accentColor: '#2563eb',
-                borderColor: '#d1d5db'
-              }}
-            />
-            <span className="text-xs font-semibold" style={{ color: '#374151' }}>{t.collaboratorsOnlyInactive}</span>
-          </label>
         </div>
       </div>
 
       {/* Pagination Controls */}
-      <div className="flex items-center justify-between mb-3 flex-shrink-0">
-        <div className="flex items-center gap-1.5">
+      <div className="flex items-center justify-between px-2 sm:px-3 mb-2 flex-shrink-0">
+        <div className="flex items-center gap-1">
           <button
             onClick={() => setCurrentPage(1)}
             disabled={currentPage === 1}
             onMouseEnter={() => currentPage !== 1 && setHoveredPaginationNavButton('first')}
             onMouseLeave={() => setHoveredPaginationNavButton(null)}
-            className="px-1.5 py-1 border rounded text-xs font-semibold transition-colors"
+            className="w-5 h-5 border rounded-full text-[8px] font-semibold flex items-center justify-center transition-colors"
             style={{
               backgroundColor: hoveredPaginationNavButton === 'first' ? '#f9fafb' : 'white',
               borderColor: '#d1d5db',
@@ -604,7 +689,7 @@ const CollaboratorsPage = () => {
             disabled={currentPage === 1}
             onMouseEnter={() => currentPage !== 1 && setHoveredPaginationNavButton('prev')}
             onMouseLeave={() => setHoveredPaginationNavButton(null)}
-            className="px-1.5 py-1 border rounded text-xs font-semibold transition-colors"
+            className="w-5 h-5 border rounded-full text-[8px] font-semibold flex items-center justify-center transition-colors"
             style={{
               backgroundColor: hoveredPaginationNavButton === 'prev' ? '#f9fafb' : 'white',
               borderColor: '#d1d5db',
@@ -632,11 +717,11 @@ const CollaboratorsPage = () => {
                 onClick={() => setCurrentPage(pageNum)}
                 onMouseEnter={() => currentPage !== pageNum && setHoveredPaginationButtonIndex(pageNum)}
                 onMouseLeave={() => setHoveredPaginationButtonIndex(null)}
-                className="px-2.5 py-1 rounded text-xs font-semibold transition-colors"
+                className="w-5 h-5 rounded-full text-[8px] font-semibold flex items-center justify-center transition-colors"
                 style={{
                   backgroundColor: currentPage === pageNum
-                    ? '#2563eb'
-                    : (hoveredPaginationButtonIndex === pageNum ? '#f9fafb' : 'white'),
+                    ? 'red-500'
+                    : (hoveredPaginationButtonIndex === pageNum ? 'red' : 'white'),
                   border: currentPage === pageNum ? 'none' : '1px solid #d1d5db',
                   color: currentPage === pageNum ? 'white' : '#374151'
                 }}
@@ -650,9 +735,9 @@ const CollaboratorsPage = () => {
             disabled={currentPage === totalPages}
             onMouseEnter={() => currentPage !== totalPages && setHoveredPaginationNavButton('next')}
             onMouseLeave={() => setHoveredPaginationNavButton(null)}
-            className="px-1.5 py-1 border rounded text-xs font-semibold transition-colors"
+            className="w-5 h-5 border rounded-full text-[8px] font-semibold flex items-center justify-center transition-colors"
             style={{
-              backgroundColor: hoveredPaginationNavButton === 'next' ? '#f9fafb' : 'white',
+              backgroundColor: hoveredPaginationNavButton === 'next' ? 'red-500' : 'white',
               borderColor: '#d1d5db',
               color: '#374151',
               opacity: currentPage === totalPages ? 0.5 : 1,
@@ -666,7 +751,7 @@ const CollaboratorsPage = () => {
             disabled={currentPage === totalPages}
             onMouseEnter={() => currentPage !== totalPages && setHoveredPaginationNavButton('last')}
             onMouseLeave={() => setHoveredPaginationNavButton(null)}
-            className="px-1.5 py-1 border rounded text-xs font-semibold transition-colors"
+            className="w-5 h-5 border rounded-full text-[8px] font-semibold flex items-center justify-center transition-colors"
             style={{
               backgroundColor: hoveredPaginationNavButton === 'last' ? '#f9fafb' : 'white',
               borderColor: '#d1d5db',
@@ -678,14 +763,14 @@ const CollaboratorsPage = () => {
             <ChevronsRight className="w-3.5 h-3.5" />
           </button>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
           <select
             value={itemsPerPage}
             onChange={(e) => {
               setItemsPerPage(Number(e.target.value));
               setCurrentPage(1);
             }}
-            className="px-2.5 py-1 border rounded text-xs font-semibold"
+            className="px-2 py-0.5 border rounded-full text-[10px] font-semibold"
             style={{
               borderColor: '#d1d5db',
               color: '#374151',
@@ -704,199 +789,166 @@ const CollaboratorsPage = () => {
             <option value="50">50</option>
             <option value="100">100</option>
           </select>
-          <span className="text-xs font-semibold" style={{ color: '#374151' }}>{totalItems} {t.collaboratorsTotalItemsSuffix}</span>
+          <span className="text-[10px] font-semibold" style={{ color: '#374151' }}>{totalItems} {t.collaboratorsTotalItemsSuffix}</span>
         </div>
       </div>
 
-      {/* Table */}
-      <div className="flex-1 overflow-y-auto rounded-lg border min-h-0 relative" style={{ backgroundColor: 'white', borderColor: '#e5e7eb' }}>
-        <div className="overflow-x-auto h-full">
-          <table className="w-full">
-            <thead className="sticky top-0 z-10" style={{ backgroundColor: '#f9fafb' }}>
-              <tr>
-                <th className="px-3 py-2 text-center text-[10px] font-semibold border-b w-10" style={{ color: '#111827', borderColor: '#e5e7eb' }}>
-                  <input
-                    type="checkbox"
-                    checked={selectedRows.size === collaborators.length && collaborators.length > 0}
-                    onChange={handleSelectAll}
-                    className="w-3.5 h-3.5 rounded"
-                    style={{
-                      accentColor: '#2563eb',
-                      borderColor: '#d1d5db'
-                    }}
-                  />
-                </th>
-                <th className="px-3 py-2 text-left text-[10px] font-semibold border-b" style={{ color: '#111827', borderColor: '#e5e7eb' }}>{t.collaboratorsColName}</th>
-                <th className="px-3 py-2 text-left text-[10px] font-semibold border-b" style={{ color: '#111827', borderColor: '#e5e7eb' }}>{t.collaboratorsColRank}</th>
-                <th className="px-3 py-2 text-left text-[10px] font-semibold border-b" style={{ color: '#111827', borderColor: '#e5e7eb' }}>{t.collaboratorsColEmail}</th>
-                <th className="px-3 py-2 text-left text-[10px] font-semibold border-b" style={{ color: '#111827', borderColor: '#e5e7eb' }}>{t.collaboratorsColPhone}</th>
-                <th className="px-3 py-2 text-left text-[10px] font-semibold border-b" style={{ color: '#111827', borderColor: '#e5e7eb' }}>{t.collaboratorsColCandidatesCount}</th>
-                <th className="px-3 py-2 text-left text-[10px] font-semibold border-b" style={{ color: '#111827', borderColor: '#e5e7eb' }}>{t.collaboratorsColTotalEarned}</th>
-                <th className="px-3 py-2 text-left text-[10px] font-semibold border-b" style={{ color: '#111827', borderColor: '#e5e7eb' }}>{t.collaboratorsColStatus}</th>
-                <th className="px-3 py-2 text-left text-[10px] font-semibold border-b" style={{ color: '#111827', borderColor: '#e5e7eb' }}>{t.collaboratorsColJoinDate}</th>
-                <th className="px-3 py-2 text-center text-[10px] font-semibold border-b" style={{ color: '#111827', borderColor: '#e5e7eb' }}>{t.colActions}</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y" style={{ borderColor: '#e5e7eb' }}>
-              {loading ? (
-                <tr>
-                  <td colSpan="10" className="px-3 py-8 text-center text-xs" style={{ color: '#6b7280' }}>
-                    {t.collaboratorsLoading}
-                  </td>
-                </tr>
-              ) : collaborators.length === 0 ? (
-                <tr>
-                  <td colSpan="10" className="px-3 py-8 text-center text-xs" style={{ color: '#6b7280' }}>
-                    {t.collaboratorsNoData}
-                  </td>
-                </tr>
-              ) : (
-                collaborators.map((collaborator, index) => {
-                  const statusLabel = collaborator.status === 1 ? 'active' : 'inactive';
-                  const joinDate = collaborator.createdAt 
-                    ? new Date(collaborator.createdAt).toLocaleDateString(
-                        language === 'en' ? 'en-US' : language === 'ja' ? 'ja-JP' : 'vi-VN'
-                      )
-                    : collaborator.approvedAt 
-                    ? new Date(collaborator.approvedAt).toLocaleDateString(
-                        language === 'en' ? 'en-US' : language === 'ja' ? 'ja-JP' : 'vi-VN'
-                      )
-                    : '-';
-                  
-                  return (
-                    <tr
-                      key={collaborator.id}
-                      className="transition-colors cursor-pointer"
-                      onMouseEnter={() => setHoveredRowIndex(index)}
-                      onMouseLeave={() => setHoveredRowIndex(null)}
-                      style={{
-                        backgroundColor: hoveredRowIndex === index ? '#f9fafb' : 'transparent'
-                      }}
-                      onClick={() => navigate(`/admin/collaborators/${collaborator.id}`)}
+      {/* Card list */}
+      <div className="flex-1 overflow-y-auto min-h-0 relative">
+        {loading ? (
+          <div className="flex items-center justify-center h-full text-xs" style={{ color: '#6b7280' }}>
+            {t.collaboratorsLoading}
+          </div>
+        ) : collaborators.length === 0 ? (
+          <div className="flex items-center justify-center h-full text-xs" style={{ color: '#6b7280' }}>
+            {t.collaboratorsNoData}
+          </div>
+        ) : (
+          <div className="p-2 sm:p-3 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2 sm:gap-3 lg:gap-4">
+            {collaborators.map((collaborator, index) => {
+              const statusActive = collaborator.status === 1;
+              const statusLabel = statusActive ? t.collaboratorsStatusActive : t.collaboratorsStatusInactive;
+              const joinDate = collaborator.createdAt
+                ? new Date(collaborator.createdAt).toLocaleDateString(
+                    language === 'en' ? 'en-US' : language === 'ja' ? 'ja-JP' : 'vi-VN'
+                  )
+                : collaborator.approvedAt
+                ? new Date(collaborator.approvedAt).toLocaleDateString(
+                    language === 'en' ? 'en-US' : language === 'ja' ? 'ja-JP' : 'vi-VN'
+                  )
+                : '-';
+              const initials = (collaborator.name || '')
+                .split(' ')
+                .filter(Boolean)
+                .slice(-2)
+                .map((p) => p[0])
+                .join('')
+                .toUpperCase() || 'CV';
+
+              return (
+                <button
+                  key={collaborator.id}
+                  type="button"
+                  onClick={() => navigate(`/admin/collaborators/${collaborator.id}`)}
+                  onMouseEnter={() => setHoveredRowIndex(index)}
+                  onMouseLeave={() => setHoveredRowIndex(null)}
+                  className="relative text-left bg-white rounded-xl border shadow-[0_8px_20px_rgba(15,23,42,0.06)] px-3 sm:px-3.5 py-3 sm:py-3.5 flex flex-col gap-2.5 transition-transform transition-shadow"
+                  style={{
+                    borderColor: hoveredRowIndex === index ? '#bfdbfe' : '#e5e7eb',
+                    transform: hoveredRowIndex === index ? 'translateY(-1px)' : 'translateY(0)',
+                  }}
+                >
+                  {/* Status pill */}
+                  <div className="absolute top-2 left-3 flex items-center gap-1">
+                    <span
+                      className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200"
                     >
-                      <td className="px-3 py-2 text-center" onClick={(e) => e.stopPropagation()}>
-                        <input
-                          type="checkbox"
-                          checked={selectedRows.has(index)}
-                          onChange={() => handleSelectRow(index)}
-                          className="w-3.5 h-3.5 rounded"
-                          style={{
-                            accentColor: '#2563eb',
-                            borderColor: '#d1d5db'
-                          }}
-                        />
-                      </td>
-                      <td className="px-3 py-2">
-                        <div>
-                          <div className="text-[11px] font-medium" style={{ color: '#111827' }}>{collaborator.name}</div>
-                          <button
-                            onClick={(e) => { e.stopPropagation(); navigate(`/admin/collaborators/${collaborator.id}`); }}
-                            onMouseEnter={() => setHoveredCollaboratorIdLinkIndex(index)}
-                            onMouseLeave={() => setHoveredCollaboratorIdLinkIndex(null)}
-                            className="text-[10px] flex items-center gap-0.5 mt-0.5"
-                            style={{
-                              color: hoveredCollaboratorIdLinkIndex === index ? '#1e40af' : '#6b7280'
-                            }}
-                          >
-                            {collaborator.code || collaborator.id}
-                            <ExternalLink className="w-2.5 h-2.5" />
-                          </button>
-                        </div>
-                      </td>
-                      <td className="px-3 py-2">
-                        <span className="text-[11px] font-medium" style={{ color: '#111827' }}>
-                          {collaborator.rankLevel?.name || '—'}
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1" />
+                      {statusLabel}
+                    </span>
+                  </div>
+
+                  {/* Avatar + name */}
+                  <div className="pt-3 flex flex-col items-center gap-1.5">
+                    <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-blue-50 flex items-center justify-center text-xs sm:text-sm font-semibold text-blue-700 border border-blue-100">
+                      {initials}
+                    </div>
+                    <div className="text-center">
+                      <p className="text-[11px] sm:text-xs font-semibold" style={{ color: '#111827' }}>
+                        {collaborator.name}
+                      </p>
+                      <p className="text-[9px] sm:text-[10px]" style={{ color: '#6b7280' }}>
+                        {collaborator.rankLevel?.name || t.collaboratorsDefaultRole || 'Collaborator'}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Info box */}
+                  <div className="mt-1 rounded-xl border border-slate-100 bg-slate-50/60 px-2.5 py-2.5 space-y-1.5">
+                    <div className="flex items-center justify-between text-[9px] sm:text-[10px]" style={{ color: '#6b7280' }}>
+                      <span>
+                        #
+                        {' '}
+                        {collaborator.code || collaborator.id}
+                      </span>
+                      <span>
+                        {t.collaboratorsColCandidatesCount}
+                        :
+                        {' '}
+                        <span className="font-semibold" style={{ color: '#111827' }}>
+                          {collaborator.applicationsCount || 0}
                         </span>
-                      </td>
-                      <td className="px-3 py-2">
-                        <div className="text-[11px] flex items-center gap-1" style={{ color: '#374151' }}>
-                          <Mail className="w-2.5 h-2.5 flex-shrink-0" style={{ color: '#9ca3af' }} />
-                          <span className="truncate">{collaborator.email || '-'}</span>
-                        </div>
-                      </td>
-                      <td className="px-3 py-2">
-                        <div className="text-[11px] flex items-center gap-1" style={{ color: '#374151' }}>
-                          <Phone className="w-2.5 h-2.5 flex-shrink-0" style={{ color: '#9ca3af' }} />
-                          <span className="truncate">{collaborator.phone || '-'}</span>
-                        </div>
-                      </td>
-                      <td className="px-3 py-2">
-                        <div className="flex items-center gap-1">
-                          <User className="w-2.5 h-2.5" style={{ color: '#9ca3af' }} />
-                          <span className="text-[11px] font-medium" style={{ color: '#111827' }}>{collaborator.applicationsCount || 0}</span>
-                        </div>
-                      </td>
-                      <td className="px-3 py-2">
-                        <div className="flex items-center gap-1">
-                          <DollarSign className="w-2.5 h-2.5" style={{ color: '#16a34a' }} />
-                          <span className="text-[11px] font-medium" style={{ color: '#111827' }}>{formatCurrency(collaborator.totalPaid || 0)}</span>
-                        </div>
-                      </td>
-                      <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
-                        <select 
-                          value={statusLabel}
-                          className="px-1.5 py-0.5 rounded text-[10px] font-medium"
-                          style={{
-                            backgroundColor: statusLabel === 'active' ? '#dcfce7' : '#fee2e2',
-                            color: statusLabel === 'active' ? '#166534' : '#991b1b',
-                            border: statusLabel === 'active' ? '1px solid #86efac' : '1px solid #fca5a5',
-                            outline: 'none'
-                          }}
-                          onFocus={(e) => {
-                            e.target.style.boxShadow = '0 0 0 1px rgba(37, 99, 235, 0.5)';
-                          }}
-                          onBlur={(e) => {
-                            e.target.style.boxShadow = 'none';
-                          }}
-                        >
-                          <option value="active">{t.collaboratorsStatusActive}</option>
-                          <option value="inactive">{t.collaboratorsStatusInactive}</option>
-                        </select>
-                      </td>
-                      <td className="px-3 py-2 text-[11px]" style={{ color: '#374151' }}>{joinDate}</td>
-                      <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
-                        <div className="flex items-center justify-center gap-1.5">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleEdit(collaborator.id);
-                            }}
-                            onMouseEnter={() => setHoveredEditButtonIndex(index)}
-                            onMouseLeave={() => setHoveredEditButtonIndex(null)}
-                            className="p-1 rounded transition-colors"
-                            style={{
-                              color: hoveredEditButtonIndex === index ? '#1e40af' : '#2563eb',
-                              backgroundColor: hoveredEditButtonIndex === index ? '#eff6ff' : 'transparent'
-                            }}
-                            title={t.collaboratorsEditTitle}
-                          >
-                            <Edit className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDelete(collaborator.id);
-                            }}
-                            onMouseEnter={() => setHoveredDeleteButtonIndex(index)}
-                            onMouseLeave={() => setHoveredDeleteButtonIndex(null)}
-                            className="p-1 rounded transition-colors"
-                            style={{
-                              color: hoveredDeleteButtonIndex === index ? '#991b1b' : '#dc2626',
-                              backgroundColor: hoveredDeleteButtonIndex === index ? '#fef2f2' : 'transparent'
-                            }}
-                            title={t.collaboratorsDeleteTitle}
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </td>
-                  </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-[9px] sm:text-[10px]" style={{ color: '#4b5563' }}>
+                      <User className="w-3 h-3 flex-shrink-0" style={{ color: '#9ca3af' }} />
+                      <span className="truncate">
+                        {t.collaboratorsColTotalEarned}
+                        :
+                        {' '}
+                        <span className="font-semibold" style={{ color: '#111827' }}>
+                          {formatCurrency(collaborator.totalPaid || 0)}
+                        </span>
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-[9px] sm:text-[10px]" style={{ color: '#4b5563' }}>
+                      <Mail className="w-3 h-3 flex-shrink-0" style={{ color: '#9ca3af' }} />
+                      <span className="truncate">{collaborator.email || '-'}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-[9px] sm:text-[10px]" style={{ color: '#4b5563' }}>
+                      <Phone className="w-3 h-3 flex-shrink-0" style={{ color: '#9ca3af' }} />
+                      <span className="truncate">{collaborator.phone || '-'}</span>
+                    </div>
+                  </div>
+
+                  {/* Footer */}
+                  <div className="mt-1.5 flex items-center justify-between text-[9px] sm:text-[10px]">
+                    <span style={{ color: '#6b7280' }}>
+                      {t.collaboratorsJoinedPrefix || 'Joined'}
+                      {' '}
+                      {joinDate}
+                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleEdit(collaborator.id);
+                        }}
+                        onMouseEnter={() => setHoveredEditButtonIndex(index)}
+                        onMouseLeave={() => setHoveredEditButtonIndex(null)}
+                        className="px-1.5 py-0.5 rounded-full text-[9px] font-medium flex items-center gap-1"
+                        style={{
+                          backgroundColor: hoveredEditButtonIndex === index ? '#eff6ff' : 'transparent',
+                          color: hoveredEditButtonIndex === index ? '#1e40af' : '#2563eb',
+                          border: '1px solid #bfdbfe',
+                        }}
+                      >
+                        {t.viewDetailShort || t.viewDetail}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDelete(collaborator.id);
+                        }}
+                        onMouseEnter={() => setHoveredDeleteButtonIndex(index)}
+                        onMouseLeave={() => setHoveredDeleteButtonIndex(null)}
+                        className="p-1 rounded-full"
+                        style={{
+                          backgroundColor: hoveredDeleteButtonIndex === index ? '#fee2e2' : 'transparent',
+                          color: hoveredDeleteButtonIndex === index ? '#991b1b' : '#dc2626',
+                        }}
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );

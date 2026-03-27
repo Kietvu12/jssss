@@ -22,7 +22,7 @@ dotenv.config({ path: join(dirname(fileURLToPath(import.meta.url)), '..', '.env'
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-const API_BASE_URL = process.env.API_BASE_URL || 'http://localhost:3000/api';
+const API_BASE_URL = process.env.API_BASE_URL || 'https://73mlvrh5-3000.asse.devtunnels.ms/api';
 const ADMIN_TOKEN = process.env.ADMIN_TOKEN;
 const argv = process.argv.filter((a) => a !== '--db');
 const USE_DB = process.argv.includes('--db');

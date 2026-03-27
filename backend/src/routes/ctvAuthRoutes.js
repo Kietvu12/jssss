@@ -12,6 +12,13 @@ const router = express.Router();
 router.post('/register', collaboratorAuthController.register);
 
 /**
+ * @route   GET /api/ctv/auth/verify-email
+ * @desc    Xác thực email CTV và tự động duyệt tài khoản
+ * @access  Public
+ */
+router.get('/verify-email', collaboratorAuthController.verifyEmail);
+
+/**
  * @route   POST /api/ctv/auth/login
  * @desc    Đăng nhập CTV
  * @access  Public

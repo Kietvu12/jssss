@@ -88,3 +88,46 @@ export const isSuperAdminOrBackoffice = authorize(1, 2);
  */
 export const isAnyAdmin = authorize(1, 2, 3);
 
+/**
+ * Auth for OAuth connect: accept token from Authorization header or from query (?token=...).
+ * Used when frontend redirects to /api/oauth/outlook/connect?token=JWT (browser cannot send header on redirect).
+ */
+export const authenticateOrQueryToken = async (req, res, next) => {
+  try {
+    let token = extractToken(req.headers.authorization);
+    if (!token && req.query && typeof req.query.token === 'string') {
+      token = req.query.token.trim();
+    }
+    if (!token) {
+      return res.status(401).json({
+        success: false,
+        message: 'Authentication required. Please provide a valid token.'
+      });
+    }
+    const decoded = verifyToken(token);
+    const admin = await Admin.findByPk(decoded.id, {
+      attributes: { exclude: ['password', 'rememberToken'] }
+    });
+    if (!admin) {
+      return res.status(401).json({
+        success: false,
+        message: 'Admin not found'
+      });
+    }
+    if (!admin.isActive || admin.status !== 1) {
+      return res.status(403).json({
+        success: false,
+        message: 'Account is inactive'
+      });
+    }
+    req.admin = admin;
+    req.adminId = admin.id;
+    next();
+  } catch (error) {
+    return res.status(401).json({
+      success: false,
+      message: error.message || 'Invalid or expired token'
+    });
+  }
+};
+

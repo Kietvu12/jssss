@@ -227,6 +227,18 @@ export const Collaborator = sequelize.define(
       type: DataTypes.DATE,
       field: 'email_verified_at'
     },
+    emailVerificationTokenHash: {
+      type: DataTypes.STRING(128),
+      field: 'email_verification_token_hash'
+    },
+    emailVerificationExpiresAt: {
+      type: DataTypes.DATE,
+      field: 'email_verification_expires_at'
+    },
+    emailVerificationSentAt: {
+      type: DataTypes.DATE,
+      field: 'email_verification_sent_at'
+    },
     password: {
       type: DataTypes.STRING(255),
       allowNull: false
@@ -572,6 +584,12 @@ export const Job = sequelize.define(
       allowNull: false,
       field: 'job_category_id'
     },
+    // Lĩnh vực (business sector key) được chọn trên form AdminAddJobPage
+    businessSectorKey: {
+      type: DataTypes.STRING(100),
+      allowNull: true,
+      field: 'business_sector_key'
+    },
     title: {
       type: DataTypes.STRING(255),
       allowNull: false
@@ -723,6 +741,21 @@ export const Job = sequelize.define(
       type: DataTypes.TINYINT,
       field: 'recruitment_type'
     },
+    residenceStatus: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+      field: 'residence_status'
+    },
+    residenceStatusEn: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+      field: 'residence_status_en'
+    },
+    residenceStatusJp: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+      field: 'residence_status_jp'
+    },
     contractPeriod: {
       type: DataTypes.TEXT,
       field: 'contract_period'
@@ -736,6 +769,36 @@ export const Job = sequelize.define(
       type: DataTypes.TEXT,
       allowNull: true,
       field: 'contract_period_jp'
+    },
+    probationPeriod: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+      field: 'probation_period'
+    },
+    probationPeriodEn: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+      field: 'probation_period_en'
+    },
+    probationPeriodJp: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+      field: 'probation_period_jp'
+    },
+    probationDetail: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+      field: 'probation_detail'
+    },
+    probationDetailEn: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+      field: 'probation_detail_en'
+    },
+    probationDetailJp: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+      field: 'probation_detail_jp'
     },
     companyId: {
       type: DataTypes.BIGINT.UNSIGNED,
@@ -754,6 +817,21 @@ export const Job = sequelize.define(
       type: DataTypes.TEXT,
       allowNull: true,
       field: 'recruitment_process_jp'
+    },
+    transferAbility: {
+      type: DataTypes.STRING(255),
+      allowNull: true,
+      field: 'transfer_ability'
+    },
+    transferAbilityEn: {
+      type: DataTypes.STRING(255),
+      allowNull: true,
+      field: 'transfer_ability_en'
+    },
+    transferAbilityJp: {
+      type: DataTypes.STRING(255),
+      allowNull: true,
+      field: 'transfer_ability_jp'
     },
     viewsCount: {
       type: DataTypes.INTEGER,
@@ -782,6 +860,21 @@ export const Job = sequelize.define(
     jdOriginalFilename: {
       type: DataTypes.STRING(255),
       field: 'jd_original_filename'
+    },
+    jdOriginalFile: {
+      type: DataTypes.STRING(255),
+      allowNull: true,
+      field: 'jd_original_file'
+    },
+    jdFileEn: {
+      type: DataTypes.STRING(255),
+      allowNull: true,
+      field: 'jd_file_en'
+    },
+    jdFileJp: {
+      type: DataTypes.STRING(255),
+      allowNull: true,
+      field: 'jd_file_jp'
     },
     isHot: {
       type: DataTypes.BOOLEAN,
@@ -1082,6 +1175,9 @@ export const Post = sequelize.define(
     image: {
       type: DataTypes.STRING(255)
     },
+    thumbnail: {
+      type: DataTypes.STRING(255)
+    },
     status: {
       type: DataTypes.TINYINT,
       allowNull: false,
@@ -1138,6 +1234,38 @@ export const Post = sequelize.define(
     publishedAt: {
       type: DataTypes.DATE,
       field: 'published_at'
+    },
+    titleEn: {
+      type: DataTypes.STRING(255),
+      field: 'title_en'
+    },
+    titleJp: {
+      type: DataTypes.STRING(255),
+      field: 'title_jp'
+    },
+    contentEn: {
+      type: DataTypes.TEXT,
+      field: 'content_en'
+    },
+    contentJp: {
+      type: DataTypes.TEXT,
+      field: 'content_jp'
+    },
+    metaTitleEn: {
+      type: DataTypes.STRING(255),
+      field: 'meta_title_en'
+    },
+    metaTitleJp: {
+      type: DataTypes.STRING(255),
+      field: 'meta_title_jp'
+    },
+    metaDescriptionEn: {
+      type: DataTypes.STRING(255),
+      field: 'meta_description_en'
+    },
+    metaDescriptionJp: {
+      type: DataTypes.STRING(255),
+      field: 'meta_description_jp'
     }
   },
   {
@@ -1147,6 +1275,158 @@ export const Post = sequelize.define(
     updatedAt: 'updated_at',
     paranoid: true,
     deletedAt: 'deleted_at'
+  }
+);
+
+// Events (sự kiện)
+export const Event = sequelize.define(
+  'Event',
+  {
+    id: {
+      type: DataTypes.BIGINT.UNSIGNED,
+      primaryKey: true,
+      autoIncrement: true
+    },
+    title: {
+      type: DataTypes.STRING(255),
+      allowNull: false
+    },
+    description: {
+      type: DataTypes.TEXT
+    },
+    startAt: {
+      type: DataTypes.DATE,
+      allowNull: false,
+      field: 'start_at'
+    },
+    endAt: {
+      type: DataTypes.DATE,
+      field: 'end_at'
+    },
+    location: {
+      type: DataTypes.STRING(255)
+    },
+    status: {
+      type: DataTypes.TINYINT,
+      allowNull: false,
+      defaultValue: 1
+    },
+    createdBy: {
+      type: DataTypes.BIGINT.UNSIGNED,
+      field: 'created_by'
+    }
+  },
+  {
+    tableName: 'events',
+    timestamps: true,
+    createdAt: 'created_at',
+    updatedAt: 'updated_at',
+    paranoid: true,
+    deletedAt: 'deleted_at'
+  }
+);
+
+// Event Participants (người tham gia sự kiện)
+export const EventParticipant = sequelize.define(
+  'EventParticipant',
+  {
+    id: {
+      type: DataTypes.BIGINT.UNSIGNED,
+      primaryKey: true,
+      autoIncrement: true
+    },
+    eventId: {
+      type: DataTypes.BIGINT.UNSIGNED,
+      allowNull: false,
+      field: 'event_id'
+    },
+    adminId: {
+      type: DataTypes.BIGINT.UNSIGNED,
+      field: 'admin_id'
+    },
+    collaboratorId: {
+      type: DataTypes.BIGINT.UNSIGNED,
+      field: 'collaborator_id'
+    },
+    email: {
+      type: DataTypes.STRING(255)
+    },
+    name: {
+      type: DataTypes.STRING(255)
+    },
+    phone: {
+      type: DataTypes.STRING(50)
+    },
+    isInternal: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: true,
+      field: 'is_internal'
+    }
+  },
+  {
+    tableName: 'event_participants',
+    timestamps: true,
+    createdAt: 'created_at',
+    updatedAt: 'updated_at',
+    paranoid: true,
+    deletedAt: 'deleted_at'
+  }
+);
+
+// Posts – Event (junction: bài viết gắn sự kiện)
+export const PostEvent = sequelize.define(
+  'PostEvent',
+  {
+    id: {
+      type: DataTypes.BIGINT.UNSIGNED,
+      primaryKey: true,
+      autoIncrement: true
+    },
+    postId: {
+      type: DataTypes.BIGINT.UNSIGNED,
+      allowNull: false,
+      field: 'post_id'
+    },
+    eventId: {
+      type: DataTypes.BIGINT.UNSIGNED,
+      allowNull: false,
+      field: 'event_id'
+    }
+  },
+  {
+    tableName: 'posts_event',
+    timestamps: true,
+    createdAt: 'created_at',
+    updatedAt: 'updated_at'
+  }
+);
+
+// Posts – Campaign (junction: bài viết gắn chiến dịch)
+export const PostCampaign = sequelize.define(
+  'PostCampaign',
+  {
+    id: {
+      type: DataTypes.BIGINT.UNSIGNED,
+      primaryKey: true,
+      autoIncrement: true
+    },
+    postId: {
+      type: DataTypes.BIGINT.UNSIGNED,
+      allowNull: false,
+      field: 'post_id'
+    },
+    campaignId: {
+      type: DataTypes.BIGINT.UNSIGNED,
+      allowNull: false,
+      field: 'campaign_id'
+    }
+  },
+  {
+    tableName: 'posts_campaign',
+    timestamps: true,
+    createdAt: 'created_at',
+    updatedAt: 'updated_at'
   }
 );
 
@@ -1575,6 +1855,18 @@ export const CVStorage = sequelize.define(
     duplicateWithCvId: {
       type: DataTypes.BIGINT.UNSIGNED,
       field: 'duplicate_with_cv_id'
+    },
+    isParse: {
+      type: DataTypes.BOOLEAN,
+      field: 'is_parse',
+      allowNull: false,
+      defaultValue: false
+    },
+    lastTimeParsed: {
+      type: DataTypes.BOOLEAN,
+      field: 'last_time_parsed',
+      allowNull: false,
+      defaultValue: false
     }
   },
   {
@@ -2819,6 +3111,22 @@ export const Message = sequelize.define(
       type: DataTypes.TEXT,
       allowNull: false
     },
+    attachmentName: {
+      type: DataTypes.STRING(255),
+      field: 'attachment_name'
+    },
+    attachmentKey: {
+      type: DataTypes.STRING(512),
+      field: 'attachment_key'
+    },
+    attachmentMimeType: {
+      type: DataTypes.STRING(100),
+      field: 'attachment_mime_type'
+    },
+    attachmentSize: {
+      type: DataTypes.BIGINT.UNSIGNED,
+      field: 'attachment_size'
+    },
     isReadByAdmin: {
       type: DataTypes.BOOLEAN,
       allowNull: false,
@@ -2998,6 +3306,35 @@ Admin.hasMany(EmailToGroup, { as: 'emailsToGroups', foreignKey: 'createdBy' });
 Post.belongsTo(Admin, { as: 'author', foreignKey: 'authorId' });
 Admin.hasMany(Post, { as: 'posts', foreignKey: 'authorId' });
 
+// Event & EventParticipant associations
+Event.belongsTo(Admin, { as: 'creator', foreignKey: 'createdBy' });
+Admin.hasMany(Event, { as: 'events', foreignKey: 'createdBy' });
+
+EventParticipant.belongsTo(Event, { as: 'event', foreignKey: 'eventId' });
+Event.hasMany(EventParticipant, { as: 'participants', foreignKey: 'eventId' });
+
+EventParticipant.belongsTo(Admin, { as: 'admin', foreignKey: 'adminId' });
+Admin.hasMany(EventParticipant, { as: 'eventParticipations', foreignKey: 'adminId' });
+
+EventParticipant.belongsTo(Collaborator, { as: 'collaborator', foreignKey: 'collaboratorId' });
+Collaborator.hasMany(EventParticipant, { as: 'eventParticipations', foreignKey: 'collaboratorId' });
+
+// Post – Event (many-to-many)
+Post.belongsToMany(Event, { through: PostEvent, foreignKey: 'postId', otherKey: 'eventId' });
+Event.belongsToMany(Post, { through: PostEvent, foreignKey: 'eventId', otherKey: 'postId' });
+PostEvent.belongsTo(Post, { foreignKey: 'postId' });
+Post.hasMany(PostEvent, { foreignKey: 'postId' });
+PostEvent.belongsTo(Event, { foreignKey: 'eventId' });
+Event.hasMany(PostEvent, { foreignKey: 'eventId' });
+
+// Post – Campaign (many-to-many)
+Post.belongsToMany(Campaign, { through: PostCampaign, foreignKey: 'postId', otherKey: 'campaignId' });
+Campaign.belongsToMany(Post, { through: PostCampaign, foreignKey: 'campaignId', otherKey: 'postId' });
+PostCampaign.belongsTo(Post, { foreignKey: 'postId' });
+Post.hasMany(PostCampaign, { foreignKey: 'postId' });
+PostCampaign.belongsTo(Campaign, { foreignKey: 'campaignId' });
+Campaign.hasMany(PostCampaign, { foreignKey: 'campaignId' });
+
 JobPickupId.belongsTo(JobPickup, { as: 'pickup', foreignKey: 'jobPickupId' });
 JobPickup.hasMany(JobPickupId, { as: 'jobPickupIds', foreignKey: 'jobPickupId' });
 
@@ -3106,10 +3443,15 @@ export const OutlookConnection = sequelize.define(
       primaryKey: true,
       autoIncrement: true
     },
+    adminId: {
+      type: DataTypes.BIGINT.UNSIGNED,
+      allowNull: true,
+      field: 'admin_id'
+    },
     email: {
       type: DataTypes.STRING(255),
       allowNull: false,
-      unique: true
+      unique: false
     },
     accessToken: {
       type: DataTypes.TEXT,
@@ -3257,6 +3599,9 @@ export const SyncedEmail = sequelize.define(
 );
 
 // Outlook Email Associations
+OutlookConnection.belongsTo(Admin, { as: 'admin', foreignKey: 'adminId' });
+Admin.hasOne(OutlookConnection, { as: 'outlookConnection', foreignKey: 'adminId' });
+
 OutlookConnection.hasMany(SyncedEmail, { as: 'syncedEmails', foreignKey: 'outlookConnectionId' });
 SyncedEmail.belongsTo(OutlookConnection, { as: 'outlookConnection', foreignKey: 'outlookConnectionId' });
 
@@ -3280,6 +3625,10 @@ export default {
   JobApplication,
   PaymentRequest,
   Post,
+  Event,
+  EventParticipant,
+  PostEvent,
+  PostCampaign,
   Category,
   FAQ,
   CollaboratorNotification,

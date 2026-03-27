@@ -19,6 +19,20 @@ router.get('/', authenticate, isSuperAdminOrBackoffice, cvController.getCVs);
 router.post('/mark-overdue', authenticate, isSuperAdminOrBackoffice, cvController.markOverdueCVs);
 
 /**
+ * @route   POST /api/admin/cvs/bulk-import/preview
+ * @desc    Xem trước dữ liệu import (theo sheet), không ghi DB
+ * @access  Private (Super Admin or Admin Backoffice)
+ */
+router.post('/bulk-import/preview', authenticate, isSuperAdminOrBackoffice, cvController.bulkImportPreview);
+
+/**
+ * @route   POST /api/admin/cvs/bulk-import
+ * @desc    Import danh sách ứng viên từ Excel (.xlsx) + ZIP file CV (tùy chọn)
+ * @access  Private (Super Admin or Admin Backoffice)
+ */
+router.post('/bulk-import', authenticate, isSuperAdminOrBackoffice, cvController.bulkImportCVs);
+
+/**
  * @route   GET /api/admin/cvs/:id
  * @desc    Lấy thông tin CV theo ID
  * @access  Private (Super Admin or Admin Backoffice)

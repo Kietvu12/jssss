@@ -64,6 +64,7 @@ const JobCategoriesPage = () => {
   const [hoveredCloseModalButton, setHoveredCloseModalButton] = useState(false);
   const [hoveredCancelModalButton, setHoveredCancelModalButton] = useState(false);
   const [hoveredSubmitModalButton, setHoveredSubmitModalButton] = useState(false);
+  const [isStatusFilterOpen, setIsStatusFilterOpen] = useState(false);
 
   useEffect(() => {
     loadCategories();
@@ -454,100 +455,104 @@ const JobCategoriesPage = () => {
 
   return (
     <div className="space-y-4">
-      {/* Header */}
-      <div className="rounded-lg p-4 border flex items-center justify-between" style={{ backgroundColor: 'white', borderColor: '#e5e7eb' }}>
-        <div>
-          <h1 className="text-lg font-bold" style={{ color: '#111827' }}>
-            {t.jobCategoriesTitle}
-          </h1>
-          <p className="text-xs mt-1" style={{ color: '#6b7280' }}>
-            {t.jobCategoriesSubtitle}
-          </p>
-        </div>
-        <button
-          onClick={() => navigate('/admin/job-categories/add')}
-          onMouseEnter={() => setHoveredAddCategoryButton(true)}
-          onMouseLeave={() => setHoveredAddCategoryButton(false)}
-          className="px-4 py-2 rounded-lg text-xs font-semibold transition-colors flex items-center gap-2"
-          style={{
-            backgroundColor: hoveredAddCategoryButton ? '#1d4ed8' : '#2563eb',
-            color: 'white'
-          }}
-        >
-          <Plus className="w-4 h-4" />
-          {t.jobCategoriesAddButton}
-        </button>
-      </div>
+      {/* Filter section — UI giống CollaboratorsPage, chiều ngang bằng nội dung bên dưới */}
+      <div className="py-1.5 mb-1.5 flex-shrink-0">
+        <div className="flex items-center gap-2.5 flex-wrap justify-between">
+          {/* Search box (pill, không border) */}
+          <div className="flex items-center px-3 py-1.5 rounded-full bg-white text-[12px] sm:text-[13px] min-w-[220px] flex-1">
+            <Search className="w-3.5 h-3.5 mr-2 shrink-0" style={{ color: '#9ca3af' }} />
+            <input
+              type="text"
+              placeholder={t.jobCategoriesSearchPlaceholder}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full bg-transparent outline-none text-[12px] sm:text-[13px]"
+              style={{ border: 'none' }}
+            />
+          </div>
 
-      {/* Filters */}
-      <div className="rounded-lg p-4 border" style={{ backgroundColor: 'white', borderColor: '#e5e7eb' }}>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          <div>
-            <label className="block text-xs font-semibold mb-2" style={{ color: '#111827' }}>
-              {t.jobCategoriesSearchLabel}
-            </label>
+          {/* Pills + nút bên phải */}
+          <div className="flex items-center gap-2.5 flex-wrap justify-end">
+            {/* Status pill với dropdown */}
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4" style={{ color: '#9ca3af' }} />
-              <input
-                type="text"
-                placeholder={t.jobCategoriesSearchPlaceholder}
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-3 py-2 border rounded-lg text-xs"
-                style={{
-                  borderColor: '#d1d5db',
-                  outline: 'none'
-                }}
-                onFocus={(e) => {
-                  e.target.style.borderColor = '#2563eb';
-                  e.target.style.boxShadow = '0 0 0 2px rgba(37, 99, 235, 0.5)';
-                }}
-                onBlur={(e) => {
-                  e.target.style.borderColor = '#d1d5db';
-                  e.target.style.boxShadow = 'none';
-                }}
-              />
+              <button
+                type="button"
+                onClick={() => setIsStatusFilterOpen((v) => !v)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white text-[11px] sm:text-xs font-semibold"
+                style={{ color: '#374151' }}
+              >
+                {t.jobCategoriesStatusLabel}
+                <ChevronDown className="w-3 h-3" />
+              </button>
+              {isStatusFilterOpen && (
+                <div className="absolute right-0 mt-2 w-52 rounded-xl border bg-white p-3 z-20 text-[11px] sm:text-xs" style={{ borderColor: '#e5e7eb' }}>
+                  <div className="flex flex-col gap-2">
+                    <label className="flex items-center gap-1.5 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="job-cat-status"
+                        value=""
+                        checked={selectedStatus === ''}
+                        onChange={(e) => { setSelectedStatus(e.target.value); setIsStatusFilterOpen(false); }}
+                        className="w-3.5 h-3.5"
+                      />
+                      <span>{t.jobCategoriesStatusAll}</span>
+                    </label>
+                    <label className="flex items-center gap-1.5 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="job-cat-status"
+                        value="1"
+                        checked={selectedStatus === '1'}
+                        onChange={(e) => { setSelectedStatus(e.target.value); setIsStatusFilterOpen(false); }}
+                        className="w-3.5 h-3.5"
+                      />
+                      <span>{t.jobCategoriesStatusActive}</span>
+                    </label>
+                    <label className="flex items-center gap-1.5 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="job-cat-status"
+                        value="0"
+                        checked={selectedStatus === '0'}
+                        onChange={(e) => { setSelectedStatus(e.target.value); setIsStatusFilterOpen(false); }}
+                        className="w-3.5 h-3.5"
+                      />
+                      <span>{t.jobCategoriesStatusHidden}</span>
+                    </label>
+                  </div>
+                </div>
+              )}
             </div>
-          </div>
-          <div>
-            <label className="block text-xs font-semibold mb-2" style={{ color: '#111827' }}>
-              {t.jobCategoriesStatusLabel}
-            </label>
-            <select
-              value={selectedStatus}
-              onChange={(e) => setSelectedStatus(e.target.value)}
-              className="w-full px-3 py-2 border rounded-lg text-xs"
-              style={{
-                borderColor: '#d1d5db',
-                outline: 'none'
-              }}
-              onFocus={(e) => {
-                e.target.style.borderColor = '#2563eb';
-                e.target.style.boxShadow = '0 0 0 2px rgba(37, 99, 235, 0.5)';
-              }}
-              onBlur={(e) => {
-                e.target.style.borderColor = '#d1d5db';
-                e.target.style.boxShadow = 'none';
-              }}
-            >
-              <option value="">{t.jobCategoriesStatusAll}</option>
-              <option value="1">{t.jobCategoriesStatusActive}</option>
-              <option value="0">{t.jobCategoriesStatusHidden}</option>
-            </select>
-          </div>
-          <div className="flex items-end">
+
+            {/* Nút Làm mới */}
             <button
               onClick={loadCategories}
               onMouseEnter={() => setHoveredRefreshButton(true)}
               onMouseLeave={() => setHoveredRefreshButton(false)}
-              className="w-full px-4 py-2 rounded-lg text-xs font-semibold transition-colors flex items-center justify-center gap-2"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] sm:text-xs font-semibold"
               style={{
                 backgroundColor: hoveredRefreshButton ? '#e5e7eb' : '#f3f4f6',
                 color: '#374151'
               }}
             >
-              <ArrowUpDown className="w-4 h-4" />
+              <ArrowUpDown className="w-3.5 h-3.5" />
               {t.jobCategoriesRefresh}
+            </button>
+
+            {/* Nút Thêm danh mục */}
+            <button
+              onClick={() => navigate('/admin/job-categories/add')}
+              onMouseEnter={() => setHoveredAddCategoryButton(true)}
+              onMouseLeave={() => setHoveredAddCategoryButton(false)}
+              className="px-3 sm:px-4 py-1.5 rounded-full text-[11px] sm:text-xs font-semibold flex items-center gap-1.5"
+              style={{
+                backgroundColor: hoveredAddCategoryButton ? '#b91c1c' : '#dc2626',
+                color: 'white'
+              }}
+            >
+              <Plus className="w-3 h-3" />
+              <span className="hidden sm:inline">{t.jobCategoriesAddButton}</span>
             </button>
           </div>
         </div>

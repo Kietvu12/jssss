@@ -10,13 +10,16 @@ import {
   PaymentRequest,
   Admin,
   CollaboratorAssignment,
-  JobApplicationMemo
+  JobApplicationMemo,
+  Message
 } from '../../models/index.js';
 import { Op } from 'sequelize';
 import sequelize from '../../config/database.js';
 import { statusMessageService } from '../../services/statusMessageService.js';
 import { STATUS_JOINED_COMPANY, STATUS_PAID, STATUS_DUPLICATE, STATUSES_ENDED } from '../../constants/jobApplicationStatus.js';
 import { canCVBeNominated } from '../../constants/cvStatus.js';
+import { collaboratorNotificationService } from '../../services/collaboratorNotificationService.js';
+import { nominationEmailService } from '../../services/nominationEmailService.js';
 
 // Helper function to map model field names to database column names
 const mapOrderField = (fieldName) => {
@@ -80,6 +83,140 @@ const checkAdminBackOfficePermission = async (admin, jobApplication) => {
 
   // Các role khác không có quyền
   return false;
+};
+
+const INTERVIEW_STATUSES = new Set([7, 8]);
+const FAILED_STATUSES = new Set(STATUSES_ENDED);
+const STATUS_HAS_NAITEI = 11;
+const STATUS_ACCEPTED_NAITEI = 12;
+const STATUS_JOINED = 14;
+
+const sendInterviewEmailIfNeeded = async (jobApplicationId, status) => {
+  const nextStatus = Number(status);
+  if (!INTERVIEW_STATUSES.has(nextStatus)) return;
+
+  const fullJobApplication = await JobApplication.findByPk(jobApplicationId, {
+    include: [
+      { model: Job, as: 'job', required: false, attributes: ['id', 'jobCode', 'title', 'titleEn', 'titleJp'] },
+      { model: CVStorage, as: 'cv', required: false, attributes: ['id', 'name', 'code'] },
+      { model: Collaborator, as: 'collaborator', required: false, attributes: ['id', 'email'] }
+    ]
+  });
+
+  if (!fullJobApplication?.collaborator?.email) return;
+
+  await nominationEmailService.sendInterviewScheduledEmail({
+    to: fullJobApplication.collaborator.email,
+    jobApplicationId: fullJobApplication.id,
+    jobCode: fullJobApplication.job?.jobCode || String(fullJobApplication.id),
+    candidateName: fullJobApplication.cv?.name || null,
+    jobTitleVi: fullJobApplication.job?.title || null,
+    jobTitleEn: fullJobApplication.job?.titleEn || fullJobApplication.job?.title_en || null,
+    jobTitleJp: fullJobApplication.job?.titleJp || fullJobApplication.job?.title_jp || null,
+    interviewDate: fullJobApplication.interviewDate || null
+  });
+};
+
+const sendFailedEmailIfNeeded = async (jobApplicationId, status, rejectReason = null) => {
+  const nextStatus = Number(status);
+  if (!FAILED_STATUSES.has(nextStatus)) return;
+
+  const fullJobApplication = await JobApplication.findByPk(jobApplicationId, {
+    include: [
+      { model: Job, as: 'job', required: false, attributes: ['id', 'jobCode', 'title', 'titleEn', 'titleJp'] },
+      { model: CVStorage, as: 'cv', required: false, attributes: ['id', 'name', 'code'] },
+      { model: Collaborator, as: 'collaborator', required: false, attributes: ['id', 'email'] }
+    ]
+  });
+
+  if (!fullJobApplication?.collaborator?.email) return;
+
+  await nominationEmailService.sendNominationFailedEmail({
+    to: fullJobApplication.collaborator.email,
+    jobApplicationId: fullJobApplication.id,
+    jobCode: fullJobApplication.job?.jobCode || String(fullJobApplication.id),
+    candidateName: fullJobApplication.cv?.name || null,
+    jobTitleVi: fullJobApplication.job?.title || null,
+    jobTitleEn: fullJobApplication.job?.titleEn || fullJobApplication.job?.title_en || null,
+    jobTitleJp: fullJobApplication.job?.titleJp || fullJobApplication.job?.title_jp || null,
+    rejectReason: rejectReason || fullJobApplication.rejectNote || null
+  });
+};
+
+const sendJobOfferEmailIfNeeded = async (jobApplicationId, status) => {
+  const nextStatus = Number(status);
+  if (nextStatus !== STATUS_HAS_NAITEI) return;
+
+  const fullJobApplication = await JobApplication.findByPk(jobApplicationId, {
+    include: [
+      { model: Job, as: 'job', required: false, attributes: ['id', 'jobCode', 'title', 'titleEn', 'titleJp'] },
+      { model: CVStorage, as: 'cv', required: false, attributes: ['id', 'name', 'code'] },
+      { model: Collaborator, as: 'collaborator', required: false, attributes: ['id', 'email'] }
+    ]
+  });
+
+  if (!fullJobApplication?.collaborator?.email) return;
+
+  await nominationEmailService.sendJobOfferEmail({
+    to: fullJobApplication.collaborator.email,
+    jobApplicationId: fullJobApplication.id,
+    jobCode: fullJobApplication.job?.jobCode || String(fullJobApplication.id),
+    candidateName: fullJobApplication.cv?.name || null,
+    jobTitleVi: fullJobApplication.job?.title || null,
+    jobTitleEn: fullJobApplication.job?.titleEn || fullJobApplication.job?.title_en || null,
+    jobTitleJp: fullJobApplication.job?.titleJp || fullJobApplication.job?.title_jp || null
+  });
+};
+
+const sendOfferAcceptedEmailIfNeeded = async (jobApplicationId, status) => {
+  const nextStatus = Number(status);
+  if (nextStatus !== STATUS_ACCEPTED_NAITEI) return;
+
+  const fullJobApplication = await JobApplication.findByPk(jobApplicationId, {
+    include: [
+      { model: Job, as: 'job', required: false, attributes: ['id', 'jobCode', 'title', 'titleEn', 'titleJp'] },
+      { model: CVStorage, as: 'cv', required: false, attributes: ['id', 'name', 'code'] },
+      { model: Collaborator, as: 'collaborator', required: false, attributes: ['id', 'email'] }
+    ]
+  });
+
+  if (!fullJobApplication?.collaborator?.email) return;
+
+  await nominationEmailService.sendOfferAcceptedEmail({
+    to: fullJobApplication.collaborator.email,
+    jobApplicationId: fullJobApplication.id,
+    jobCode: fullJobApplication.job?.jobCode || String(fullJobApplication.id),
+    candidateName: fullJobApplication.cv?.name || null,
+    jobTitleVi: fullJobApplication.job?.title || null,
+    jobTitleEn: fullJobApplication.job?.titleEn || fullJobApplication.job?.title_en || null,
+    jobTitleJp: fullJobApplication.job?.titleJp || fullJobApplication.job?.title_jp || null
+  });
+};
+
+const sendJoinedCompanyEmailIfNeeded = async (jobApplicationId, status) => {
+  const nextStatus = Number(status);
+  if (nextStatus !== STATUS_JOINED) return;
+
+  const fullJobApplication = await JobApplication.findByPk(jobApplicationId, {
+    include: [
+      { model: Job, as: 'job', required: false, attributes: ['id', 'jobCode', 'title', 'titleEn', 'titleJp'] },
+      { model: CVStorage, as: 'cv', required: false, attributes: ['id', 'name', 'code'] },
+      { model: Collaborator, as: 'collaborator', required: false, attributes: ['id', 'email'] }
+    ]
+  });
+
+  if (!fullJobApplication?.collaborator?.email) return;
+
+  await nominationEmailService.sendJoinedCompanyEmail({
+    to: fullJobApplication.collaborator.email,
+    jobApplicationId: fullJobApplication.id,
+    jobCode: fullJobApplication.job?.jobCode || String(fullJobApplication.id),
+    candidateName: fullJobApplication.cv?.name || null,
+    jobTitleVi: fullJobApplication.job?.title || null,
+    jobTitleEn: fullJobApplication.job?.titleEn || fullJobApplication.job?.title_en || null,
+    jobTitleJp: fullJobApplication.job?.titleJp || fullJobApplication.job?.title_jp || null,
+    startDate: fullJobApplication.nyushaDate || null
+  });
 };
 
 /**
@@ -409,18 +546,31 @@ export const jobApplicationController = {
           });
         }
 
+        const normalizePath = (value) => String(value || '').replace(/\\/g, '/').trim().replace(/\/+$/, '');
         const normalizedBodyPath = bodyCvPath && typeof bodyCvPath === 'string'
-          ? String(bodyCvPath).replace(/\\/g, '/').trim()
+          ? normalizePath(bodyCvPath)
           : '';
-        const cvIdStr = String(cv.id);
         if (normalizedBodyPath.length > 0) {
-          if (!normalizedBodyPath.includes(cvIdStr) || (!normalizedBodyPath.includes('CV_original') && !normalizedBodyPath.includes('CV_Template'))) {
+          const originalBasePath = normalizePath(cv.cvOriginalPath);
+          const templateBasePath = normalizePath(cv.curriculumVitae);
+          const allowedTemplateBasePaths = ['Common', 'IT', 'Technical']
+            .map((tpl) => `${templateBasePath}/${tpl}`)
+            .filter(Boolean);
+          const isOriginalPath = !!originalBasePath && (
+            normalizedBodyPath === originalBasePath || normalizedBodyPath.startsWith(`${originalBasePath}/`)
+          );
+          const isTemplatePath = !!templateBasePath && (
+            normalizedBodyPath === templateBasePath ||
+            normalizedBodyPath.startsWith(`${templateBasePath}/`) ||
+            allowedTemplateBasePaths.some((p) => normalizedBodyPath === p || normalizedBodyPath.startsWith(`${p}/`))
+          );
+          if (!isOriginalPath && !isTemplatePath) {
             return res.status(400).json({
               success: false,
               message: 'Đường dẫn CV không hợp lệ hoặc không thuộc hồ sơ này'
             });
           }
-          selectedCvPath = normalizedBodyPath.replace(/\/+$/, '');
+          selectedCvPath = normalizedBodyPath;
         }
       }
 
@@ -500,6 +650,54 @@ export const jobApplicationController = {
           }
         ]
       });
+
+      // Tạo tin nhắn hệ thống mặc định sau khi tạo đơn tiến cử
+      try {
+        const candidateName = String(jobApplication.cv?.name || 'ứng viên').trim();
+        const jobTitleText = String(jobApplication.job?.title || '').trim();
+        const introMessage = `Cảm ơn bạn đã tiến cử ${candidateName} tới job: ${jobTitleText}`;
+        await Message.create({
+          jobApplicationId: jobApplication.id,
+          adminId: req.admin?.id || null,
+          collaboratorId: jobApplication.collaboratorId || null,
+          senderType: 3, // System
+          content: introMessage,
+          isReadByAdmin: true,
+          isReadByCollaborator: true
+        });
+      } catch (messageError) {
+        console.error('[Admin createJobApplication] Error creating intro message:', messageError);
+      }
+
+      if (jobApplication.collaboratorId) {
+        try {
+          await collaboratorNotificationService.notifyNominationCreated({
+            collaboratorId: jobApplication.collaboratorId,
+            candidateName: jobApplication.cv?.name || null,
+            jobCode: jobApplication.job?.jobCode || String(jobApplication.id),
+            jobId: jobApplication.jobId || null,
+            jobApplicationId: jobApplication.id,
+            createdByAdmin: true
+          });
+        } catch (notificationError) {
+          console.error('[Admin createJobApplication] Error creating notification:', notificationError);
+        }
+
+        try {
+          const recipientEmail = jobApplication.collaborator?.email || null;
+          await nominationEmailService.sendNominationSubmittedEmail({
+            to: recipientEmail,
+            jobApplicationId: jobApplication.id,
+            jobCode: jobApplication.job?.jobCode || String(jobApplication.id),
+            candidateName: jobApplication.cv?.name || null,
+            jobTitleVi: jobApplication.job?.title || null,
+            jobTitleEn: jobApplication.job?.titleEn || jobApplication.job?.title_en || null,
+            jobTitleJp: jobApplication.job?.titleJp || jobApplication.job?.title_jp || null
+          });
+        } catch (emailError) {
+          console.error('[Admin createJobApplication] Error sending nomination email:', emailError);
+        }
+      }
 
       // Log action
       await ActionLog.create({
@@ -729,6 +927,52 @@ export const jobApplicationController = {
           });
         } catch (messageError) {
           console.error('[Job Application] Error creating status message:', messageError);
+        }
+
+        if (jobApplication.collaboratorId) {
+          try {
+            await collaboratorNotificationService.notifyStatusChanged({
+              collaboratorId: jobApplication.collaboratorId,
+              candidateName: jobApplication.cv?.name || null,
+              jobCode: jobApplication.job?.jobCode || String(jobApplication.id),
+              status: parseInt(updateData.status),
+              nyushaDate: jobApplication.nyushaDate || null,
+              jobId: jobApplication.jobId || null,
+              jobApplicationId: jobApplication.id
+            });
+          } catch (notificationError) {
+            console.error('[Job Application] Error creating status notification:', notificationError);
+          }
+
+          try {
+            await sendInterviewEmailIfNeeded(jobApplication.id, parseInt(updateData.status, 10));
+          } catch (emailError) {
+            console.error('[Job Application] Error sending interview scheduled email:', emailError);
+          }
+          try {
+            await sendFailedEmailIfNeeded(
+              jobApplication.id,
+              parseInt(updateData.status, 10),
+              updateData.rejectNote || null
+            );
+          } catch (emailError) {
+            console.error('[Job Application] Error sending failed nomination email:', emailError);
+          }
+          try {
+            await sendJobOfferEmailIfNeeded(jobApplication.id, parseInt(updateData.status, 10));
+          } catch (emailError) {
+            console.error('[Job Application] Error sending job offer email:', emailError);
+          }
+          try {
+            await sendOfferAcceptedEmailIfNeeded(jobApplication.id, parseInt(updateData.status, 10));
+          } catch (emailError) {
+            console.error('[Job Application] Error sending offer accepted email:', emailError);
+          }
+          try {
+            await sendJoinedCompanyEmailIfNeeded(jobApplication.id, parseInt(updateData.status, 10));
+          } catch (emailError) {
+            console.error('[Job Application] Error sending joined company email:', emailError);
+          }
         }
       } else if (updateData.status === undefined) {
         // Nếu không thay đổi status, kiểm tra các thay đổi khác
@@ -1115,13 +1359,24 @@ export const jobApplicationController = {
         }
       }
 
-      // Khi chuyển sang Đã thanh toán (15): tạo/cập nhật payment_request với số tiền nhập vào
-      if (statusNum === STATUS_PAID && jobApplication.collaboratorId) {
+      // Khi chuyển sang Đã thanh toán (15): bắt buộc có CTV để tạo đơn thanh toán, rồi tạo/cập nhật payment_request
+      if (statusNum === STATUS_PAID) {
+        if (!jobApplication.collaboratorId) {
+          return res.status(400).json({
+            success: false,
+            message: 'Không thể tạo đơn thanh toán: đơn ứng tuyển chưa có CTV. Vui lòng gán CTV trước khi chuyển sang trạng thái Đã thanh toán.'
+          });
+        }
         try {
           const amount = parseFloat(paymentAmount);
-          let paymentRequest = await PaymentRequest.findOne({
-            where: { jobApplicationId: jobApplication.id }
-          });
+          if (Number.isNaN(amount) || amount < 0) {
+            return res.status(400).json({
+              success: false,
+              message: 'Vui lòng nhập số tiền thanh toán hợp lệ'
+            });
+          }
+          const paymentWhere = { jobApplicationId: jobApplication.id };
+          let paymentRequest = await PaymentRequest.findOne({ where: paymentWhere });
 
           if (paymentRequest) {
             paymentRequest.amount = amount;
@@ -1158,6 +1413,59 @@ export const jobApplicationController = {
         } catch (messageError) {
           console.error('[Job Application] Error creating status message:', messageError);
           // Không throw error để không ảnh hưởng đến việc update status
+        }
+
+        if (jobApplication.collaboratorId) {
+          try {
+            const fullJobApplication = await JobApplication.findByPk(jobApplication.id, {
+              include: [
+                { model: Job, as: 'job', required: false, attributes: ['id', 'jobCode', 'title'] },
+                { model: CVStorage, as: 'cv', required: false, attributes: ['id', 'name', 'code'] }
+              ]
+            });
+
+            await collaboratorNotificationService.notifyStatusChanged({
+              collaboratorId: jobApplication.collaboratorId,
+              candidateName: fullJobApplication?.cv?.name || null,
+              jobCode: fullJobApplication?.job?.jobCode || String(jobApplication.id),
+              status: statusNum,
+              nyushaDate: jobApplication.nyushaDate || null,
+              jobId: jobApplication.jobId || null,
+              jobApplicationId: jobApplication.id
+            });
+          } catch (notificationError) {
+            console.error('[Job Application] Error creating status notification:', notificationError);
+          }
+
+          try {
+            await sendInterviewEmailIfNeeded(jobApplication.id, statusNum);
+          } catch (emailError) {
+            console.error('[Job Application] Error sending interview scheduled email:', emailError);
+          }
+          try {
+            await sendFailedEmailIfNeeded(
+              jobApplication.id,
+              statusNum,
+              rejectNote !== undefined && rejectNote !== null ? String(rejectNote).trim() || null : null
+            );
+          } catch (emailError) {
+            console.error('[Job Application] Error sending failed nomination email:', emailError);
+          }
+          try {
+            await sendJobOfferEmailIfNeeded(jobApplication.id, statusNum);
+          } catch (emailError) {
+            console.error('[Job Application] Error sending job offer email:', emailError);
+          }
+          try {
+            await sendOfferAcceptedEmailIfNeeded(jobApplication.id, statusNum);
+          } catch (emailError) {
+            console.error('[Job Application] Error sending offer accepted email:', emailError);
+          }
+          try {
+            await sendJoinedCompanyEmailIfNeeded(jobApplication.id, statusNum);
+          } catch (emailError) {
+            console.error('[Job Application] Error sending joined company email:', emailError);
+          }
         }
       }
 
